@@ -9,7 +9,7 @@ npm install
 
 ### Validator Docker setup
 
-The validator worker is listenign for relaying requests via Waku. To run a validator worker it is possible to use the provided docker file. 
+The validator worker is listening for relaying requests via Waku. To run a validator worker, you can use the provided Dockerfile.
 
 1. Setup env file
 ```sh
