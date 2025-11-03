@@ -50,7 +50,10 @@ describe("checkedAddressSchema", () => {
 
 		expect(result.success).toBe(false);
 		if (!result.success) {
-			expect(result.error.issues[0].message).toContain(
+			expect(result.error.issues).toHaveLength(1);
+			const issue = result.error.issues[0];
+			expect(issue.code).toBe("invalid_type");
+			expect(issue.message).toBe(
 				"Invalid input: expected string, received number",
 			);
 		}
@@ -127,6 +130,8 @@ describe("validatorConfigSchema", () => {
 			const error = result.error.issues.find(
 				(issue) => issue.path[0] === "RPC_URL",
 			);
+			expect(error).toBeDefined();
+			expect(error?.code).toBe("invalid_type");
 			expect(error?.message).toBe(
 				"Invalid input: expected string, received undefined",
 			);
@@ -145,6 +150,8 @@ describe("validatorConfigSchema", () => {
 			const error = result.error.issues.find(
 				(issue) => issue.path[0] === "CONSENSUS_CORE_ADDRESS",
 			);
+			expect(error).toBeDefined();
+			expect(error?.code).toBe("invalid_type");
 			expect(error?.message).toBe(
 				"Invalid input: expected string, received undefined",
 			);
