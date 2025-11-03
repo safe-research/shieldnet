@@ -2,9 +2,6 @@ name: validator
 
 on:
   pull_request:
-    paths:
-      - "validator/**"
-      - ".github/workflows/**"
   push:
     branches:
       - main
