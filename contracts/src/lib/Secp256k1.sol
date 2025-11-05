@@ -20,13 +20,15 @@ library Secp256k1 {
     function add(Point memory p, Point memory q) internal view returns (Point memory r) {
         // See <https://www.hyperelliptic.org/EFD/g1p/auto-shortw.html>
         //
-        // Since we are doing a single addition; we just implement the affine
-        // formulas instead of the more efficient projective formulas, the
-        // additional gas cost of storing the projective `Z` coordinate in
-        // storage is higher than the additional cost of arithmetic. Note
-        // that we optimize the computation to do as few `_divmod`s as
-        // possible (one per operation), as that is by far the most expensive
-        // computation (~200 gas for the `modexp` precompile call).
+        // Since we are doing a single addition per transaction; we just
+        // implement the affine formulas instead of the projective formulas
+        // (which are typically considered more efficient when doing multiple
+        // point additions at a time). The additional gas cost of storing the
+        // projective `Z` coordinate in storage is higher than the additional
+        // cost of the extra arithmetic from using affine coordinates. Note that
+        // we optimize the computation to do as few `_divmod`s as possible (one
+        // per operation), as that is by far the most expensive computation
+        // (~200 gas for the `modexp` precompile call).
 
         (uint256 px, uint256 py) = _unpack(p);
         (uint256 qx, uint256 qy) = _unpack(q);
