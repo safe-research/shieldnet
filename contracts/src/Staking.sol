@@ -17,33 +17,24 @@ contract Staking is Ownable {
      */
     struct WithdrawalNode {
         uint256 amount;
-        uint256 claimableAt;
-        uint256 next; // ID of next withdrawal, 0 if last
+        uint128 claimableAt;
+        uint128 next; // ID of next withdrawal, 0 if last
     }
 
     /*
      * @notice Tracks the withdrawal queue for a staker-validator pair
      */
     struct WithdrawalQueue {
-        uint256 head; // ID of first withdrawal in queue, 0 if empty
-        uint256 tail; // ID of last withdrawal in queue, 0 if empty
+        uint128 head; // ID of first withdrawal in queue, 0 if empty
+        uint128 tail; // ID of last withdrawal in queue, 0 if empty
     }
 
     /*
      * @notice Represents a pending configuration change proposal
      */
     struct ConfigProposal {
-        uint256 value;
-        uint256 executableAt; // 0 if no proposal exists
-    }
-
-    /*
-     * @notice Represents a pending validator changes proposal
-     */
-    struct ValidatorProposal {
-        address[] validators;
-        bool[] isRegistration;
-        uint256 executableAt; // 0 if no proposal exists
+        uint128 value;
+        uint128 executableAt; // 0 if no proposal exists
     }
 
     /*
@@ -69,16 +60,6 @@ contract Staking is Ownable {
     uint256 public immutable configTimeDelay;
 
     /*
-     * @notice Fixed stake amount required for 1 vote
-     */
-    uint256 public fixedStakeAmount;
-
-    /*
-     * @notice Withdraw time delay before tokens can be claimed
-     */
-    uint256 public withdrawDelay;
-
-    /*
      * @notice Global counter for total staked tokens
      */
     uint256 public totalStakedAmount;
@@ -89,9 +70,14 @@ contract Staking is Ownable {
     uint256 public totalPendingWithdrawals;
 
     /*
+     * @notice Withdraw time delay before tokens can be claimed
+     */
+    uint128 public withdrawDelay;
+
+    /*
      * @notice Counter for generating unique withdrawal IDs
      */
-    uint256 public nextWithdrawalId;
+    uint128 public nextWithdrawalId;
 
     // ============================================================
     // MAPPINGS
@@ -120,12 +106,7 @@ contract Staking is Ownable {
     /*
      * @notice Stores all withdrawal nodes by ID
      */
-    mapping(uint256 withdrawalId => WithdrawalNode node) public withdrawalNodes;
-
-    /*
-     * @notice Pending proposal for fixed stake amount change
-     */
-    ConfigProposal public pendingFixedStakeAmountChange;
+    mapping(uint128 withdrawalId => WithdrawalNode node) public withdrawalNodes;
 
     /*
      * @notice Pending proposal for withdraw delay change
@@ -135,7 +116,7 @@ contract Staking is Ownable {
     /*
      * @notice Pending proposal for validator changes
      */
-    ValidatorProposal public pendingValidatorChanges;
+    bytes32 public pendingValidatorChangeHash;
 
     // ============================================================
     // EVENTS
@@ -147,12 +128,12 @@ contract Staking is Ownable {
     event WithdrawalClaimed(address indexed staker, address indexed validator, uint256 amount);
 
     // Validator Management
-    event ValidatorProposed(address indexed validator, bool isRegistration, uint256 executableAt);
+    event ValidatorsProposed(
+        bytes32 indexed validatorsHash, address[] indexed validator, bool[] isRegistration, uint256 executableAt
+    );
     event ValidatorUpdated(address indexed validator, bool isRegistered);
 
     // Configuration Changes
-    event FixedStakeAmountProposed(uint256 currentAmount, uint256 proposedAmount, uint256 executableAt);
-    event FixedStakeAmountChanged(uint256 oldAmount, uint256 newAmount);
     event WithdrawDelayProposed(uint256 currentDelay, uint256 proposedDelay, uint256 executableAt);
     event WithdrawDelayChanged(uint256 oldDelay, uint256 newDelay);
 
@@ -182,6 +163,16 @@ contract Staking is Ownable {
      * @notice Thrown when trying to withdraw more than the current stake
      */
     error InsufficientStake();
+
+    /*
+     * @notice Thrown when trying to execute a proposal that hasn't been set
+     */
+    error ProposalNotSet();
+
+    /*
+     * @notice Thrown when trying to execute a proposal with an invalid hash
+     */
+    error InvalidProposalHash();
 
     /*
      * @notice Thrown when trying to execute a proposal before the timelock expires
@@ -222,21 +213,15 @@ contract Staking is Ownable {
     // CONSTRUCTOR
     // ============================================================
 
-    constructor(
-        address initialOwner,
-        address _safeToken,
-        uint256 initialFixedStakeAmount,
-        uint256 initialWithdrawDelay,
-        uint256 _configTimeDelay
-    ) Ownable(initialOwner) {
+    constructor(address initialOwner, address _safeToken, uint128 initialWithdrawDelay, uint256 _configTimeDelay)
+        Ownable(initialOwner)
+    {
         if (_safeToken == address(0)) revert InvalidAddress();
-        if (initialFixedStakeAmount == 0) revert InvalidAmount();
         if (initialWithdrawDelay == 0) revert InvalidParameter();
         if (_configTimeDelay == 0) revert InvalidParameter();
 
         safeToken = IERC20(_safeToken);
         configTimeDelay = _configTimeDelay;
-        fixedStakeAmount = initialFixedStakeAmount;
         withdrawDelay = initialWithdrawDelay;
         nextWithdrawalId = 1;
     }
@@ -278,13 +263,10 @@ contract Staking is Ownable {
         totalPendingWithdrawals += amount;
 
         // Calculate claimable timestamp
-        // If the validator has been removed, we allow immediate withdrawal.
-        // This design ensures users are not penalized by withdrawal delays for validators that are no longer active,
-        // and can reclaim their funds without waiting once a validator is removed.
-        uint256 claimableAt = isValidator[validator] ? block.timestamp + withdrawDelay : block.timestamp;
+        uint128 claimableAt = uint128(block.timestamp + withdrawDelay);
 
         // Generate new withdrawal ID and create node
-        uint256 withdrawalId = nextWithdrawalId++;
+        uint128 withdrawalId = nextWithdrawalId++;
         withdrawalNodes[withdrawalId] = WithdrawalNode({amount: amount, claimableAt: claimableAt, next: 0});
 
         // Add to queue
@@ -334,25 +316,13 @@ contract Staking is Ownable {
     // ============================================================
 
     /*
-     * @notice Propose a new fixed stake amount
-     * @param newAmount The proposed fixed stake amount
-     */
-    function proposeFixedStakeAmount(uint256 newAmount) external onlyOwner {
-        if (newAmount == 0) revert InvalidAmount();
-
-        uint256 executableAt = block.timestamp + configTimeDelay;
-        pendingFixedStakeAmountChange = ConfigProposal({value: newAmount, executableAt: executableAt});
-        emit FixedStakeAmountProposed(fixedStakeAmount, newAmount, executableAt);
-    }
-
-    /*
      * @notice Propose a new withdraw delay
      * @param newDelay The proposed withdraw delay in seconds
      */
-    function proposeWithdrawDelay(uint256 newDelay) external onlyOwner {
+    function proposeWithdrawDelay(uint128 newDelay) external onlyOwner {
         if (newDelay == 0 || newDelay > configTimeDelay) revert InvalidParameter();
 
-        uint256 executableAt = block.timestamp + configTimeDelay;
+        uint128 executableAt = uint128(block.timestamp + configTimeDelay);
         pendingWithdrawDelayChange = ConfigProposal({value: newDelay, executableAt: executableAt});
         emit WithdrawDelayProposed(withdrawDelay, newDelay, executableAt);
     }
@@ -368,32 +338,19 @@ contract Staking is Ownable {
         if (validators.length != isRegistration.length) revert ArrayLengthMismatch();
 
         uint256 executableAt = block.timestamp + configTimeDelay;
+        bytes32 validatorsHash = keccak256(abi.encode(validators, isRegistration, executableAt));
         for (uint256 i = 0; i < validators.length; i++) {
             if (validators[i] == address(0)) revert InvalidAddress();
-            emit ValidatorProposed(validators[i], isRegistration[i], executableAt);
         }
 
-        pendingValidatorChanges =
-            ValidatorProposal({validators: validators, isRegistration: isRegistration, executableAt: executableAt});
+        pendingValidatorChangeHash = validatorsHash;
+
+        emit ValidatorsProposed(validatorsHash, validators, isRegistration, executableAt);
     }
 
     // ============================================================
     // EXTERNAL FUNCTIONS - CONFIGURATION EXECUTION (PUBLIC)
     // ============================================================
-
-    /*
-     * @notice Execute a pending fixed stake amount change
-     */
-    function executeFixedStakeAmountChange() external {
-        ConfigProposal memory proposal = pendingFixedStakeAmountChange;
-        if (proposal.executableAt == 0) revert NoProposalExists();
-        if (block.timestamp < proposal.executableAt) revert ProposalNotExecutable();
-
-        uint256 oldAmount = fixedStakeAmount;
-        fixedStakeAmount = proposal.value;
-        delete pendingFixedStakeAmountChange;
-        emit FixedStakeAmountChanged(oldAmount, proposal.value);
-    }
 
     /*
      * @notice Execute a pending withdraw delay change
@@ -404,7 +361,7 @@ contract Staking is Ownable {
         if (block.timestamp < proposal.executableAt) revert ProposalNotExecutable();
 
         uint256 oldDelay = withdrawDelay;
-        withdrawDelay = proposal.value;
+        withdrawDelay = uint128(proposal.value);
         delete pendingWithdrawDelayChange;
         emit WithdrawDelayChanged(oldDelay, proposal.value);
     }
@@ -412,17 +369,25 @@ contract Staking is Ownable {
     /*
      * @notice Execute pending validator changes
      */
-    function executeValidatorChanges() external {
-        ValidatorProposal memory proposal = pendingValidatorChanges;
-        if (proposal.executableAt == 0) revert NoProposalExists();
-        if (block.timestamp < proposal.executableAt) revert ProposalNotExecutable();
+    function executeValidatorChanges(
+        address[] calldata validators,
+        bool[] calldata isRegistration,
+        uint256 executableAt
+    ) external {
+        bytes32 proposalHash = pendingValidatorChangeHash;
+        if (proposalHash == bytes32(0)) revert NoProposalExists();
 
-        for (uint256 i = 0; i < proposal.validators.length; i++) {
-            isValidator[proposal.validators[i]] = proposal.isRegistration[i];
-            emit ValidatorUpdated(proposal.validators[i], proposal.isRegistration[i]);
+        bytes32 validatorsHash = keccak256(abi.encode(validators, isRegistration, executableAt));
+        if (proposalHash != validatorsHash) revert InvalidProposalHash();
+        if (executableAt == 0) revert ProposalNotSet();
+        if (block.timestamp < executableAt) revert ProposalNotExecutable();
+
+        for (uint256 i = 0; i < validators.length; i++) {
+            isValidator[validators[i]] = isRegistration[i];
+            emit ValidatorUpdated(validators[i], isRegistration[i]);
         }
 
-        delete pendingValidatorChanges;
+        pendingValidatorChangeHash = bytes32(0);
     }
 
     // ============================================================
@@ -453,30 +418,6 @@ contract Staking is Ownable {
     }
 
     // ============================================================
-    // VIEW FUNCTIONS - STAKING QUERIES
-    // ============================================================
-
-    /*
-     * @notice Get the voting power of a validator
-     * @param validator The validator address
-     * @return The number of votes
-     */
-    function getVotingPower(address validator) external view returns (uint256) {
-        if (!isValidator[validator]) return 0;
-        return totalStakes[validator] / fixedStakeAmount;
-    }
-
-    /*
-     * @notice Get the unused stake amount for a validator
-     * @param validator The validator address
-     * @return The unused stake amount
-     */
-    function getUnusedStake(address validator) external view returns (uint256) {
-        if (!isValidator[validator]) return 0;
-        return totalStakes[validator] % fixedStakeAmount;
-    }
-
-    // ============================================================
     // VIEW FUNCTIONS - WITHDRAWAL QUERIES
     // ============================================================
 
@@ -494,7 +435,7 @@ contract Staking is Ownable {
 
         // Count withdrawals
         uint256 count = 0;
-        uint256 currentId = queue.head;
+        uint128 currentId = queue.head;
         while (currentId != 0) {
             count++;
             currentId = withdrawalNodes[currentId].next;
