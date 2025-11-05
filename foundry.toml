@@ -9,6 +9,7 @@ broadcast = "target/contracts/broadcast"
 
 remappings = [
   "@/=contracts/src/",
+  "@test/=contracts/test/",
   "@forge-std/=contracts/lib/forge-std/src/",
   "@oz/=contracts/lib/openzeppelin-contracts/contracts/",
 ]
