@@ -4,7 +4,7 @@ pragma solidity ^0.8.30;
 import {Test, Vm} from "@forge-std/Test.sol";
 import {ForgeSecp256k1} from "@test/util/ForgeSecp256k1.sol";
 import {ParticipantMerkleTree} from "@test/util/ParticipantMerkleTree.sol";
-import {FROSTCoordinator} from "@/base/FROSTCoordinator.sol";
+import {FROSTCoordinator} from "@/FROSTCoordinator.sol";
 import {Secp256k1} from "@/lib/Secp256k1.sol";
 
 contract FROSTCoordinatorTest is Test {
@@ -17,8 +17,13 @@ contract FROSTCoordinatorTest is Test {
     ParticipantMerkleTree public participants;
 
     function setUp() public {
+        // When debegging, it may be useful to use deterministic values to check
+        // intermediate steps. Uncomment the following line in order to set a
+        // deterministic seed and ensure that all random values are predictable.
+        //vm.setSeed(0x5afe);
+
         coordinator = new FROSTCoordinator();
-        participants = new ParticipantMerkleTree(_randomSortedAddresses(uint256(COUNT)));
+        participants = new ParticipantMerkleTree(_randomSortedAddresses(COUNT));
     }
 
     function test_KeyGen() public {
@@ -77,11 +82,17 @@ contract FROSTCoordinatorTest is Test {
         // Round 1.4
         for (uint256 index = 1; index <= COUNT; index++) {
             (address participant, bytes32[] memory poap) = participants.proof(index);
+            FROSTCoordinator.KeyGenCommitment memory commitment = commitments[index];
+
+            vm.expectEmit();
+            emit FROSTCoordinator.KeyGenCommitted(id, index, commitment);
             vm.prank(participant);
-            coordinator.keygenCommit(id, index, poap, commitments[index]);
+            coordinator.keygenCommit(id, index, poap, commitment);
         }
 
         // Round 1.5
+        // Note that at this point `commitments` is public information that was
+        // included in events emitted during the `KeyGen` process.
         for (uint256 index = 1; index <= COUNT; index++) {
             FROSTCoordinator.KeyGenCommitment memory commitment = commitments[index];
             bytes32 c = _h(index, commitment.c[0], commitment.r);
@@ -134,11 +145,15 @@ contract FROSTCoordinatorTest is Test {
                 share.f[i++] = fi;
             }
 
+            vm.expectEmit();
+            emit FROSTCoordinator.KeyGenSecretShared(id, index, share);
             vm.prank(participants.addr(index));
             coordinator.keygenSecretShare(id, index, share);
         }
 
         // Round 2.2*
+        // Note that at this point `shares` is public information that was
+        // included in events emitted during the `KeyGen` process.
         uint256[][] memory f = new uint256[][](COUNT + 1);
         for (uint256 index = 1; index <= COUNT; index++) {
             f[index] = new uint256[](COUNT + 1);
@@ -147,6 +162,12 @@ contract FROSTCoordinatorTest is Test {
                     continue;
                 }
 
+                // The secret shares, as per the KeyGen algorthim, are only
+                // broadcast for every _other_ participant (meaning there are
+                // `COUNT - 1` of them). Compute the index in the `f` array
+                // for a given participant given that the array starts at
+                // index `0` (unlike participant indexes), and that the share
+                // for `l` is skipped.
                 f[index][l] = shares[l].f[index < l ? index - 1 : index - 2];
 
                 // EXTENSION: We need to reverse the ECDH we applied in the
@@ -180,19 +201,19 @@ contract FROSTCoordinatorTest is Test {
         }
     }
 
-    function _randomSortedAddresses(uint256 length) private view returns (address[] memory result) {
-        result = new address[](length);
-        for (uint256 i = 0; i < length; i++) {
-            result[i] = vm.randomAddress();
+    function _randomSortedAddresses(uint128 length) private returns (address[] memory result) {
+        // Forge standard library only supports sorting arrays of integers, so
+        // use type coersion to sort random addresses (noting that arrays of
+        // integers and arrays of addresses have the same layout in memory).
+
+        uint256[] memory unsorted = new uint256[](uint256(length));
+        for (uint256 i = 0; i < unsorted.length; i++) {
+            unsorted[i] = uint256(uint160(vm.randomAddress()));
         }
-        for (uint256 i = 0; i < length; i++) {
-            for (uint256 j = i + 1; j < length; j++) {
-                if (result[i] > result[j]) {
-                    address temp = result[i];
-                    result[i] = result[j];
-                    result[j] = temp;
-                }
-            }
+
+        uint256[] memory sorted = vm.sort(unsorted);
+        assembly ("memory-safe") {
+            result := sorted
         }
     }
 

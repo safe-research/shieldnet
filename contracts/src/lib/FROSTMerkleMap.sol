@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.30;
 
-import {Hash} from "@/lib/Hash.sol";
+import {Hashes} from "@oz/utils/cryptography/Hashes.sol";
+import {MerkleProof} from "@oz/utils/cryptography/MerkleProof.sol";
 import {Secp256k1} from "@/lib/Secp256k1.sol";
 
 /// @title FROST Merkle Map
@@ -40,13 +41,8 @@ library FROSTMerkleMap {
     /// @notice Registers a particpant to the merkle tree for the specified index.
     function register(T storage self, uint256 index, address participant, bytes32[] memory poap) internal {
         require(self.entries[index].participant == address(0), AlreadyRegistered());
-        bytes32 digest = Hash.pair(bytes32(index), bytes32(uint256(uint160(participant))));
-        for (uint256 i = 0; i < poap.length; i++) {
-            bytes32 p = poap[i];
-            (bytes32 a, bytes32 b) = digest < p ? (digest, p) : (p, digest);
-            digest = Hash.pair(a, b);
-        }
-        require(self.root == digest, NotParticipating());
+        bytes32 leaf = Hashes.efficientKeccak256(bytes32(index), bytes32(uint256(uint160(participant))));
+        require(MerkleProof.verify(poap, self.root, leaf), NotParticipating());
         self.entries[index].participant = participant;
     }
 
