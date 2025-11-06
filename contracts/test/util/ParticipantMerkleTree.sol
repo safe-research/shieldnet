@@ -76,7 +76,7 @@ contract ParticipantMerkleTree {
 
     function _nextPowerOfTwo(uint256 l) private pure returns (uint256 result) {
         // See <https://stackoverflow.com/questions/466204/rounding-up-to-next-power-of-2>
-        assert(l < 0x100000000);
+        assert(l < 0x80000000);
         l--;
         l |= l >> 1;
         l |= l >> 2;
