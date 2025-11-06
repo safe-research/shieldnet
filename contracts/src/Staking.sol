@@ -327,9 +327,7 @@ contract Staking is Ownable {
      *      The caller must ensure that the specified position is of it's own linked list, else this
      *      might get added to the wrong user's queue.
      */
-    function initiateWithdrawalAtPosition(address validator, uint256 amount, uint64 previousId)
-        external
-    {
+    function initiateWithdrawalAtPosition(address validator, uint256 amount, uint64 previousId) external {
         require(amount != 0, InvalidAmount());
         require(stakes[msg.sender][validator] >= amount, InsufficientStake());
 
@@ -340,7 +338,7 @@ contract Staking is Ownable {
         // Check if the Id's are correct and claimableAt ordering is correct
         if (previousId == 0) {
             // Inserting at head - get the current head as nextId
-            nextId = withdrawalQueues[msg.sender][validator].head;            
+            nextId = withdrawalQueues[msg.sender][validator].head;
         } else {
             require(withdrawalNodes[previousId].claimableAt <= claimableAt, InvalidOrdering());
 
