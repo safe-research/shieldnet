@@ -439,7 +439,7 @@ contract Staking is Ownable {
         require(validators.length == isRegistration.length, ArrayLengthMismatch());
 
         uint256 executableAt = block.timestamp + CONFIG_TIME_DELAY;
-        bytes32 validatorsHash = keccak256(abi.encode(validators, isRegistration, executableAt));
+        bytes32 validatorsHash = _getValidatorsHash(validators, isRegistration, executableAt);
         for (uint256 i = 0; i < validators.length; i++) {
             require(validators[i] != address(0), InvalidAddress());
         }
@@ -478,7 +478,7 @@ contract Staking is Ownable {
         bytes32 proposalHash = pendingValidatorChangeHash;
         require(proposalHash != bytes32(0), NoProposalExists());
 
-        bytes32 validatorsHash = keccak256(abi.encode(validators, isRegistration, executableAt));
+        bytes32 validatorsHash = _getValidatorsHash(validators, isRegistration, executableAt);
         require(proposalHash == validatorsHash, InvalidProposalHash());
         require(executableAt != 0, ProposalNotSet());
         require(block.timestamp >= executableAt, ProposalNotExecutable());
@@ -573,5 +573,25 @@ contract Staking is Ownable {
 
         WithdrawalNode memory node = withdrawalNodes[queue.head];
         return (node.amount, node.claimableAt);
+    }
+
+    // ============================================================
+    // INTERNAL HELPER FUNCTIONS
+    // ============================================================
+
+    /*
+     * @notice Compute the hash of the validators for a configuration change.
+     * @param validators The validators affected by the configuration change.
+     * @param isRegistration Whether or not the validator should be registered or unregistered.
+     * @param executableAt The timestamp once the validator change can be executed.
+     * @return validatorsHash The digest for the validators configuration change.
+     */
+    function _getValidatorsHash(address[] calldata validators, bool[] calldata isRegistration, uint256 executableAt)
+        internal
+        pure
+        returns (bytes32 validatorsHash)
+    {
+        // forge-lint: disable-next-line(asm-keccak256)
+        return keccak256(abi.encode(validators, isRegistration, executableAt));
     }
 }
