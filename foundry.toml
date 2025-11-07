@@ -2,10 +2,10 @@
 src = "contracts/src"
 test = "contracts/test"
 script = "contracts/script"
-out = "target/contracts/out"
+out = "contracts/build/out"
 libs = ["contracts/lib"]
-cache_path = "target/contracts/cache"
-broadcast = "target/contracts/broadcast"
+cache_path = "contracts/build/cache"
+broadcast = "contracts/build/broadcast"
 
 remappings = [
   "@/=contracts/src/",

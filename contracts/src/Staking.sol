@@ -4,8 +4,10 @@ pragma solidity ^0.8.30;
 import {Ownable} from "@oz/access/Ownable.sol";
 import {IERC20} from "@oz/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@oz/token/ERC20/utils/SafeERC20.sol";
+import {SafeCast} from "@oz/utils/math/SafeCast.sol";
 
 contract Staking is Ownable {
+    using SafeCast for uint256;
     using SafeERC20 for IERC20;
 
     // ============================================================
@@ -423,7 +425,7 @@ contract Staking is Ownable {
     function proposeWithdrawDelay(uint128 newDelay) external onlyOwner {
         require(newDelay != 0 && newDelay <= CONFIG_TIME_DELAY, InvalidParameter());
 
-        uint128 executableAt = uint128(block.timestamp + CONFIG_TIME_DELAY);
+        uint128 executableAt = (block.timestamp + CONFIG_TIME_DELAY).toUint128();
         pendingWithdrawDelayChange = ConfigProposal({value: newDelay, executableAt: executableAt});
         emit WithdrawDelayProposed(withdrawDelay, newDelay, executableAt);
     }
@@ -439,7 +441,7 @@ contract Staking is Ownable {
         require(validators.length == isRegistration.length, ArrayLengthMismatch());
 
         uint256 executableAt = block.timestamp + CONFIG_TIME_DELAY;
-        bytes32 validatorsHash = keccak256(abi.encode(validators, isRegistration, executableAt));
+        bytes32 validatorsHash = _getValidatorsHash(validators, isRegistration, executableAt);
         for (uint256 i = 0; i < validators.length; i++) {
             require(validators[i] != address(0), InvalidAddress());
         }
@@ -478,7 +480,7 @@ contract Staking is Ownable {
         bytes32 proposalHash = pendingValidatorChangeHash;
         require(proposalHash != bytes32(0), NoProposalExists());
 
-        bytes32 validatorsHash = keccak256(abi.encode(validators, isRegistration, executableAt));
+        bytes32 validatorsHash = _getValidatorsHash(validators, isRegistration, executableAt);
         require(proposalHash == validatorsHash, InvalidProposalHash());
         require(executableAt != 0, ProposalNotSet());
         require(block.timestamp >= executableAt, ProposalNotExecutable());
@@ -573,5 +575,25 @@ contract Staking is Ownable {
 
         WithdrawalNode memory node = withdrawalNodes[queue.head];
         return (node.amount, node.claimableAt);
+    }
+
+    // ============================================================
+    // INTERNAL HELPER FUNCTIONS
+    // ============================================================
+
+    /*
+     * @notice Compute the hash of the validators for a configuration change.
+     * @param validators The validators affected by the configuration change.
+     * @param isRegistration Whether or not the validator should be registered or unregistered.
+     * @param executableAt The timestamp once the validator change can be executed.
+     * @return validatorsHash The digest for the validators configuration change.
+     */
+    function _getValidatorsHash(address[] calldata validators, bool[] calldata isRegistration, uint256 executableAt)
+        internal
+        pure
+        returns (bytes32 validatorsHash)
+    {
+        // forge-lint: disable-next-line(asm-keccak256)
+        return keccak256(abi.encode(validators, isRegistration, executableAt));
     }
 }

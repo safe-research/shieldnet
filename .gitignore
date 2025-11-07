@@ -1,19 +1,6 @@
-target/
-foundry.lock
-
-node_modules
-.env
-
-# TypeChain files
-/typechain
-/typechain-types
-
-# solidity-coverage files
-/coverage
-/coverage.json
-
-
+dist/
+node_modules/
+build/
 .DS_Store
-dist
-dist-ssr
-*.local
+.env
+foundry.lock
