@@ -1,6 +1,3 @@
-// Assuming your schemas are in a file named './schemas.ts'
-// Make sure to import from your actual file location.
-
 import { describe, expect, it } from "vitest"; // or '@jest/globals'
 import { checkedAddressSchema, validatorConfigSchema } from "./schemas.js";
 
