@@ -33,24 +33,43 @@ contract FROSTCoordinator {
         uint256[] f;
     }
 
+    type SignatureId is bytes32;
+
+    struct Signature {
+        GroupId group;
+        uint256 count;
+        mapping(uint256 index => bytes32 commitment) commitments;
+    }
+
     event KeyGen(GroupId indexed id, bytes32 participants, uint128 count, uint128 threshold);
     event KeyGenAborted(GroupId indexed id);
     event KeyGenCommitted(GroupId indexed id, uint256 index, KeyGenCommitment commitment);
     event KeyGenSecretShared(GroupId indexed id, uint256 index, KeyGenSecretShare share);
+    event Sign(SignatureId indexed id, GroupId group);
 
     error InvalidGroupParameters();
+    error NotGroupInitiator();
     error InvalidKeyGenCommitment();
     error InvalidKeyGenSecretShare();
+    error AkreadySigning();
 
-    // forge-lint: disable-next-line(mixed-case-variable)
+    // forge-lint: disable-start(mixed-case-variable)
     mapping(GroupId => Group) private $groups;
+    mapping(SignatureId => Signature) private $signatures;
+    // forge-lint: disable-end(mixed-case-variable)
+
+    modifier onlyInitiator(GroupId id) {
+        address initiator = address(uint160(uint256(GroupId.unwrap(id))));
+        require(msg.sender == initiator, NotGroupInitiator());
+        _;
+    }
 
     /// @notice Initiate a distributed key generation ceremony.
     function keygen(uint96 nonce, bytes32 participants, uint128 count, uint128 threshold)
         external
         returns (GroupId id)
     {
-        id = _groupId(nonce);
+        id = GroupId.wrap(_id("grp", nonce));
         Group storage group = $groups[id];
         require(count >= threshold && threshold > 1, InvalidGroupParameters());
 
@@ -60,8 +79,7 @@ contract FROSTCoordinator {
     }
 
     /// @notice Abort an key generation ceremony.
-    function keygenAbort(uint96 nonce) external returns (GroupId id) {
-        id = _groupId(nonce);
+    function keygenAbort(GroupId id) external onlyInitiator(id) {
         $groups[id].participants.seal();
         emit KeyGenAborted(id);
     }
@@ -95,6 +113,17 @@ contract FROSTCoordinator {
         emit KeyGenSecretShared(id, index, share);
     }
 
+    /// @notice Initiate a signing ceremony.
+    function sign(GroupId group, uint96 nonce) external onlyInitiator(group) returns (SignatureId id) {
+        id = SignatureId.wrap(_id("sig", nonce));
+        Signature storage sig = $signatures[id];
+        require(sig.group == GroupId.unwrap(0), AlreadySigning());
+        sig.group = group;
+        emit Sign(id, group);
+    }
+
+    /// @notice Commit a nonce
+
     /// @notice Retrieve the group public key. Note that it is undefined
     ///         behaviour to call this before the keygen ceremony is completed.
     function groupKey(GroupId id) external view returns (Secp256k1.Point memory key) {
@@ -106,7 +135,11 @@ contract FROSTCoordinator {
         return $groups[id].participants.get(index);
     }
 
-    function _groupId(uint96 nonce) private view returns (GroupId id) {
-        return GroupId.wrap(bytes32((uint256(nonce) << 160) | uint256(uint160(msg.sender))));
+    function _id(bytes3 domain, uint96 nonce) private view returns (bytes32 id) {
+        return bytes32(uint256(domain)) | (uint256(nonce) << 160) | uint256(uint160(msg.sender));
+    }
+
+    function _initiator(bytes32 id) private pure returns (address initiator) {
+        return address(uint160(uint256(id)));
     }
 }

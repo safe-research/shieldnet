@@ -9,6 +9,8 @@ import {Secp256k1} from "@/lib/Secp256k1.sol";
 /// @notice A mapping of FROST participant indexes to their public address and
 ///         verification share.
 library FROSTMerkleMap {
+    using Secp256k1 for Secp256k1.Point;
+
     struct T {
         bytes32 root;
         mapping(uint256 index => Entry) entries;
@@ -51,6 +53,7 @@ library FROSTMerkleMap {
         Entry storage entry = self.entries[index];
         require(entry.y.x | entry.y.y == 0, AlreadySet());
         require(self.root != _SEALED && entry.participant == participant, NotParticipating());
+        y.requireNonZero();
         entry.y = y;
     }
 
