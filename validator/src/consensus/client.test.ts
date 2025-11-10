@@ -20,11 +20,10 @@ const createRandomAccount = () => privateKeyToAccount(generatePrivateKey());
 // --- Tests ---
 describe("client", () => {
 	it("e2e keygen flow", () => {
-		const validatorAddresses = [
-			createRandomAccount(),
-			createRandomAccount(),
-			createRandomAccount(),
-		];
+		const count = 3n
+		const threshold = count / 2n + 1n
+		const validatorAddresses = Array.from({length: Number(count)}, () => createRandomAccount())
+		console.log(`Run test with ${count} validators and threshold ${threshold}`)
 		const participants: Participant[] = validatorAddresses.map((a, i) => {
 			return { index: BigInt(i + 1), address: a.address };
 		});
@@ -106,7 +105,7 @@ describe("client", () => {
 		);
 		clients.forEach((c) => {
 			console.log(`>>>> Keygen init to ${c.validator()} >>>>`);
-			c.handleKeygenInit(groupId, participantsRoot, 3n, 2n);
+			c.handleKeygenInit(groupId, participantsRoot, count, threshold);
 		});
 		console.log(
 			"------------------------ Publish Commitments ------------------------",
