@@ -155,7 +155,7 @@ describe("client", () => {
 
 	it.skip("integration keygen flow", { timeout: 30000 }, async () => {
 		// Make sure to first start the Anvil testnode (run `anvil` in the root)
-		// and run the deployment script: forge script contracts/script/Deploy.s.sol:DeployScript --rpc-url http://127.0.0.1:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast
+		// and run the deployment script: forge script DeployScript --rpc-url http://127.0.0.1:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast
 		// Private key from Anvil testnet
 		const accounts = [
 			privateKeyToAccount(

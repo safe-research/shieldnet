@@ -24,19 +24,19 @@ export const validatorConfigSchema = z.object({
 });
 
 export const frostPointSchema = z.object({
-	x: z.bigint().positive(),
-	y: z.bigint().positive(),
+	x: z.bigint().nonnegative(),
+	y: z.bigint().nonnegative(),
 });
 
 export const frostCommitmentSchema = z.object({
 	c: z.array(frostPointSchema),
 	r: frostPointSchema,
-	mu: z.bigint().positive(),
+	mu: z.bigint().nonnegative(),
 });
 
 export const frostShareSchema = z.object({
 	y: frostPointSchema,
-	f: z.array(z.bigint().positive()),
+	f: z.array(z.bigint().nonnegative()),
 });
 
 export const keyGenEventSchema = z.object({
