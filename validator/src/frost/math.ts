@@ -21,9 +21,15 @@ export const g = (scalar: bigint): FrostPoint => {
 	return point;
 };
 
-export function mod_n(x: bigint) {
+export const mod_n = (x: bigint) => {
 	return mod(x, N);
-}
+};
+
+export const toPoint = (coordinates: { x: bigint; y: bigint }): FrostPoint => {
+	const point = secp256k1.Point.fromAffine(coordinates);
+	point.assertValidity();
+	return point;
+};
 
 // TODO: replace by proper hashing function
 export const hashToBigInt = (
@@ -58,7 +64,7 @@ export const hashToBigInt = (
 };
 
 export const createVerificationShare = (
-	allCommitments: Map<bigint, FrostPoint[]>,
+	allCommitments: Map<bigint, readonly FrostPoint[]>,
 	senderIndex: bigint,
 ): FrostPoint => {
 	let verificationShare = null;
@@ -115,7 +121,7 @@ export const evalPoly = (coefficient: bigint[], x: bigint): bigint => {
 };
 
 export const evalCommitment = (
-	commitments: FrostPoint[],
+	commitments: readonly FrostPoint[],
 	x: bigint,
 ): FrostPoint => {
 	if (x === 0n) {

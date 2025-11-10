@@ -30,9 +30,10 @@ export const calculateMerkleRoot = (leaves: Hex[]): Hex => {
 };
 
 export const hashParticipant = (p: Participant): Hex =>
-	keccak256(encodePacked(["uint256", "address"], [p.index, p.address]));
+	keccak256(encodePacked(["uint256", "uint256"], [p.index, BigInt(p.address)]));
 
 export const calculateParticipantsRoot = (participants: Participant[]): Hex => {
+	// TODO: sort participants
 	return calculateMerkleRoot(participants.map(hashParticipant));
 };
 
@@ -49,11 +50,8 @@ export const verifyMerkleProof = (
 	return root === node;
 };
 
-export const generateMerkleProof = (
-	participants: Hex[],
-	index: number,
-): Hex[] => {
-	const tree = buildMerkleTree(participants);
+export const generateMerkleProof = (leaves: Hex[], index: number): Hex[] => {
+	const tree = buildMerkleTree(leaves);
 	const proof: Hex[] = [];
 	const height = tree.length;
 	for (let i = 0; i < height - 1; i++) {
@@ -69,5 +67,6 @@ export const generateParticipantProof = (
 	participants: Participant[],
 	index: number,
 ): Hex[] => {
+	// TODO: sort participants
 	return generateMerkleProof(participants.map(hashParticipant), index);
 };

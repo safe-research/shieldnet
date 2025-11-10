@@ -1,4 +1,4 @@
-import type { Address } from "viem";
+import type { Address, Hex } from "viem";
 import type {
 	FrostPoint,
 	GroupId,
@@ -18,12 +18,12 @@ export type FrostCoordinator = {
 		commits: FrostPoint[],
 		pok: ProofOfKnowledge,
 		poap: ProofOfAttestationParticipation,
-	): void;
+	): Promise<Hex>;
 
 	publishKeygenSecretShares(
 		groupId: GroupId,
 		index: bigint,
 		verificationShare: FrostPoint,
 		peerShares: bigint[],
-	): void;
+	): Promise<Hex>;
 };

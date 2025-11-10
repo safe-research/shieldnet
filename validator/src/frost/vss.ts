@@ -38,7 +38,7 @@ export const createCommitments = (coefficients: bigint[]): FrostPoint[] => {
 export const verifyCommitments = (
 	groupId: GroupId,
 	index: bigint,
-	commitments: FrostPoint[],
+	commitments: readonly FrostPoint[],
 	proof: ProofOfKnowledge,
 ) => {
 	const ga0 = commitments[0];

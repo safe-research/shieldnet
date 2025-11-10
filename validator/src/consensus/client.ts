@@ -25,7 +25,7 @@ type KeygenInfo = {
 	participants: Participant[];
 	coefficients: bigint[];
 	participantIndex: bigint;
-	commitments: Map<bigint, FrostPoint[]>;
+	commitments: Map<bigint, readonly FrostPoint[]>;
 	secretShares: Map<bigint, bigint>;
 	verificationShare?: FrostPoint;
 	signingShare?: bigint;
@@ -70,6 +70,7 @@ const checkInformationComplete = (
 export class FrostClient {
 	#coordinator: FrostCoordinator;
 	#validatorAddress: Address;
+	// TODO: extract into storage object to iterate on secure storage
 	#participantsInfo = new Map<Hex, Participant[]>();
 	#keyGenInfo = new Map<GroupId, KeygenInfo>();
 
@@ -96,7 +97,7 @@ export class FrostClient {
 		this.#keyGenInfo.delete(groupId);
 	}
 
-	handleKeygenInit(
+	async handleKeygenInit(
 		groupId: GroupId,
 		participantsRoot: Hex,
 		count: bigint,
@@ -134,7 +135,7 @@ export class FrostClient {
 			commitments,
 			secretShares,
 		});
-		this.#coordinator.publishKeygenCommitments(
+		await this.#coordinator.publishKeygenCommitments(
 			groupId,
 			participantIndex,
 			localCommitments,
@@ -143,10 +144,10 @@ export class FrostClient {
 		);
 	}
 
-	handleKeygenCommitment(
+	async handleKeygenCommitment(
 		groupId: GroupId,
 		senderIndex: bigint,
-		peerCommitments: FrostPoint[],
+		peerCommitments: readonly FrostPoint[],
 		pok: ProofOfKnowledge,
 	) {
 		const info = this.#keyGenInfo.get(groupId);
@@ -161,12 +162,12 @@ export class FrostClient {
 		verifyCommitments(groupId, senderIndex, peerCommitments, pok);
 		info.commitments.set(senderIndex, peerCommitments);
 		if (checkInformationComplete(info.participants, info.commitments)) {
-			this.prepareAndPublishKeygenSecretShares(info);
+			await this.prepareAndPublishKeygenSecretShares(info);
 		}
 	}
 
 	// Round 2.1
-	private prepareAndPublishKeygenSecretShares(info: KeygenInfo) {
+	private async prepareAndPublishKeygenSecretShares(info: KeygenInfo) {
 		// Will be published as y
 		const verificationShare = createVerificationShare(
 			info.commitments,
@@ -193,7 +194,7 @@ export class FrostClient {
 		if (shares.length !== info.participants.length - 1) {
 			throw Error("Unexpect f length");
 		}
-		this.#coordinator.publishKeygenSecretShares(
+		await this.#coordinator.publishKeygenSecretShares(
 			info.groupId,
 			info.participantIndex,
 			verificationShare,
@@ -203,10 +204,10 @@ export class FrostClient {
 
 	// `senderIndex` is the index of sending local participant in the participants set
 	// `peerShares` are the calculated and encrypted shares (also defined as `f`)
-	handleKeygenSecrets(
+	async handleKeygenSecrets(
 		groupId: GroupId,
 		senderIndex: bigint,
-		peerShares: bigint[],
+		peerShares: readonly bigint[],
 	) {
 		const info = this.#keyGenInfo.get(groupId);
 		if (info === undefined) return;
@@ -249,6 +250,7 @@ export class FrostClient {
 			const signingShare = createSigningShare(info.secretShares);
 			verifyKey(verificationShare, signingShare);
 			info.signingShare = signingShare;
+			// TODO: cleanup stored information
 			console.info(`Final signing key for ${info.participantIndex} calculated`);
 		}
 	}
