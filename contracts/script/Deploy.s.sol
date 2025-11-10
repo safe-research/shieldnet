@@ -9,7 +9,7 @@ contract DeployScript is Script {
         vm.startBroadcast();
 
         // Deploy your contract
-        FROSTCoordinator coordinator = new FROSTCoordinator{ salt: bytes32(0) }();
+        FROSTCoordinator coordinator = new FROSTCoordinator{salt: bytes32(0)}();
 
         vm.stopBroadcast();
 
