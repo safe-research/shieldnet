@@ -4,9 +4,9 @@ pragma solidity ^0.8.30;
 import {Hashes} from "@oz/utils/cryptography/Hashes.sol";
 import {Secp256k1} from "@/lib/Secp256k1.sol";
 
-/// @title FROST Commitment Set
+/// @title FROST Nonce Commitment Set
 /// @notice A set of nonce commitments for FROST signature ceremonies.
-library FROSTCommitmentSet {
+library FROSTNonceCommitmentSet {
     using Secp256k1 for Secp256k1.Point;
 
     struct T {
@@ -63,7 +63,7 @@ library FROSTCommitmentSet {
         require(proof.length == _CHUNKSZ, NotIncluded());
         for (uint256 i = 0; i < _CHUNKSZ; i++) {
             bytes32 p = proof[i];
-            (bytes32 left, bytes32 right) = offset & 1 == 0 ? (digest, p) : (p, digest);
+            (bytes32 left, bytes32 right) = (offset >> i) & 1 == 0 ? (digest, p) : (p, digest);
             digest = Hashes.efficientKeccak256(left, right);
         }
         require(digest & _ROOTMASK == commitment, NotIncluded());

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.30;
 
-import {FROSTCommitmentSet} from "@/lib/FROSTCommitmentSet.sol";
+import {FROSTNonceCommitmentSet} from "@/lib/FROSTNonceCommitmentSet.sol";
 import {FROSTParticipantMap} from "@/lib/FROSTParticipantMap.sol";
 import {FROSTSignatureShares} from "@/lib/FROSTSignatureShares.sol";
 import {Secp256k1} from "@/lib/Secp256k1.sol";
@@ -9,7 +9,7 @@ import {Secp256k1} from "@/lib/Secp256k1.sol";
 /// @title FROST Coordinator
 /// @notice An onchain coordinator for FROST key generation and signing.
 contract FROSTCoordinator {
-    using FROSTCommitmentSet for FROSTCommitmentSet.T;
+    using FROSTNonceCommitmentSet for FROSTNonceCommitmentSet.T;
     using FROSTParticipantMap for FROSTParticipantMap.T;
     using FROSTSignatureShares for FROSTSignatureShares.T;
 
@@ -18,7 +18,7 @@ contract FROSTCoordinator {
 
     struct Group {
         FROSTParticipantMap.T participants;
-        FROSTCommitmentSet.T commitments;
+        FROSTNonceCommitmentSet.T nonces;
         GroupParameters parameters;
         Secp256k1.Point key;
     }
@@ -113,10 +113,10 @@ contract FROSTCoordinator {
     ///         256 nonces that get revealed as part of the signing process.
     ///         This allows signing requests to reveal the `message` right away
     ///         while still preventing Wagner's Birthday Attacks.
-    function preprocess(GroupId id, bytes32 noncesCommitment) external returns (uint32 chunk) {
+    function preprocess(GroupId id, bytes32 commitment) external returns (uint32 chunk) {
         Group storage group = $groups[id];
         uint256 index = group.participants.indexOf(msg.sender);
-        chunk = group.commitments.commit(index, noncesCommitment, group.parameters.sequence);
+        chunk = group.nonces.commit(index, commitment, group.parameters.sequence);
         emit Preprocess(id, index, chunk);
     }
 
@@ -137,7 +137,7 @@ contract FROSTCoordinator {
         uint256 index = group.participants.indexOf(msg.sender);
         uint32 sequence = _signatureSequence(sig);
         require(sequence < group.parameters.sequence, NotSigning());
-        group.commitments.verify(index, nonces.d, nonces.e, sequence, proof);
+        group.nonces.verify(index, nonces.d, nonces.e, sequence, proof);
         emit SignRevealedNonces(sig, index, nonces);
     }
 
