@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.30;
 
-import {MerkleTreeBase} from "@test/util/MerkleTreeBase.sol";
-import {Secp256k1} from "@/lib/Secp256k1.sol";
-
 abstract contract MerkleTreeBase {
     // forge-lint: disable-start(mixed-case-variable)
     mapping(uint256 x => mapping(uint256 y => bytes32 digest)) private $tree;

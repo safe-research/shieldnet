@@ -3,6 +3,7 @@ pragma solidity ^0.8.30;
 
 import {FROSTCommitmentSet} from "@/lib/FROSTCommitmentSet.sol";
 import {FROSTParticipantMap} from "@/lib/FROSTParticipantMap.sol";
+import {FROSTSignatureShares} from "@/lib/FROSTSignatureShares.sol";
 import {Secp256k1} from "@/lib/Secp256k1.sol";
 
 /// @title FROST Coordinator
@@ -10,6 +11,7 @@ import {Secp256k1} from "@/lib/Secp256k1.sol";
 contract FROSTCoordinator {
     using FROSTCommitmentSet for FROSTCommitmentSet.T;
     using FROSTParticipantMap for FROSTParticipantMap.T;
+    using FROSTSignatureShares for FROSTSignatureShares.T;
 
     type GroupId is bytes32;
     type SignatureId is bytes32;
@@ -40,7 +42,7 @@ contract FROSTCoordinator {
     }
 
     struct Signature {
-        GroupId group;
+        FROSTSignatureShares.T shares;
     }
 
     struct SignNonces {
@@ -54,6 +56,7 @@ contract FROSTCoordinator {
     event Preprocess(GroupId indexed id, uint256 index, uint32 chunk);
     event Sign(GroupId indexed id, SignatureId sig, bytes32 message);
     event SignRevealedNonces(SignatureId indexed sig, uint256 index, SignNonces nonces);
+    event SignShare(SignatureId indexed sig, uint256 index, uint256 z);
 
     error NotInitiator();
     error InvalidGroupParameters();
@@ -61,6 +64,7 @@ contract FROSTCoordinator {
     error InvalidKeyGenSecretShare();
     error InvalidGroup();
     error NotSigning();
+    error InvalidShare();
 
     // forge-lint: disable-start(mixed-case-variable)
     mapping(GroupId => Group) private $groups;
@@ -138,6 +142,25 @@ contract FROSTCoordinator {
         emit SignRevealedNonces(sig, index, nonces);
     }
 
+    /// @notice Broadcast a signature share.
+    function signShare(
+        SignatureId sig,
+        bytes32 root,
+        Secp256k1.Point memory r,
+        uint256 z,
+        uint256 cl,
+        bytes32[] calldata proof
+    ) external {
+        GroupId id = _signatureGroup(sig);
+        Group storage group = $groups[id];
+        uint256 index = group.participants.indexOf(msg.sender);
+        Secp256k1.Point memory y = group.participants.getKey(index);
+        Secp256k1.mulmuladd(z, cl, y, r);
+        Signature storage signature = $signatures[sig];
+        signature.shares.register(root, index, r, z, cl, proof);
+        emit SignShare(sig, index, z);
+    }
+
     /// @notice Retrieve the group public key. Note that it is undefined
     ///         behaviour to call this before the keygen ceremony is completed.
     function groupKey(GroupId id) external view returns (Secp256k1.Point memory key) {
@@ -147,6 +170,11 @@ contract FROSTCoordinator {
     /// @notice Retrieve the participant public key.
     function participantKey(GroupId id, uint256 index) external view returns (Secp256k1.Point memory key) {
         return $groups[id].participants.getKey(index);
+    }
+
+    /// @notice Retrieve the group signature.
+    function groupSignature(SignatureId sig, bytes32 root) external view returns (Secp256k1.Point memory r, uint256 z) {
+        return $signatures[sig].shares.groupSignature(root);
     }
 
     /// @notice Returns the signature ID of the next ceremony.

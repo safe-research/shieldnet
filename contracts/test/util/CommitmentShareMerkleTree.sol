@@ -8,7 +8,7 @@ contract CommitmentShareMerkleTree is MerkleTreeBase {
     struct S {
         uint256 index;
         Secp256k1.Point r;
-        uint256 lambda;
+        uint256 cl;
     }
 
     // forge-lint: disable-start(mixed-case-variable)
@@ -21,7 +21,7 @@ contract CommitmentShareMerkleTree is MerkleTreeBase {
         uint256 last = 0;
         for (uint256 i = 0; i < shares.length; i++) {
             S memory share = shares[i];
-            _leaf(keccak256(abi.encode(share.index, share.r.x, share.r.y, share.lambda)));
+            _leaf(keccak256(abi.encode(share.index, share.r.x, share.r.y, share.cl)));
 
             assert(share.index > last);
             last = share.index;

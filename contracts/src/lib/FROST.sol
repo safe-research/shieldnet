@@ -15,6 +15,7 @@ library FROST {
     }
 
     error UnorderedCommitments();
+    error InvalidScalar();
 
     /// @notice Generate a random nonce from some randomness and a secret key.
     function nonce(bytes32 random, Secp256k1.Point memory secret) internal view returns (uint256 n) {
@@ -66,6 +67,13 @@ library FROST {
         (uint8 rv, bytes32 rx) = r.serialize();
         (uint8 yv, bytes32 yx) = y.serialize();
         return _h2(abi.encodePacked(rv, rx, yv, yx, message));
+    }
+
+    /// @notice Verifies a FROST signature.
+    function verify(Secp256k1.Point memory y, Secp256k1.Point memory r, uint256 z, bytes32 message) internal view {
+        require(z < Secp256k1.N, InvalidScalar());
+        uint256 c = challenge(r, y, message);
+        Secp256k1.mulmuladd(z, c, y, r);
     }
 
     function _encodeCommitments(Commitment[] memory commitments) private pure returns (bytes memory result) {

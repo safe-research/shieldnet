@@ -76,10 +76,8 @@ library FROSTCommitmentSet {
         e.requireNonZero();
         assembly ("memory-safe") {
             let ptr := mload(0x40)
-            mstore(ptr, mload(d))
-            mstore(add(ptr, 0x20), mload(add(d, 0x20)))
-            mstore(add(ptr, 0x40), mload(e))
-            mstore(add(ptr, 0x60), mload(add(e, 0x20)))
+            mcopy(ptr, d, 0x40)
+            mcopy(add(ptr, 0x40), e, 0x40)
             digest := keccak256(ptr, 0x80)
         }
     }
