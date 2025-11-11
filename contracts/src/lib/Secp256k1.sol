@@ -121,13 +121,12 @@ library Secp256k1 {
 
     /// @notice Serializes a point to its compressed form.
     function serialize(Point memory p) internal pure returns (uint8 prefix, bytes32 encoded) {
-        uint256 x = p.x;
+        requireNonZero(p);
         uint256 y = p.y;
-        require(_satisfiesCurveEquation(x, y), NotOnCurve());
         assembly ("memory-safe") {
             prefix := add(2, and(y, 1))
         }
-        encoded = bytes32(x);
+        encoded = bytes32(p.x);
     }
 
     function _unpack(Point memory p) private pure returns (uint256 x, uint256 y) {
