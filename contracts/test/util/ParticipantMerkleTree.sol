@@ -4,10 +4,10 @@ pragma solidity ^0.8.30;
 import {MerkleTreeBase} from "@test/util/MerkleTreeBase.sol";
 
 contract ParticipantMerkleTree is MerkleTreeBase {
-    // forge-lint: disable-start(mixed-case-variable)
+    // forge-lint: disable-next-line(mixed-case-variable)
     mapping(address participant => uint256 index) private $indexes;
+    // forge-lint: disable-next-line(mixed-case-variable)
     mapping(uint256 index => address participant) private $addresses;
-    // forge-lint: disable-end(mixed-case-variable)
 
     constructor(address[] memory participants) {
         address last = address(0);

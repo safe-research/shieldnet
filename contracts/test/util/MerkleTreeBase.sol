@@ -2,12 +2,14 @@
 pragma solidity ^0.8.30;
 
 abstract contract MerkleTreeBase {
-    // forge-lint: disable-start(mixed-case-variable)
+    // forge-lint: disable-next-line(mixed-case-variable)
     mapping(uint256 x => mapping(uint256 y => bytes32 digest)) private $tree;
-    bytes32 private $root;
+    // forge-lint: disable-next-line(mixed-case-variable)
     uint256 private $width;
+    // forge-lint: disable-next-line(mixed-case-variable)
     uint256 private $height;
-    // forge-lint: disable-end(mixed-case-variable)
+    // forge-lint: disable-next-line(mixed-case-variable)
+    bytes32 private $root;
 
     function root() external view returns (bytes32 r) {
         return $root;
@@ -41,8 +43,8 @@ abstract contract MerkleTreeBase {
         }
 
         assert(l > 0);
-        $root = $tree[0][y];
         $height = y;
+        $root = $tree[0][y];
     }
 
     function _proof(uint256 x) internal view returns (bytes32[] memory proof) {

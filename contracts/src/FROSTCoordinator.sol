@@ -66,11 +66,10 @@ contract FROSTCoordinator {
     error NotSigning();
     error InvalidShare();
 
-    // forge-lint: disable-start(mixed-case-variable)
+    // forge-lint: disable-next-line(mixed-case-variable)
     mapping(GroupId => Group) private $groups;
+    // forge-lint: disable-next-line(mixed-case-variable)
     mapping(SignatureId => Signature) private $signatures;
-
-    // forge-lint: disable-end(mixed-case-variable)
 
     /// @notice Initiate a distributed key generation ceremony.
     function keygen(uint64 domain, bytes32 participants, uint64 count, uint64 threshold) external returns (GroupId id) {
@@ -114,10 +113,10 @@ contract FROSTCoordinator {
     ///         256 nonces that get revealed as part of the signing process.
     ///         This allows signing requests to reveal the `message` right away
     ///         while still preventing Wagner's Birthday Attacks.
-    function preprocess(GroupId id, bytes32 commitment) external returns (uint32 chunk) {
+    function preprocess(GroupId id, bytes32 noncesCommitment) external returns (uint32 chunk) {
         Group storage group = $groups[id];
         uint256 index = group.participants.indexOf(msg.sender);
-        chunk = group.commitments.commit(index, commitment, group.parameters.sequence);
+        chunk = group.commitments.commit(index, noncesCommitment, group.parameters.sequence);
         emit Preprocess(id, index, chunk);
     }
 
@@ -142,7 +141,7 @@ contract FROSTCoordinator {
         emit SignRevealedNonces(sig, index, nonces);
     }
 
-    /// @notice Broadcast a signature share.
+    /// @notice Broadcast a signature share for a commitment shares root.
     function signShare(
         SignatureId sig,
         bytes32 root,
@@ -172,7 +171,7 @@ contract FROSTCoordinator {
         return $groups[id].participants.getKey(index);
     }
 
-    /// @notice Retrieve the group signature.
+    /// @notice Retrieve a group signature.
     function groupSignature(SignatureId sig, bytes32 root) external view returns (Secp256k1.Point memory r, uint256 z) {
         return $signatures[sig].shares.groupSignature(root);
     }

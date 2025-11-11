@@ -9,8 +9,8 @@ import {CommitmentShareMerkleTree} from "@test/util/CommitmentShareMerkleTree.so
 import {ForgeSecp256k1} from "@test/util/ForgeSecp256k1.sol";
 import {ParticipantMerkleTree} from "@test/util/ParticipantMerkleTree.sol";
 import {FROSTCoordinator} from "@/FROSTCoordinator.sol";
-import {Secp256k1} from "@/lib/Secp256k1.sol";
 import {FROST} from "@/lib/FROST.sol";
+import {Secp256k1} from "@/lib/Secp256k1.sol";
 
 contract FROSTCoordinatorTest is Test {
     using Arrays for address[];
@@ -217,7 +217,7 @@ contract FROSTCoordinatorTest is Test {
     }
 
     function test_Sign() public {
-        // Implementatino of the two-round FROST signing protocol from RFC-9591
+        // Implementation of the two-round FROST signing protocol from RFC-9591
         // <https://datatracker.ietf.org/doc/html/rfc9591#section-5>
 
         (FROSTCoordinator.GroupId id, uint256[] memory s) = _trustedKeyGen(0);
