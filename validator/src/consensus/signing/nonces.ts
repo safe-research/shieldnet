@@ -41,11 +41,12 @@ export const generateNonceCommitments = (secret: bigint): NonceCommitments => {
 	};
 };
 
-const hashNonceCommitments = (c: PublicNonceCommitments): Hex =>
+const hashNonceCommitments = (index: bigint, c: PublicNonceCommitments): Hex =>
 	keccak256(
 		encodePacked(
-			["uint256", "uint256", "uint256", "uint256"],
+			["uint256", "uint256", "uint256", "uint256", "uint256"],
 			[
+                index,
 				c.hidingNonceCommitment.x,
 				c.hidingNonceCommitment.y,
 				c.bindingNonceCommitment.x,
@@ -56,14 +57,14 @@ const hashNonceCommitments = (c: PublicNonceCommitments): Hex =>
 
 export const createNonceTree = (
 	secret: bigint,
-	size: number = 1024,
+	size: bigint = 1024n,
 ): NonceTree => {
 	const commitments: NonceCommitments[] = [];
 	const leaves: Hex[] = [];
-	for (let i = 0; i < size; i++) {
+	for (let i = 0n; i < size; i++) {
 		const commitment = generateNonceCommitments(secret);
 		commitments.push(commitment);
-		leaves.push(hashNonceCommitments(commitment));
+		leaves.push(hashNonceCommitments(i, commitment));
 	}
 	const root = calculateMerkleRoot(leaves);
 	return {
