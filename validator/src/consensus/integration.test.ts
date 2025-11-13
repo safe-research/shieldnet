@@ -1,15 +1,15 @@
 import { randomBytes } from "node:crypto";
 import { bytesToNumberBE } from "@noble/curves/utils.js";
 import { createPublicClient, createWalletClient, http, parseAbi } from "viem";
-import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import { privateKeyToAccount } from "viem/accounts";
 import { anvil } from "viem/chains";
 import { describe, expect, it } from "vitest"; // or '@jest/globals'
 import { FrostClient } from "./client.js";
 import { OnchainCoordinator } from "./coordinator.js";
 import { linkClientToCoordinator } from "./events.js";
 import { calculateParticipantsRoot } from "./merkle.js";
-import type { Participant } from "./types.js";
 import { InMemoryStorage } from "./storage.js";
+import type { Participant } from "./types.js";
 
 // --- Tests ---
 describe("integration", () => {
@@ -48,7 +48,7 @@ describe("integration", () => {
 				signingClient,
 				coordinatorAddress,
 			);
-			const storage = new InMemoryStorage(a.address)
+			const storage = new InMemoryStorage(a.address);
 			const client = new FrostClient(storage, coordinator);
 			linkClientToCoordinator(client, publicClient, coordinatorAddress);
 			client.registerParticipants(participants);

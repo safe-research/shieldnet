@@ -108,34 +108,60 @@ describe("client", () => {
 			const storage = new InMemoryStorage(a.address);
 			const client = new FrostClient(storage, coordinator);
 			client.registerParticipants(participants);
-			return client;
+			return {
+				storage,
+				client,
+			};
 		});
 		const groupId = keccak256(participantsRoot);
 		log(
 			"------------------------ Trigger Keygen Init ------------------------",
 		);
-		for (const c of clients) {
+		for (const { client } of clients) {
 			log(`>>>> Keygen init >>>>`);
-			await c.handleKeygenInit(groupId, participantsRoot, count, threshold);
+			await client.handleKeygenInit(
+				groupId,
+				participantsRoot,
+				count,
+				threshold,
+			);
 		}
 		log(
 			"------------------------ Publish Commitments ------------------------",
 		);
-		for (const c of clients) {
+		for (const { client } of clients) {
 			for (const e of commitmentEvents) {
 				log(
-					`>>>> Keygen commitment from ${e.index} to ${c.participationIndex(e.groupId)} >>>>`,
+					`>>>> Keygen commitment from ${e.index} to ${client.participationIndex(e.groupId)} >>>>`,
 				);
-				await c.handleKeygenCommitment(e.groupId, e.index, e.commits, e.pok);
+				await client.handleKeygenCommitment(
+					e.groupId,
+					e.index,
+					e.commits,
+					e.pok,
+				);
 			}
 		}
 		log("------------------------ Publish Shares ------------------------");
-		for (const c of clients) {
+		for (const { client } of clients) {
 			for (const e of shareEvents) {
 				log(
-					`>>>> Keygen secrets from ${e.index} to ${c.participationIndex(e.groupId)} >>>>`,
+					`>>>> Keygen secrets from ${e.index} to ${client.participationIndex(e.groupId)} >>>>`,
 				);
-				await c.handleKeygenSecrets(e.groupId, e.index, e.peerShares);
+				await client.handleKeygenSecrets(e.groupId, e.index, e.peerShares);
+			}
+		}
+		for (const { storage } of clients) {
+			log(storage.accountAddress());
+			for (const groupId of storage.knownGroups()) {
+				log({
+					groupId,
+					secretShare: storage.signingShare(groupId),
+					participants: storage.participants(groupId),
+					participantId: storage.participantId(groupId),
+					verificationShare: storage.verificationShare(groupId),
+					publicKey: storage.publicKey(groupId),
+				});
 			}
 		}
 	});

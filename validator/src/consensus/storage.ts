@@ -1,10 +1,17 @@
-import type { Address, Hex } from "viem";
-import type { FrostPoint, GroupId, ParticipantId } from "../frost/types.js";
+import { type Address, encodePacked, type Hex, keccak256 } from "viem";
+import type {
+	FrostPoint,
+	GroupId,
+	ParticipantId,
+	SignatureId,
+} from "../frost/types.js";
 import { calculateParticipantsRoot } from "./merkle.js";
+import type { NonceTree, PublicNonceCommitments } from "./signing/nonces.js";
 import type {
 	GroupInfoStorage,
 	KeyGenInfoStorage,
 	Participant,
+	SignatureRequestStorage,
 } from "./types.js";
 
 type GroupInfo = {
@@ -18,15 +25,28 @@ type GroupInfo = {
 
 type KeyGenInfo = {
 	coefficients: readonly bigint[];
-	commitments: Map<bigint, readonly FrostPoint[]>;
-	secretShares: Map<bigint, bigint>;
+	commitments: Map<ParticipantId, readonly FrostPoint[]>;
+	secretShares: Map<ParticipantId, bigint>;
 };
 
-export class InMemoryStorage implements KeyGenInfoStorage, GroupInfoStorage {
+type SignatureRequest = {
+	sequence: bigint;
+	groupId: Hex;
+	message: Hex;
+	signerNonceCommitments: Map<ParticipantId, PublicNonceCommitments>;
+	signers: ParticipantId[];
+};
+
+export class InMemoryStorage
+	implements KeyGenInfoStorage, GroupInfoStorage, SignatureRequestStorage
+{
 	#account: Address;
 	#participantsInfo = new Map<Hex, readonly Participant[]>();
 	#keyGenInfo = new Map<GroupId, KeyGenInfo>();
 	#groupInfo = new Map<GroupId, GroupInfo>();
+	#nonceTrees = new Map<Hex, NonceTree>();
+	#chunkNonces = new Map<Hex, Hex>();
+	#signatureRequests = new Map<SignatureId, SignatureRequest>();
 
 	constructor(account: Address) {
 		this.#account = account;
@@ -45,15 +65,19 @@ export class InMemoryStorage implements KeyGenInfoStorage, GroupInfoStorage {
 	}
 
 	private checkInformationComplete(
-		participants: readonly Participant[],
+		participants: readonly ParticipantId[],
 		information: Map<bigint, unknown>,
 	): boolean {
-		for (const participant of participants) {
-			if (!information.has(participant.id)) {
+		for (const id of participants) {
+			if (!information.has(id)) {
 				return false;
 			}
 		}
 		return true;
+	}
+
+	accountAddress(): Address {
+		return this.#account;
 	}
 
 	registerKeyGen(groupId: GroupId, coefficients: readonly bigint[]): void {
@@ -73,6 +97,10 @@ export class InMemoryStorage implements KeyGenInfoStorage, GroupInfoStorage {
 		commitments: readonly FrostPoint[],
 	): void {
 		const info = this.keyGenInfo(groupId);
+		if (info.commitments.has(participantId))
+			throw Error(
+				`Commitments for ${groupId}:${participantId} already registered!`,
+			);
 		info.commitments.set(participantId, commitments);
 	}
 	registerSecretShare(
@@ -81,17 +109,27 @@ export class InMemoryStorage implements KeyGenInfoStorage, GroupInfoStorage {
 		share: bigint,
 	): void {
 		const info = this.keyGenInfo(groupId);
+		if (info.secretShares.has(participantId))
+			throw Error(
+				`Secret share for ${groupId}:${participantId} already registered!`,
+			);
 		info.secretShares.set(participantId, share);
 	}
 	checkIfCommitmentsComplete(groupId: GroupId): boolean {
 		const participants = this.participants(groupId);
 		const info = this.keyGenInfo(groupId);
-		return this.checkInformationComplete(participants, info.commitments);
+		return this.checkInformationComplete(
+			participants.map((p) => p.id),
+			info.commitments,
+		);
 	}
 	checkIfSecretSharesComplete(groupId: GroupId): boolean {
 		const participants = this.participants(groupId);
 		const info = this.keyGenInfo(groupId);
-		return this.checkInformationComplete(participants, info.secretShares);
+		return this.checkInformationComplete(
+			participants.map((p) => p.id),
+			info.secretShares,
+		);
 	}
 	encryptionKey(groupId: GroupId): bigint {
 		const info = this.keyGenInfo(groupId);
@@ -183,6 +221,9 @@ export class InMemoryStorage implements KeyGenInfoStorage, GroupInfoStorage {
 	participants(groupId: GroupId): readonly Participant[] {
 		return this.groupInfo(groupId).participants;
 	}
+	signingShare(groupId: GroupId): bigint | undefined {
+		return this.groupInfo(groupId).signingShare;
+	}
 	verificationShare(groupId: GroupId): FrostPoint {
 		const verificationShare = this.groupInfo(groupId).verificationShare;
 		if (verificationShare === undefined)
@@ -191,5 +232,98 @@ export class InMemoryStorage implements KeyGenInfoStorage, GroupInfoStorage {
 	}
 	unregisterGroup(groupId: GroupId): void {
 		this.#groupInfo.delete(groupId);
+	}
+
+	/*
+	 * Signing related storage
+	 */
+
+	private signatureRequest(signatureId: SignatureId): SignatureRequest {
+		const request = this.#signatureRequests.get(signatureId);
+		if (request === undefined)
+			throw Error(`Unknown signature request ${signatureId}!`);
+		return request;
+	}
+
+	registerSignatureRequest(
+		signatureId: SignatureId,
+		groupId: GroupId,
+		message: Hex,
+		signers: ParticipantId[],
+		sequence: bigint,
+	): void {
+		// Check if group is known, otherwise this will throw
+		this.groupInfo(groupId);
+		if (this.#signatureRequests.has(groupId))
+			throw Error(`SignatureRequest for ${signatureId} already registered!`);
+		this.#signatureRequests.set(signatureId, {
+			groupId,
+			message,
+			signerNonceCommitments: new Map(),
+			signers,
+			sequence,
+		});
+	}
+	registerNonceCommitments(
+		signatureId: SignatureId,
+		signerId: ParticipantId,
+		nonceCommitments: PublicNonceCommitments,
+	): void {
+		const request = this.signatureRequest(signatureId);
+		if (request.signerNonceCommitments.has(signerId))
+			throw Error(
+				`Nonce commitments for ${signatureId}:${signerId} already registered!`,
+			);
+		request.signerNonceCommitments.set(signerId, nonceCommitments);
+	}
+
+	checkIfNoncesComplete(signatureId: SignatureId): boolean {
+		const request = this.signatureRequest(signatureId);
+		return this.checkInformationComplete(
+			request.signers,
+			request.signerNonceCommitments,
+		);
+	}
+	signingGroup(signatureId: SignatureId): GroupId {
+		return this.signatureRequest(signatureId).groupId;
+	}
+	signers(signatureId: SignatureId): ParticipantId[] {
+		return this.signatureRequest(signatureId).signers;
+	}
+	message(signatureId: SignatureId): Hex {
+		return this.signatureRequest(signatureId).message;
+	}
+	sequence(signatureId: SignatureId): bigint {
+		return this.signatureRequest(signatureId).sequence;
+	}
+	nonceCommitmentsMap(
+		signatureId: SignatureId,
+	): Map<ParticipantId, PublicNonceCommitments> {
+		return this.signatureRequest(signatureId).signerNonceCommitments;
+	}
+
+	registerNonceTree(tree: NonceTree): Hex {
+		this.#nonceTrees.set(tree.root, tree);
+		return tree.root;
+	}
+	linkNonceTree(groupId: GroupId, chunk: bigint, treeHash: Hex): void {
+		const chunkId = keccak256(
+			encodePacked(["bytes32", "uint256"], [groupId, chunk]),
+		);
+		if (this.#chunkNonces.has(chunkId))
+			throw Error(`Chunk ${groupId}:${chunk} has already be linked!`);
+		this.#chunkNonces.set(chunkId, treeHash);
+	}
+	nonceTree(groupId: GroupId, chunk: bigint): NonceTree {
+		const chunkId = keccak256(
+			encodePacked(["bytes32", "uint256"], [groupId, chunk]),
+		);
+		const treeHash = this.#chunkNonces.get(chunkId);
+		if (treeHash === undefined)
+			throw Error(`No nonces linked to ${groupId}:${chunk}!`);
+		const nonceTree = this.#nonceTrees.get(treeHash);
+		if (nonceTree === undefined)
+			throw Error(`No nonces available for ${groupId}:${chunk}!`);
+		return nonceTree;
 	}
 }

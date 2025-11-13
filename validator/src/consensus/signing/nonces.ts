@@ -4,7 +4,9 @@ import { encodePacked, type Hex, hexToBytes, keccak256 } from "viem";
 import { h1, h3, h4, h5 } from "../../frost/hashes.js";
 import { g, randomBigInt } from "../../frost/math.js";
 import type { FrostPoint } from "../../frost/types.js";
-import { calculateMerkleRoot } from "../merkle.js";
+import { calculateMerkleRoot, generateMerkleProof } from "../merkle.js";
+
+const SEQUENCE_CHUNK_SIZE = 1024n;
 
 export type SecretNonceCommitments = {
 	hidingNonce: bigint; // d
@@ -57,7 +59,7 @@ const hashNonceCommitments = (index: bigint, c: PublicNonceCommitments): Hex =>
 
 export const createNonceTree = (
 	secret: bigint,
-	size: bigint = 1024n,
+	size: bigint = SEQUENCE_CHUNK_SIZE,
 ): NonceTree => {
 	const commitments: NonceCommitments[] = [];
 	const leaves: Hex[] = [];
@@ -164,4 +166,35 @@ export const groupCommitement = (
 	groupCommitmentShares: FrostPoint[],
 ): FrostPoint => {
 	return groupCommitmentShares.reduce((v, c) => v.add(c));
+};
+
+export const decodeSequence = (
+	sequence: bigint,
+	chunkSize: bigint = SEQUENCE_CHUNK_SIZE,
+): {
+	chunk: bigint;
+	offset: bigint;
+} => {
+	const chunk = sequence / chunkSize;
+	const offset = sequence % chunkSize;
+	return {
+		chunk,
+		offset,
+	};
+};
+
+export const nonceCommitmentsWithProof = (
+	nonceTree: NonceTree,
+	offset: bigint,
+): {
+	nonceCommitments: NonceCommitments;
+	nonceProof: Hex[];
+} => {
+	const nonceOffset = Number(offset);
+	const nonceCommitments = nonceTree.commitments[nonceOffset];
+	const nonceProof = generateMerkleProof(nonceTree.leaves, nonceOffset);
+	return {
+		nonceCommitments,
+		nonceProof,
+	};
 };

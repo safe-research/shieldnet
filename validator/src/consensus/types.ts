@@ -7,7 +7,7 @@ import type {
 	ProofOfKnowledge,
 	SignatureId,
 } from "../frost/types.js";
-import type { PublicNonceCommitments } from "./signing/nonces.js";
+import type { NonceTree, PublicNonceCommitments } from "./signing/nonces.js";
 
 export type Participant = {
 	id: ParticipantId;
@@ -55,6 +55,7 @@ export type SigningCoordinator = {
 };
 
 export type FrostCoordinator = KeyGenCoordinator;
+
 export type GroupInfoStorage = {
 	knownGroups(): GroupId[];
 	registerGroup(
@@ -71,6 +72,7 @@ export type GroupInfoStorage = {
 	participantId(groupId: GroupId): ParticipantId;
 	publicKey(groupId: GroupId): FrostPoint | undefined;
 	participants(groupId: GroupId): readonly Participant[];
+	signingShare(groupId: GroupId): bigint | undefined;
 	verificationShare(groupId: GroupId): FrostPoint;
 	unregisterGroup(groupId: GroupId): void;
 };
@@ -106,3 +108,34 @@ export type KeyGenInfoStorage = {
 	secretSharesMap(groupId: GroupId): Map<ParticipantId, bigint>;
 	clearKeyGen(groupId: GroupId): void;
 } & ParticipantStorage;
+
+export type NonceStorage = {
+	registerNonceTree(tree: NonceTree): Hex;
+	linkNonceTree(groupId: GroupId, chunk: bigint, treeHash: Hex): void;
+	nonceTree(groupId: GroupId, chunk: bigint): NonceTree;
+};
+
+export type SignatureRequestStorage = {
+	registerSignatureRequest(
+		signatureId: SignatureId,
+		groupId: GroupId,
+		message: Hex,
+		signers: ParticipantId[],
+		sequence: bigint,
+	): void;
+	registerNonceCommitments(
+		signatureId: SignatureId,
+		signerId: ParticipantId,
+		nonceCommitments: PublicNonceCommitments,
+	): void;
+
+	checkIfNoncesComplete(signatureId: SignatureId): boolean;
+
+	signingGroup(signatureId: SignatureId): GroupId;
+	signers(signatureId: SignatureId): ParticipantId[];
+	message(signatureId: SignatureId): Hex;
+	sequence(signatureId: SignatureId): bigint;
+	nonceCommitmentsMap(
+		signatureId: SignatureId,
+	): Map<ParticipantId, PublicNonceCommitments>;
+} & NonceStorage;
