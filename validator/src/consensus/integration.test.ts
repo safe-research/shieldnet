@@ -1,44 +1,20 @@
 import { randomBytes } from "node:crypto";
 import { bytesToNumberBE } from "@noble/curves/utils.js";
-import {
-	createPublicClient,
-	createWalletClient,
-	type Hex,
-	http,
-	keccak256,
-	parseAbi,
-} from "viem";
+import { createPublicClient, createWalletClient, http, parseAbi } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { anvil } from "viem/chains";
 import { describe, expect, it } from "vitest"; // or '@jest/globals'
-import { toPoint } from "../frost/math.js";
-import type {
-	FrostPoint,
-	GroupId,
-	ProofOfAttestationParticipation,
-	ProofOfKnowledge,
-} from "../frost/types.js";
-import { watchCoordinatorEvents } from "../service/watchers.js";
-import {
-	keyGenCommittedEventSchema,
-	keyGenEventSchema,
-	keyGenSecretSharedEventSchema,
-} from "../types/schemas.js";
 import { FrostClient } from "./client.js";
 import { OnchainCoordinator } from "./coordinator.js";
-import {
-	calculateParticipantsRoot,
-	hashParticipant,
-	verifyMerkleProof,
-} from "./merkle.js";
-import type { FrostCoordinator, Participant } from "./types.js";
 import { linkClientToCoordinator } from "./events.js";
+import { calculateParticipantsRoot } from "./merkle.js";
+import type { Participant } from "./types.js";
 
-const createRandomAccount = () => privateKeyToAccount(generatePrivateKey());
+const _createRandomAccount = () => privateKeyToAccount(generatePrivateKey());
 
 // --- Tests ---
 describe("integration", () => {
-	it.only("keygen and signing flow", { timeout: 30000 }, async () => {
+	it("keygen and signing flow", { timeout: 30000 }, async () => {
 		// Make sure to first start the Anvil testnode (run `anvil` in the root)
 		// and run the deployment script: forge script DeployScript --rpc-url http://127.0.0.1:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast
 		// Private key from Anvil testnet
@@ -74,7 +50,7 @@ describe("integration", () => {
 				coordinatorAddress,
 			);
 			const client = new FrostClient(a.address, coordinator);
-			linkClientToCoordinator(client, publicClient, coordinatorAddress)
+			linkClientToCoordinator(client, publicClient, coordinatorAddress);
 			client.registerParticipants(participants);
 			return client;
 		});
@@ -86,7 +62,7 @@ describe("integration", () => {
 		});
 		const abi = parseAbi([
 			"function groupKey(bytes32 id) external view returns ((uint256 x, uint256 y) memory key)",
-			"function keyGen(uint64 domain, bytes32 participants, uint64 count, uint64 threshold) external"
+			"function keyGen(uint64 domain, bytes32 participants, uint64 count, uint64 threshold) external",
 		]);
 		await initiatorClient.writeContract({
 			address: coordinatorAddress,
@@ -103,24 +79,22 @@ describe("integration", () => {
 
 		const readClient = createPublicClient({
 			chain: anvil,
-			transport: http()
+			transport: http(),
 		});
 		for (const c of clients) {
-			const knownGroups = c.knownGroups()
-			expect(knownGroups.length).toBeGreaterThan(0)
+			const knownGroups = c.knownGroups();
+			expect(knownGroups.length).toBeGreaterThan(0);
 			for (const groupId of knownGroups) {
 				const groupKey = await readClient.readContract({
 					address: coordinatorAddress,
 					abi: abi,
 					functionName: "groupKey",
-					args: [
-						groupId
-					]
-				})
-				const localGroupKey = c.groupPublicKey(groupId)
-				expect(localGroupKey !== undefined).toBeTruthy()
-				expect(localGroupKey?.x).toBe(groupKey.x)
-				expect(localGroupKey?.y).toBe(groupKey.y)
+					args: [groupId],
+				});
+				const localGroupKey = c.groupPublicKey(groupId);
+				expect(localGroupKey !== undefined).toBeTruthy();
+				expect(localGroupKey?.x).toBe(groupKey.x);
+				expect(localGroupKey?.y).toBe(groupKey.y);
 			}
 		}
 	});

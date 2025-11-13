@@ -114,7 +114,7 @@ export const verifyKey = (publicKey: FrostPoint, privateKey: bigint): void => {
 	}
 };
 
-export const evalPoly = (coefficient: bigint[], x: bigint): bigint => {
+export const evalPoly = (coefficient: readonly bigint[], x: bigint): bigint => {
 	if (x === 0n) {
 		throw new Error("x is zero");
 	}

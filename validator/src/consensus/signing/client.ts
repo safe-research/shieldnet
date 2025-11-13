@@ -3,23 +3,26 @@ import type { FrostPoint, GroupId, SignatureId } from "../../frost/types.js";
 import type { KeygenInfo } from "../client.js";
 import { generateMerkleProof, generateMerkleProofWithRoot } from "../merkle.js";
 import type { SigningCoordinator } from "../types.js";
+import { groupChallenge, lagrangeCoefficient } from "./group.js";
 import {
-    bindingFactors,
+	bindingFactors,
 	createNonceTree,
 	groupCommitement,
 	groupCommitementShares,
-	NonceCommitments,
+	type NonceCommitments,
 	type NonceTree,
 	type PublicNonceCommitments,
 } from "./nonces.js";
-import { groupChallenge, lagrangeCoefficient } from "./group.js";
-import { createSigningShare as createSignatureShare, lagrangeChallange } from "./shares.js";
+import {
+	createSigningShare as createSignatureShare,
+	lagrangeChallange,
+} from "./shares.js";
 
 const SEQUENCE_CHUNK_SIZE = 1024n;
 
 type SignatureRequest = {
-    sequence: bigint,
-    groupId: Hex; 
+	sequence: bigint;
+	groupId: Hex;
 	message: Hex;
 	signerNonceCommitments: Map<bigint, PublicNonceCommitments>;
 	signers: bigint[];
@@ -59,11 +62,14 @@ export class SigningClient {
 		);
 	}
 
-    private getNonceCommitments(groupId: GroupId, sequence: bigint): {
-        nonceCommitments: NonceCommitments,
-        nonceProof: Hex[]
-     } {
-        // TODO: extract nonce tree into separate class
+	private getNonceCommitments(
+		groupId: GroupId,
+		sequence: bigint,
+	): {
+		nonceCommitments: NonceCommitments;
+		nonceProof: Hex[];
+	} {
+		// TODO: extract nonce tree into separate class
 		const chunk = sequence / SEQUENCE_CHUNK_SIZE;
 		const chunkId = keccak256(
 			encodePacked(["bytes32", "uint256"], [groupId, chunk]),
@@ -80,11 +86,11 @@ export class SigningClient {
 		const nonceOffset = Number(sequence % SEQUENCE_CHUNK_SIZE);
 		const nonceCommitments = nonceTree.commitments[nonceOffset];
 		const nonceProof = generateMerkleProof(nonceTree.leaves, nonceOffset);
-        return {
-            nonceCommitments,
-            nonceProof
-        }
-    }
+		return {
+			nonceCommitments,
+			nonceProof,
+		};
+	}
 
 	async handleNonceCommitmentsHash(
 		groupId: GroupId,
@@ -115,20 +121,20 @@ export class SigningClient {
 			throw Error(`Already handled signature request: ${signatureId}`);
 		// TODO: check if we really want to sign the message
 
-        const {
-            nonceCommitments,
-            nonceProof
-        } = this.getNonceCommitments(groupId, sequence)
+		const { nonceCommitments, nonceProof } = this.getNonceCommitments(
+			groupId,
+			sequence,
+		);
 
 		const signerNonceCommitments = new Map<bigint, PublicNonceCommitments>();
 		// Set own nonce commitments
 		signerNonceCommitments.set(info.participantIndex, nonceCommitments);
 		this.#signatureRequests.set(signatureId, {
-            sequence,
+			sequence,
 			message,
 			signerNonceCommitments,
-            groupId: info.groupId,
-			signers: info.participants.map((p) => p.index).sort(),
+			groupId: info.groupId,
+			signers: info.participants.map((p) => p.id).sort(),
 		});
 		await this.#coordinator.publishNonceCommitments(
 			signatureId,
@@ -170,70 +176,73 @@ export class SigningClient {
 		if (groupInfo === undefined || groupInfo.signingShare === undefined)
 			throw Error(`Missing info for ${signatureRequest.groupId}`);
 
-        const signers = signatureRequest.signers
-        const signerId = groupInfo.participantIndex
-        const signerIndex = signatureRequest.signers.indexOf(signerId)
+		const signers = signatureRequest.signers;
+		const signerId = groupInfo.participantIndex;
+		const signerIndex = signatureRequest.signers.indexOf(signerId);
 
-        // Calculate information over the complete signer group
-        const groupPublicKey = undefined as unknown as FrostPoint
-        const bindingFactorList = bindingFactors(
-            groupPublicKey,
-            signers,
-            signatureRequest.signerNonceCommitments,
-            signatureRequest.message
-        )
-        const groupCommitmentShares = groupCommitementShares(
-            bindingFactorList,
-            signatureRequest.signerNonceCommitments
-        )
-        const groupCommitment = groupCommitement(groupCommitmentShares)
-        const challenge = groupChallenge(
-            groupCommitment,
-            groupPublicKey,
-            signatureRequest.message
-        )
-        const signerParts = signers.map((signerId, index) => {
-            const nonceCommitments = signatureRequest.signerNonceCommitments.get(signerId)
-            if (nonceCommitments === undefined)
-                throw Error(`Missing nonce commitments for ${signerId}`)
-            const r = groupCommitmentShares[index]
-            const coeff = lagrangeCoefficient(signers, signerId)
-            const cl = lagrangeChallange(coeff, challenge)
-            const node = encodePacked(
-                ["uint256", "uint256", "uint256", "uint256"],
-                [signerId, r.x, r.y, cl]
-            )
-            return {
-                signerId,
-                r,
-                cl,
-                node
-            }
-        })
+		// Calculate information over the complete signer group
+		const groupPublicKey = undefined as unknown as FrostPoint;
+		const bindingFactorList = bindingFactors(
+			groupPublicKey,
+			signers,
+			signatureRequest.signerNonceCommitments,
+			signatureRequest.message,
+		);
+		const groupCommitmentShares = groupCommitementShares(
+			bindingFactorList,
+			signatureRequest.signerNonceCommitments,
+		);
+		const groupCommitment = groupCommitement(groupCommitmentShares);
+		const challenge = groupChallenge(
+			groupCommitment,
+			groupPublicKey,
+			signatureRequest.message,
+		);
+		const signerParts = signers.map((signerId, index) => {
+			const nonceCommitments =
+				signatureRequest.signerNonceCommitments.get(signerId);
+			if (nonceCommitments === undefined)
+				throw Error(`Missing nonce commitments for ${signerId}`);
+			const r = groupCommitmentShares[index];
+			const coeff = lagrangeCoefficient(signers, signerId);
+			const cl = lagrangeChallange(coeff, challenge);
+			const node = encodePacked(
+				["uint256", "uint256", "uint256", "uint256"],
+				[signerId, r.x, r.y, cl],
+			);
+			return {
+				signerId,
+				r,
+				cl,
+				node,
+			};
+		});
 
-        // Calculate information specific to this signer
-        const {
-            nonceCommitments,
-        } = this.getNonceCommitments(signatureRequest.groupId, signatureRequest.sequence)
-        const signerPart = signerParts[signerIndex]
-        const signatureShare = createSignatureShare(
-            groupInfo.signingShare,
-            nonceCommitments,
-            bindingFactorList[signerIndex].bindingFactor,
-            signerPart.cl
-        )
-        const {
-            proof: signingParticipantsProof,
-            root: signingParticipantsHash
-        } = generateMerkleProofWithRoot(signerParts.map((p) => p.node), signerIndex)
+		// Calculate information specific to this signer
+		const { nonceCommitments } = this.getNonceCommitments(
+			signatureRequest.groupId,
+			signatureRequest.sequence,
+		);
+		const signerPart = signerParts[signerIndex];
+		const signatureShare = createSignatureShare(
+			groupInfo.signingShare,
+			nonceCommitments,
+			bindingFactorList[signerIndex].bindingFactor,
+			signerPart.cl,
+		);
+		const { proof: signingParticipantsProof, root: signingParticipantsHash } =
+			generateMerkleProofWithRoot(
+				signerParts.map((p) => p.node),
+				signerIndex,
+			);
 
-        await this.#coordinator.publishSignatureShare(
-            signatureId,
-            signingParticipantsHash,
-            signerPart.r,
-            signatureShare,
-            signerPart.cl,
-            signingParticipantsProof
-        )
-    }
+		await this.#coordinator.publishSignatureShare(
+			signatureId,
+			signingParticipantsHash,
+			signerPart.r,
+			signatureShare,
+			signerPart.cl,
+			signingParticipantsProof,
+		);
+	}
 }

@@ -2,6 +2,7 @@ import type { Address, Hex } from "viem";
 import type {
 	FrostPoint,
 	GroupId,
+	ParticipantId,
 	ProofOfAttestationParticipation,
 	ProofOfKnowledge,
 	SignatureId,
@@ -9,7 +10,7 @@ import type {
 import type { PublicNonceCommitments } from "./signing/nonces.js";
 
 export type Participant = {
-	index: bigint;
+	id: ParticipantId;
 	address: Address;
 };
 
@@ -50,9 +51,58 @@ export type SigningCoordinator = {
 		signingParticipantsProof: Hex[],
 	): Promise<Hex>;
 
-	groupPublicKey(
-		groupId: Hex
-	): Promise<FrostPoint>
+	groupPublicKey(groupId: Hex): Promise<FrostPoint>;
 };
 
 export type FrostCoordinator = KeyGenCoordinator;
+export type GroupInfoStorage = {
+	knownGroups(): GroupId[];
+	registerGroup(
+		groupId: GroupId,
+		participants: readonly Participant[],
+	): ParticipantId;
+	registerVerification(
+		groupId: GroupId,
+		groupPublicKey: FrostPoint,
+		verificationShare: FrostPoint,
+	): void;
+	registerSigningShare(groupId: GroupId, signingShare: bigint): void;
+
+	participantId(groupId: GroupId): ParticipantId;
+	publicKey(groupId: GroupId): FrostPoint | undefined;
+	participants(groupId: GroupId): readonly Participant[];
+	verificationShare(groupId: GroupId): FrostPoint;
+	unregisterGroup(groupId: GroupId): void;
+};
+
+export type ParticipantStorage = {
+	registerParticipants(participants: readonly Participant[]): Hex;
+	loadParticipants(hash: Hex): readonly Participant[];
+};
+
+export type KeyGenInfoStorage = {
+	registerKeyGen(groupId: GroupId, coefficients: readonly bigint[]): void;
+	registerCommitments(
+		groupId: GroupId,
+		participantId: ParticipantId,
+		commitments: readonly FrostPoint[],
+	): void;
+	registerSecretShare(
+		groupId: GroupId,
+		participantId: ParticipantId,
+		share: bigint,
+	): void;
+
+	checkIfCommitmentsComplete(groupId: GroupId): boolean;
+	checkIfSecretSharesComplete(groupId: GroupId): boolean;
+
+	encryptionKey(groupId: GroupId): bigint;
+	coefficients(groupId: GroupId): readonly bigint[];
+	commitments(
+		groupId: GroupId,
+		participantId: ParticipantId,
+	): readonly FrostPoint[];
+	commitmentsMap(groupId: GroupId): Map<ParticipantId, readonly FrostPoint[]>;
+	secretSharesMap(groupId: GroupId): Map<ParticipantId, bigint>;
+	clearKeyGen(groupId: GroupId): void;
+} & ParticipantStorage;

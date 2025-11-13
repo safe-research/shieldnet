@@ -107,14 +107,14 @@ export const bindingPrefix = (
 	const msgHash = h4(hexToBytes(message));
 	const commitmentHash = h5(encodeCommitments(signers, nonceCommitments));
 	return concatBytes(serializedKey, msgHash, commitmentHash);
-}
+};
 
 export const bindingFactor = (
 	signerId: bigint,
-	bindingPrefix: Uint8Array, 
+	bindingPrefix: Uint8Array,
 ): bigint => {
-	return h1(concatBytes(bindingPrefix, numberToBytesBE(signerId, 32)))
-}
+	return h1(concatBytes(bindingPrefix, numberToBytesBE(signerId, 32)));
+};
 
 export const bindingFactors = (
 	groupPublicKey: FrostPoint,
@@ -122,24 +122,28 @@ export const bindingFactors = (
 	nonceCommitments: Map<bigint, PublicNonceCommitments>,
 	message: Hex,
 ): BindingFactor[] => {
-	const prefix = bindingPrefix(groupPublicKey, signers, nonceCommitments, message)
+	const prefix = bindingPrefix(
+		groupPublicKey,
+		signers,
+		nonceCommitments,
+		message,
+	);
 	return signers.map((id) => {
 		return {
 			id,
-			bindingFactor: bindingFactor(id, prefix)
-		}
-	})
-}
+			bindingFactor: bindingFactor(id, prefix),
+		};
+	});
+};
 
 export const groupCommitmentShare = (
 	bindingFactor: bigint,
-	nonceCommitments: PublicNonceCommitments
+	nonceCommitments: PublicNonceCommitments,
 ): FrostPoint => {
-	const factor = nonceCommitments.bindingNonceCommitment.multiply(
-			bindingFactor,
-	);
+	const factor =
+		nonceCommitments.bindingNonceCommitment.multiply(bindingFactor);
 	return nonceCommitments.hidingNonceCommitment.add(factor);
-}
+};
 
 export const groupCommitementShares = (
 	bindingFactors: BindingFactor[],

@@ -1,4 +1,4 @@
-import type { Address, Hex } from "viem";
+import type { Hex } from "viem";
 import {
 	createSigningShare,
 	createVerificationShare,
@@ -7,18 +7,25 @@ import {
 	verifyKey,
 } from "../frost/math.js";
 import { ecdh } from "../frost/secret.js";
-import type { FrostPoint, GroupId, ProofOfKnowledge } from "../frost/types.js";
+import type {
+	FrostPoint,
+	GroupId,
+	ParticipantId,
+	ProofOfKnowledge,
+} from "../frost/types.js";
 import {
 	createCoefficients,
 	createCommitments,
 	createProofOfKnowledge,
 	verifyCommitments,
 } from "../frost/vss.js";
-import {
-	calculateParticipantsRoot,
-	generateParticipantProof,
-} from "./merkle.js";
-import type { FrostCoordinator, Participant } from "./types.js";
+import { generateParticipantProof } from "./merkle.js";
+import type {
+	FrostCoordinator,
+	GroupInfoStorage,
+	KeyGenInfoStorage,
+	Participant,
+} from "./types.js";
 
 export type KeygenInfo = {
 	groupId: GroupId;
@@ -32,33 +39,6 @@ export type KeygenInfo = {
 	signingShare?: bigint;
 };
 
-const findParticipationIndex = (
-	participants: Participant[],
-	validatorAddress: Address,
-): [bigint, number] => {
-	const arrayIndex = participants.findIndex(
-		(p) => p.address === validatorAddress,
-	);
-	if (arrayIndex < 0)
-		throw Error("Cannot find participant in participants array!");
-	const participantIndex = participants.at(arrayIndex)?.index;
-	if (participantIndex === undefined)
-		throw Error("Cannot determine FROST index of participant!");
-	return [participantIndex, arrayIndex];
-};
-
-const checkInformationComplete = (
-	participants: Participant[],
-	information: Map<bigint, unknown>,
-): boolean => {
-	for (const participant of participants) {
-		if (!information.has(participant.index)) {
-			return false;
-		}
-	}
-	return true;
-};
-
 /**
  * The following order must always strictly kept:
  * 1. register participants root
@@ -70,40 +50,34 @@ const checkInformationComplete = (
  */
 export class FrostClient {
 	#coordinator: FrostCoordinator;
-	#validatorAddress: Address;
-	// TODO: extract into storage object to iterate on secure storage
-	#participantsInfo = new Map<Hex, Participant[]>();
-	#keyGenInfo = new Map<GroupId, KeygenInfo>();
+	#storage: GroupInfoStorage & KeyGenInfoStorage;
 
-	constructor(validatorAddress: Address, coordinator: FrostCoordinator) {
-		this.#validatorAddress = validatorAddress;
+	constructor(
+		storage: GroupInfoStorage & KeyGenInfoStorage,
+		coordinator: FrostCoordinator,
+	) {
+		this.#storage = storage;
 		this.#coordinator = coordinator;
 	}
 
-	validator(): Address {
-		return this.#validatorAddress;
-	}
-
 	participationIndex(groupId: GroupId): bigint {
-		return this.#keyGenInfo.get(groupId)?.participantIndex ?? -1n;
+		return this.#storage.participantId(groupId);
 	}
 
 	knownGroups(): Hex[] {
-		return Array.from(this.#keyGenInfo.values().map((i) => i.groupId));
+		return this.#storage.knownGroups();
 	}
 
 	groupPublicKey(groupId: GroupId): FrostPoint | undefined {
-		return this.#keyGenInfo.get(groupId)?.groupPublicKey;
+		return this.#storage.publicKey(groupId);
 	}
 
 	registerParticipants(participants: Participant[]) {
-		const participantsRoot = calculateParticipantsRoot(participants);
-		this.#participantsInfo.set(participantsRoot, participants);
+		this.#storage.registerParticipants(participants);
 	}
 
 	abortKeygen(groupId: GroupId) {
-		if (!this.#keyGenInfo.has(groupId)) return;
-		this.#keyGenInfo.delete(groupId);
+		this.#storage.unregisterGroup(groupId);
 	}
 
 	async handleKeygenInit(
@@ -112,41 +86,26 @@ export class FrostClient {
 		count: bigint,
 		threshold: bigint,
 	) {
-		if (this.#keyGenInfo.has(groupId))
-			throw Error(`Key generation for ${groupId} has already been initialized`);
-		const participants = this.#participantsInfo.get(participantsRoot);
-		if (participants === undefined)
-			throw Error(`Unknown root hash ${participantsRoot} for participants`);
+		const participants = this.#storage.loadParticipants(participantsRoot);
 		if (participants.length !== Number(count))
 			throw Error(
 				`Unexpected participant count ${participantsRoot}! (Expected ${participants.length} got ${count})`,
 			);
-		const [participantIndex, arrayIndex] = findParticipationIndex(
-			participants,
-			this.#validatorAddress,
-		);
+		const participantId = this.#storage.registerGroup(groupId, participants);
 		const coefficients = createCoefficients(threshold);
-		const pok = createProofOfKnowledge(groupId, participantIndex, coefficients);
+		this.#storage.registerKeyGen(groupId, coefficients);
+		const pok = createProofOfKnowledge(groupId, participantId, coefficients);
 		const localCommitments = createCommitments(coefficients);
-		const poap = generateParticipantProof(participants, arrayIndex);
-		const commitments = new Map<bigint, FrostPoint[]>();
-		commitments.set(participantIndex, localCommitments);
-		const secretShares = new Map<bigint, bigint>();
-		secretShares.set(
-			participantIndex,
-			evalPoly(coefficients, participantIndex),
-		);
-		this.#keyGenInfo.set(groupId, {
+		const poap = generateParticipantProof(participants, participantId);
+		this.#storage.registerCommitments(groupId, participantId, localCommitments);
+		this.#storage.registerSecretShare(
 			groupId,
-			participants,
-			participantIndex: participantIndex,
-			coefficients,
-			commitments,
-			secretShares,
-		});
+			participantId,
+			evalPoly(coefficients, participantId),
+		);
 		await this.#coordinator.publishKeygenCommitments(
 			groupId,
-			participantIndex,
+			participantId,
 			localCommitments,
 			pok,
 			poap,
@@ -155,60 +114,61 @@ export class FrostClient {
 
 	async handleKeygenCommitment(
 		groupId: GroupId,
-		senderIndex: bigint,
+		senderId: ParticipantId,
 		peerCommitments: readonly FrostPoint[],
 		pok: ProofOfKnowledge,
 	) {
-		const info = this.#keyGenInfo.get(groupId);
-		if (info === undefined) return;
-		if (senderIndex === info.participantIndex) {
+		const participantIndex = this.#storage.participantId(groupId);
+		if (senderId === participantIndex) {
 			console.info("Do not verify own commitments");
 			return;
 		}
-		if (info.commitments.has(senderIndex)) {
-			throw Error(`Commitment for ${groupId}:${senderIndex} already known!`);
-		}
-		verifyCommitments(groupId, senderIndex, peerCommitments, pok);
-		info.commitments.set(senderIndex, peerCommitments);
-		if (checkInformationComplete(info.participants, info.commitments)) {
-			await this.prepareAndPublishKeygenSecretShares(info);
+		verifyCommitments(groupId, senderId, peerCommitments, pok);
+		this.#storage.registerCommitments(groupId, senderId, peerCommitments);
+		if (this.#storage.checkIfCommitmentsComplete(groupId)) {
+			await this.prepareAndPublishKeygenSecretShares(groupId);
 		}
 	}
 
 	// Round 2.1
-	private async prepareAndPublishKeygenSecretShares(info: KeygenInfo) {
-		info.groupPublicKey = createVerificationShare(
-			info.commitments,
-			0n
-		)
+	private async prepareAndPublishKeygenSecretShares(groupId: GroupId) {
+		const commitments = this.#storage.commitmentsMap(groupId);
+		const groupPublicKey = createVerificationShare(commitments, 0n);
 		// Will be published as y
+		const participantId = this.#storage.participantId(groupId);
 		const verificationShare = createVerificationShare(
-			info.commitments,
-			info.participantIndex,
+			commitments,
+			participantId,
 		);
-		info.verificationShare = verificationShare;
+		this.#storage.registerVerification(
+			groupId,
+			groupPublicKey,
+			verificationShare,
+		);
 
+		const coefficients = this.#storage.coefficients(groupId);
+		const participants = this.#storage.participants(groupId);
 		const shares: bigint[] = [];
-		for (const participant of info.participants) {
-			if (participant.index === info.participantIndex) continue;
-			const peerCommitments = info.commitments.get(participant.index);
+		for (const participant of participants) {
+			if (participant.id === participantId) continue;
+			const peerCommitments = commitments.get(participant.id);
 			if (peerCommitments === undefined)
 				throw Error(
-					`Commitments for ${info.groupId}:${participant.index} are not available!`,
+					`Commitments for ${groupId}:${participant.id} are not available!`,
 				);
-			const peerShare = evalPoly(info.coefficients, participant.index);
+			const peerShare = evalPoly(coefficients, participant.id);
 			const encryptedShare = ecdh(
 				peerShare,
-				info.coefficients[0],
+				coefficients[0],
 				peerCommitments[0],
 			);
 			shares.push(encryptedShare);
 		}
-		if (shares.length !== info.participants.length - 1) {
+		if (shares.length !== participants.length - 1) {
 			throw Error("Unexpect f length");
 		}
 		await this.#coordinator.publishKeygenSecretShares(
-			info.groupId,
+			groupId,
 			verificationShare,
 			shares,
 		);
@@ -218,52 +178,44 @@ export class FrostClient {
 	// `peerShares` are the calculated and encrypted shares (also defined as `f`)
 	async handleKeygenSecrets(
 		groupId: GroupId,
-		senderIndex: bigint,
+		senderId: ParticipantId,
 		peerShares: readonly bigint[],
 	) {
-		const info = this.#keyGenInfo.get(groupId);
-		if (info === undefined) return;
-		if (peerShares.length !== info.participants.length - 1) {
+		const participants = this.#storage.participants(groupId);
+		if (peerShares.length !== participants.length - 1) {
 			throw Error("Unexpect f length");
 		}
-		if (senderIndex === info.participantIndex) {
+		const participantId = this.#storage.participantId(groupId);
+		if (senderId === participantId) {
 			console.info("Do not handle own share");
 			return;
 		}
-		const [participantIndex] = findParticipationIndex(
-			info.participants,
-			this.#validatorAddress,
-		);
-		const commitment = info.commitments.get(senderIndex);
+		const commitment = this.#storage.commitments(groupId, senderId);
 		if (commitment === undefined)
-			throw Error(
-				`Commitments for ${groupId}:${senderIndex} are not available!`,
-			);
+			throw Error(`Commitments for ${groupId}:${senderId} are not available!`);
 		// TODO: check if we should use a reasonable limit for the index (current uint256)
 		const shareIndex =
-			participantIndex < senderIndex ? participantIndex : participantIndex - 1n;
+			participantId < senderId ? participantId : participantId - 1n;
 		// Note: Number(shareIndex) is theoretically an unsafe cast
+		const key = this.#storage.encryptionKey(groupId);
 		const partialShare = ecdh(
 			peerShares[Number(shareIndex) - 1],
-			info.coefficients[0],
+			key,
 			commitment[0],
 		);
-		const partialVerificationShare = evalCommitment(
-			commitment,
-			participantIndex,
-		);
+		const partialVerificationShare = evalCommitment(commitment, participantId);
 		verifyKey(partialVerificationShare, partialShare);
-		info.secretShares.set(senderIndex, partialShare);
+		this.#storage.registerSecretShare(groupId, senderId, partialShare);
 
-		if (checkInformationComplete(info.participants, info.secretShares)) {
-			const verificationShare = info.verificationShare;
-			if (verificationShare === undefined)
-				throw Error("No verification share available!");
-			const signingShare = createSigningShare(info.secretShares);
+		if (this.#storage.checkIfSecretSharesComplete(groupId)) {
+			const verificationShare = this.#storage.verificationShare(groupId);
+			const secretShares = this.#storage.secretSharesMap(groupId);
+			const signingShare = createSigningShare(secretShares);
 			verifyKey(verificationShare, signingShare);
-			info.signingShare = signingShare;
-			// TODO: cleanup stored information
-			console.info(`Final signing key for ${info.participantIndex} calculated`);
+			this.#storage.registerSigningShare(groupId, signingShare);
+			this.#storage.clearKeyGen(groupId);
+			const participantId = this.#storage.participantId(groupId);
+			console.info(`Final signing key for ${participantId} calculated`);
 		}
 	}
 }
