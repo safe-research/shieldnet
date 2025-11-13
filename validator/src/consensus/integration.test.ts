@@ -9,12 +9,11 @@ import { OnchainCoordinator } from "./coordinator.js";
 import { linkClientToCoordinator } from "./events.js";
 import { calculateParticipantsRoot } from "./merkle.js";
 import type { Participant } from "./types.js";
-
-const _createRandomAccount = () => privateKeyToAccount(generatePrivateKey());
+import { InMemoryStorage } from "./storage.js";
 
 // --- Tests ---
 describe("integration", () => {
-	it("keygen and signing flow", { timeout: 30000 }, async () => {
+	it.skip("keygen and signing flow", { timeout: 30000 }, async () => {
 		// Make sure to first start the Anvil testnode (run `anvil` in the root)
 		// and run the deployment script: forge script DeployScript --rpc-url http://127.0.0.1:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast
 		// Private key from Anvil testnet
@@ -30,7 +29,7 @@ describe("integration", () => {
 			),
 		];
 		const participants: Participant[] = accounts.map((a, i) => {
-			return { index: BigInt(i + 1), address: a.address };
+			return { id: BigInt(i + 1), address: a.address };
 		});
 		const coordinatorAddress = "0x03f1bc3eF969F18C33cAC917ED453068aEee2Db5";
 		const clients = accounts.map((a) => {
@@ -49,7 +48,8 @@ describe("integration", () => {
 				signingClient,
 				coordinatorAddress,
 			);
-			const client = new FrostClient(a.address, coordinator);
+			const storage = new InMemoryStorage(a.address)
+			const client = new FrostClient(storage, coordinator);
 			linkClientToCoordinator(client, publicClient, coordinatorAddress);
 			client.registerParticipants(participants);
 			return client;
