@@ -28,6 +28,7 @@ export type KeygenInfo = {
 	commitments: Map<bigint, readonly FrostPoint[]>;
 	secretShares: Map<bigint, bigint>;
 	verificationShare?: FrostPoint;
+	groupPublicKey?: FrostPoint;
 	signingShare?: bigint;
 };
 
@@ -87,6 +88,14 @@ export class FrostClient {
 		return this.#keyGenInfo.get(groupId)?.participantIndex ?? -1n;
 	}
 
+	knownGroups(): Hex[] {
+		return Array.from(this.#keyGenInfo.values().map((i) => i.groupId));
+	}
+
+	groupPublicKey(groupId: GroupId): FrostPoint | undefined {
+		return this.#keyGenInfo.get(groupId)?.groupPublicKey;
+	}
+
 	registerParticipants(participants: Participant[]) {
 		const participantsRoot = calculateParticipantsRoot(participants);
 		this.#participantsInfo.set(participantsRoot, participants);
@@ -130,7 +139,7 @@ export class FrostClient {
 		this.#keyGenInfo.set(groupId, {
 			groupId,
 			participants,
-			participantIndex,
+			participantIndex: participantIndex,
 			coefficients,
 			commitments,
 			secretShares,
@@ -168,6 +177,10 @@ export class FrostClient {
 
 	// Round 2.1
 	private async prepareAndPublishKeygenSecretShares(info: KeygenInfo) {
+		info.groupPublicKey = createVerificationShare(
+			info.commitments,
+			0n
+		)
 		// Will be published as y
 		const verificationShare = createVerificationShare(
 			info.commitments,
@@ -196,7 +209,6 @@ export class FrostClient {
 		}
 		await this.#coordinator.publishKeygenSecretShares(
 			info.groupId,
-			info.participantIndex,
 			verificationShare,
 			shares,
 		);

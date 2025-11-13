@@ -10,6 +10,8 @@ export type FrostPoint = {
 	subtract(other: FrostPoint): FrostPoint;
 	equals(other: FrostPoint): boolean;
 	multiply(scalar: bigint): FrostPoint;
+	toBytes(isCompressed?: boolean): Uint8Array;
+	toHex(isCompressed?: boolean): string;
 };
 
 export type ProofOfKnowledge = {

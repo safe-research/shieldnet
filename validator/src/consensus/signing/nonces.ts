@@ -1,7 +1,7 @@
 import { numberToBytesBE } from "@noble/curves/utils.js";
 import { concatBytes } from "@noble/hashes/utils.js";
-import { encodePacked, type Hex, keccak256 } from "viem";
-import { h3 } from "../../frost/hashes.js";
+import { encodePacked, type Hex, hexToBytes, keccak256 } from "viem";
+import { h1, h3, h4, h5 } from "../../frost/hashes.js";
 import { g, randomBigInt } from "../../frost/math.js";
 import type { FrostPoint } from "../../frost/types.js";
 import { calculateMerkleRoot } from "../merkle.js";
@@ -46,7 +46,7 @@ const hashNonceCommitments = (index: bigint, c: PublicNonceCommitments): Hex =>
 		encodePacked(
 			["uint256", "uint256", "uint256", "uint256", "uint256"],
 			[
-                index,
+				index,
 				c.hidingNonceCommitment.x,
 				c.hidingNonceCommitment.y,
 				c.bindingNonceCommitment.x,
@@ -72,4 +72,92 @@ export const createNonceTree = (
 		leaves,
 		root,
 	};
+};
+
+const encodeCommitments = (
+	signers: bigint[],
+	nonceCommitments: Map<bigint, PublicNonceCommitments>,
+): Uint8Array => {
+	return concatBytes(
+		...signers.map((id) => {
+			const commitments = nonceCommitments.get(id);
+			if (commitments === undefined)
+				throw Error(`Missing nonce commitments for ${id}`);
+			return concatBytes(
+				numberToBytesBE(id, 32),
+				commitments.hidingNonceCommitment.toBytes(true),
+				commitments.bindingNonceCommitment.toBytes(true),
+			);
+		}),
+	);
+};
+
+export type BindingFactor = {
+	id: bigint;
+	bindingFactor: bigint;
+};
+
+export const bindingPrefix = (
+	groupPublicKey: FrostPoint,
+	signers: bigint[],
+	nonceCommitments: Map<bigint, PublicNonceCommitments>,
+	message: Hex,
+): Uint8Array => {
+	const serializedKey = groupPublicKey.toBytes(true);
+	const msgHash = h4(hexToBytes(message));
+	const commitmentHash = h5(encodeCommitments(signers, nonceCommitments));
+	return concatBytes(serializedKey, msgHash, commitmentHash);
+}
+
+export const bindingFactor = (
+	signerId: bigint,
+	bindingPrefix: Uint8Array, 
+): bigint => {
+	return h1(concatBytes(bindingPrefix, numberToBytesBE(signerId, 32)))
+}
+
+export const bindingFactors = (
+	groupPublicKey: FrostPoint,
+	signers: bigint[],
+	nonceCommitments: Map<bigint, PublicNonceCommitments>,
+	message: Hex,
+): BindingFactor[] => {
+	const prefix = bindingPrefix(groupPublicKey, signers, nonceCommitments, message)
+	return signers.map((id) => {
+		return {
+			id,
+			bindingFactor: bindingFactor(id, prefix)
+		}
+	})
+}
+
+export const groupCommitmentShare = (
+	bindingFactor: bigint,
+	nonceCommitments: PublicNonceCommitments
+): FrostPoint => {
+	const factor = nonceCommitments.bindingNonceCommitment.multiply(
+			bindingFactor,
+	);
+	return nonceCommitments.hidingNonceCommitment.add(factor);
+}
+
+export const groupCommitementShares = (
+	bindingFactors: BindingFactor[],
+	nonceCommitments: Map<bigint, PublicNonceCommitments>,
+): FrostPoint[] => {
+	return bindingFactors.map((bf) => {
+		const commitments = nonceCommitments.get(bf.id);
+		if (commitments === undefined)
+			throw Error(`Missing nonce commitments for ${bf.id}`);
+		const factor = commitments.bindingNonceCommitment.multiply(
+			bf.bindingFactor,
+		);
+		return commitments.hidingNonceCommitment.add(factor);
+	});
+};
+
+export const groupCommitement = (
+	groupCommitmentShares: FrostPoint[],
+): FrostPoint => {
+	return groupCommitmentShares.reduce((v, c) => v.add(c));
 };

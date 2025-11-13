@@ -4,7 +4,7 @@ import {
 } from "@noble/curves/abstract/hash-to-curve.js";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex, concatBytes, type Hex, stringToBytes } from "viem";
+import { concatBytes, stringToBytes } from "viem";
 
 const N = secp256k1.Point.CURVE().n;
 const DOMAIN = "FROST-secp256k1-SHA256-v1";
@@ -27,12 +27,12 @@ export const h3 = (input: Uint8Array): bigint => {
 	return hash_to_field(input, 1, opts("nonce"))[0][0];
 };
 
-export const h4 = (input: Uint8Array): Hex => {
+export const h4 = (input: Uint8Array): Uint8Array => {
 	const dstBytes = stringToBytes(dst("msg"));
-	return bytesToHex(sha256(concatBytes([dstBytes, input])));
+	return sha256(concatBytes([dstBytes, input]));
 };
 
-export const h5 = (input: Uint8Array): Hex => {
+export const h5 = (input: Uint8Array): Uint8Array => {
 	const dstBytes = stringToBytes(dst("com"));
-	return bytesToHex(sha256(concatBytes([dstBytes, input])));
+	return sha256(concatBytes([dstBytes, input]));
 };

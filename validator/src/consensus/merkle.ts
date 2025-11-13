@@ -50,7 +50,10 @@ export const verifyMerkleProof = (
 	return root === node;
 };
 
-export const generateMerkleProof = (leaves: Hex[], index: number): Hex[] => {
+export const generateMerkleProofWithRoot = (leaves: Hex[], index: number): {
+	proof: Hex[],
+	root: Hex
+ } => {
 	const tree = buildMerkleTree(leaves);
 	const proof: Hex[] = [];
 	const height = tree.length;
@@ -60,6 +63,14 @@ export const generateMerkleProof = (leaves: Hex[], index: number): Hex[] => {
 		proof.push(node);
 		index = Math.floor(index / 2);
 	}
+	return {
+		proof, 
+		root: tree[height-1][0]
+	};
+};
+
+export const generateMerkleProof = (leaves: Hex[], index: number): Hex[] => {
+	const { proof } = generateMerkleProofWithRoot(leaves, index)
 	return proof;
 };
 

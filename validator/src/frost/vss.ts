@@ -1,4 +1,11 @@
-import { g, hashToBigInt, mod_n, randomBigInt } from "./math.js";
+import {
+	addmod,
+	g,
+	hashToBigInt,
+	mod_n,
+	mulmod,
+	randomBigInt,
+} from "./math.js";
 import type { FrostPoint, GroupId, ProofOfKnowledge } from "./types.js";
 
 // Round 1.1
@@ -21,7 +28,7 @@ export const createProofOfKnowledge = (
 	const k = randomBigInt();
 	const r = g(k);
 	const c = hashToBigInt(index, ga0, r, groupId);
-	const mu = mod_n(k + a0 * c);
+	const mu = addmod(k, mulmod(a0, c));
 	return {
 		r,
 		mu,

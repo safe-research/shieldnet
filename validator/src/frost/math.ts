@@ -10,8 +10,8 @@ import { keccak_256 } from "@noble/hashes/sha3.js";
 import { hexToBigInt } from "viem";
 import type { FrostPoint, GroupId } from "./types.js";
 
-const G_BASE = secp256k1.Point.BASE;
-const N = secp256k1.Point.CURVE().n;
+export const G_BASE = secp256k1.Point.BASE;
+export const N = secp256k1.Point.CURVE().n;
 
 export const randomBigInt = () => bytesToNumberBE(randomBytes(32));
 
@@ -23,6 +23,22 @@ export const g = (scalar: bigint): FrostPoint => {
 
 export const mod_n = (x: bigint) => {
 	return mod(x, N);
+};
+
+export const addmod = (ĺhs: bigint, rhs: bigint) => {
+	return secp256k1.Point.Fn.add(ĺhs, rhs);
+};
+
+export const submod = (ĺhs: bigint, rhs: bigint) => {
+	return secp256k1.Point.Fn.sub(ĺhs, rhs);
+};
+
+export const mulmod = (ĺhs: bigint, rhs: bigint) => {
+	return secp256k1.Point.Fn.mul(ĺhs, rhs);
+};
+
+export const divmod = (ĺhs: bigint, rhs: bigint) => {
+	return secp256k1.Point.Fn.div(ĺhs, rhs);
 };
 
 export const toPoint = (coordinates: { x: bigint; y: bigint }): FrostPoint => {
@@ -85,7 +101,7 @@ export const createSigningShare = (
 ): bigint => {
 	let signingShare = 0n;
 	for (const [, share] of secretShares) {
-		signingShare = mod_n(signingShare + share);
+		signingShare = addmod(signingShare, share);
 	}
 	if (signingShare === 0n) throw Error("Could not calculate signing share!");
 	return signingShare;
@@ -124,14 +140,14 @@ export const evalCommitment = (
 	commitments: readonly FrostPoint[],
 	x: bigint,
 ): FrostPoint => {
-	if (x === 0n) {
-		throw new Error("x is zero");
-	}
 	let value = commitments[0];
+	if (x === 0n) {
+		return value;
+	}
 	let term_pow = 1n;
 	const t = commitments.length;
 	for (let j = 1; j < t; j++) {
-		term_pow = mod_n(term_pow * x);
+		term_pow = mulmod(term_pow, x);
 		value = value.add(commitments[j].multiply(term_pow));
 	}
 	return value;

@@ -41,7 +41,9 @@ describe("hashes", () => {
 			),
 		);
 		expect(hash).toBe(
-			"0x9b0cbeb8a7132d10a14f2b80fcce19e73b96ce7ce30e8c33615aab7767804777",
+			hexToBytes(
+				"0x9b0cbeb8a7132d10a14f2b80fcce19e73b96ce7ce30e8c33615aab7767804777",
+			),
 		);
 	});
 	it("should generate correct h5 hash", () => {
@@ -51,7 +53,9 @@ describe("hashes", () => {
 			),
 		);
 		expect(hash).toBe(
-			"0xe7e18b7374674a612aa7fbfba2741c09e9959ccb5b65fd2add9688b9e51d9f25",
+			hexToBytes(
+				"0xe7e18b7374674a612aa7fbfba2741c09e9959ccb5b65fd2add9688b9e51d9f25",
+			),
 		);
 	});
 });
