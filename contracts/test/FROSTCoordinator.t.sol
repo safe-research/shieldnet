@@ -236,8 +236,8 @@ contract FROSTCoordinatorTest is Test {
         Nonces[] memory nonces = new Nonces[](COUNT + 1);
         {
             bytes32[] memory commitments = new bytes32[](COUNT + 1);
-            for (uint256 index = 1; index <= COUNT; index++) {
-                Nonces memory n = nonces[index];
+            for (uint256 identifier = 1; identifier <= COUNT; identifier++) {
+                Nonces memory n = nonces[identifier];
                 uint256 d = FROST.nonce(bytes32(vm.randomUint()), s[identifier]);
                 n.d = ForgeSecp256k1.g(d);
                 uint256 e = FROST.nonce(bytes32(vm.randomUint()), s[identifier]);
