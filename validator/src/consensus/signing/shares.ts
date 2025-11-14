@@ -4,9 +4,9 @@ import type { SecretNonceCommitments } from "./nonces.js";
 export const lagrangeChallange = (
 	langrangeCoefficient: bigint,
 	challenge: bigint,
-): bigint => mulmod(langrangeCoefficient, challenge);
+): bigint => mulmod(challenge, langrangeCoefficient);
 
-export const createSigningShare = (
+export const createSignatureShare = (
 	privateKeyShare: bigint,
 	nonces: SecretNonceCommitments,
 	bindingFactor: bigint,

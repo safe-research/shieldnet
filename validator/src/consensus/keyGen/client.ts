@@ -60,7 +60,7 @@ export class KeyGenClient {
 		this.#coordinator = coordinator;
 	}
 
-	participationIndex(groupId: GroupId): bigint {
+	participationId(groupId: GroupId): bigint {
 		return this.#storage.participantId(groupId);
 	}
 

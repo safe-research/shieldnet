@@ -1,5 +1,5 @@
-import { concatBytes, hexToBytes } from "@noble/hashes/utils.js";
-import type { Hex } from "viem";
+import { concatBytes } from "@noble/hashes/utils.js";
+import { type Hex, hexToBytes } from "viem";
 import { h2 } from "../../frost/hashes.js";
 import { divmod, mulmod, submod } from "../../frost/math.js";
 import type { FrostPoint } from "../../frost/types.js";
@@ -19,7 +19,7 @@ export const groupChallenge = (
 };
 
 export const lagrangeCoefficient = (signers: bigint[], id: bigint): bigint => {
-	// TODO: assert that id is in signers
+	if (signers.indexOf(id) < 0) throw Error(`${id} not part of signers`);
 	let numerator = 1n;
 	let denominator = 1n;
 

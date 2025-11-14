@@ -1,6 +1,6 @@
 import { type Hex, keccak256 } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { describe, it } from "vitest"; // or '@jest/globals'
+import { describe, it } from "vitest";
 import type {
 	FrostPoint,
 	GroupId,
@@ -19,7 +19,7 @@ import { KeyGenClient } from "./client.js";
 const createRandomAccount = () => privateKeyToAccount(generatePrivateKey());
 
 // --- Tests ---
-describe("client", () => {
+describe("keyGen", () => {
 	it("e2e keygen flow", async () => {
 		const log = (msg: unknown) => {
 			if (process.env.VERBOSE) console.log(msg);
@@ -132,7 +132,7 @@ describe("client", () => {
 		for (const { client } of clients) {
 			for (const e of commitmentEvents) {
 				log(
-					`>>>> Keygen commitment from ${e.index} to ${client.participationIndex(e.groupId)} >>>>`,
+					`>>>> Keygen commitment from ${e.index} to ${client.participationId(e.groupId)} >>>>`,
 				);
 				await client.handleKeygenCommitment(
 					e.groupId,
@@ -146,7 +146,7 @@ describe("client", () => {
 		for (const { client } of clients) {
 			for (const e of shareEvents) {
 				log(
-					`>>>> Keygen secrets from ${e.index} to ${client.participationIndex(e.groupId)} >>>>`,
+					`>>>> Keygen secrets from ${e.index} to ${client.participationId(e.groupId)} >>>>`,
 				);
 				await client.handleKeygenSecrets(e.groupId, e.index, e.peerShares);
 			}
@@ -154,13 +154,21 @@ describe("client", () => {
 		for (const { storage } of clients) {
 			log(storage.accountAddress());
 			for (const groupId of storage.knownGroups()) {
+				const publicKey = storage.publicKey(groupId);
+				const verificationShare = storage.verificationShare(groupId);
 				log({
 					groupId,
-					secretShare: storage.signingShare(groupId),
+					signingShare: storage.signingShare(groupId),
 					participants: storage.participants(groupId),
 					participantId: storage.participantId(groupId),
-					verificationShare: storage.verificationShare(groupId),
-					publicKey: storage.publicKey(groupId),
+					verificationShare: {
+						x: verificationShare?.x,
+						y: verificationShare?.y,
+					},
+					publicKey: {
+						x: publicKey?.x,
+						y: publicKey?.y,
+					},
 				});
 			}
 		}

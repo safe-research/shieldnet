@@ -50,8 +50,6 @@ export type SigningCoordinator = {
 		lagrangeChallange: bigint,
 		signingParticipantsProof: Hex[],
 	): Promise<Hex>;
-
-	groupPublicKey(groupId: Hex): Promise<FrostPoint>;
 };
 
 export type FrostCoordinator = KeyGenCoordinator;

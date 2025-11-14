@@ -236,10 +236,12 @@ contract FROSTCoordinatorTest is Test {
         Nonces[] memory nonces = new Nonces[](COUNT + 1);
         {
             bytes32[] memory commitments = new bytes32[](COUNT + 1);
-            for (uint256 identifier = 1; identifier <= COUNT; identifier++) {
-                Nonces memory n = nonces[identifier];
-                n.d = ForgeSecp256k1.g(FROST.nonce(bytes32(vm.randomUint()), s[identifier]));
-                n.e = ForgeSecp256k1.g(FROST.nonce(bytes32(vm.randomUint()), s[identifier]));
+            for (uint256 index = 1; index <= COUNT; index++) {
+                Nonces memory n = nonces[index];
+                uint256 d = FROST.nonce(bytes32(vm.randomUint()), s[identifier]);
+                n.d = ForgeSecp256k1.g(d);
+                uint256 e = FROST.nonce(bytes32(vm.randomUint()), s[identifier]);
+                n.e = ForgeSecp256k1.g(e);
                 // forge-lint: disable-next-line(asm-keccak256)
                 bytes32 leaf = keccak256(abi.encode(0, n.d.x(), n.d.y(), n.e.x(), n.e.y()));
                 commitments[identifier] = MerkleProof.processProof(nonceProof, leaf);
@@ -263,7 +265,7 @@ contract FROSTCoordinatorTest is Test {
         bytes32 message = keccak256("Hello, Shieldnet!");
         {
             vm.expectEmit();
-            emit FROSTCoordinator.Sign(gid, sid, message);
+            emit FROSTCoordinator.Sign(gid, sid, message, 0);
             FROSTCoordinator.SignatureId actualSid = coordinator.sign(gid, message);
             assertEq(FROSTCoordinator.SignatureId.unwrap(sid), FROSTCoordinator.SignatureId.unwrap(actualSid));
         }
@@ -406,7 +408,7 @@ contract FROSTCoordinatorTest is Test {
         // For debugging purposes, also provide the group private key to the
         // caller (even if this is typically not available).
         s[0] = a[0];
-
+        
         assertEq(
             keccak256(abi.encode(coordinator.groupKey(gid))), keccak256(abi.encode(ForgeSecp256k1.g(s[0]).toPoint()))
         );

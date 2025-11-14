@@ -19,6 +19,10 @@ export const mod_n = (x: bigint) => {
 	return mod(x, N);
 };
 
+export const neg = (val: bigint) => {
+	return secp256k1.Point.Fn.neg(val);
+};
+
 export const addmod = (ĺhs: bigint, rhs: bigint) => {
 	return secp256k1.Point.Fn.add(ĺhs, rhs);
 };

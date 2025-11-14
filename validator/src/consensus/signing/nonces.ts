@@ -162,7 +162,7 @@ export const groupCommitementShares = (
 	});
 };
 
-export const groupCommitement = (
+export const calculateGroupCommitment = (
 	groupCommitmentShares: FrostPoint[],
 ): FrostPoint => {
 	return groupCommitmentShares.reduce((v, c) => v.add(c));

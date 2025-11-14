@@ -6,7 +6,7 @@ import {
 	keyGenEventSchema,
 	keyGenSecretSharedEventSchema,
 } from "../types/schemas.js";
-import type { KeyGenClient } from "./keygen/client.js";
+import type { KeyGenClient } from "./keyGen/client.js";
 
 export const linkClientToCoordinator = (
 	frostClient: KeyGenClient,

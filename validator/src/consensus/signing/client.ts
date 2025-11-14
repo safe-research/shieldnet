@@ -1,4 +1,4 @@
-import { encodePacked, type Hex } from "viem";
+import { encodePacked, type Hex, keccak256 } from "viem";
 import type { GroupId, ParticipantId, SignatureId } from "../../frost/types.js";
 import { generateMerkleProofWithRoot } from "../merkle.js";
 import type {
@@ -9,17 +9,15 @@ import type {
 import { groupChallenge, lagrangeCoefficient } from "./group.js";
 import {
 	bindingFactors,
+	calculateGroupCommitment,
 	createNonceTree,
 	decodeSequence,
-	groupCommitement,
 	groupCommitementShares,
 	nonceCommitmentsWithProof,
 	type PublicNonceCommitments,
 } from "./nonces.js";
-import {
-	createSigningShare as createSignatureShare,
-	lagrangeChallange,
-} from "./shares.js";
+import { createSignatureShare, lagrangeChallange } from "./shares.js";
+import { verifySignatureShare } from "./verify.js";
 
 export class SigningClient {
 	#storage: GroupInfoStorage & SignatureRequestStorage;
@@ -139,7 +137,7 @@ export class SigningClient {
 			bindingFactorList,
 			signerNonceCommitments,
 		);
-		const groupCommitment = groupCommitement(groupCommitmentShares);
+		const groupCommitment = calculateGroupCommitment(groupCommitmentShares);
 		const challenge = groupChallenge(groupCommitment, groupPublicKey, message);
 		const signerParts = signers.map((signerId, index) => {
 			const nonceCommitments = signerNonceCommitments.get(signerId);
@@ -148,9 +146,11 @@ export class SigningClient {
 			const r = groupCommitmentShares[index];
 			const coeff = lagrangeCoefficient(signers, signerId);
 			const cl = lagrangeChallange(coeff, challenge);
-			const node = encodePacked(
-				["uint256", "uint256", "uint256", "uint256"],
-				[signerId, r.x, r.y, cl],
+			const node = keccak256(
+				encodePacked(
+					["uint256", "uint256", "uint256", "uint256"],
+					[signerId, r.x, r.y, cl],
+				),
 			);
 			return {
 				signerId,
@@ -177,6 +177,13 @@ export class SigningClient {
 				signerParts.map((p) => p.node),
 				signerIndex,
 			);
+
+		verifySignatureShare(
+			signatureShare,
+			this.#storage.verificationShare(groupId),
+			signerPart.cl,
+			signerPart.r,
+		);
 
 		await this.#coordinator.publishSignatureShare(
 			signatureId,

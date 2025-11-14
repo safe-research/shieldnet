@@ -3,10 +3,10 @@ import { bytesToNumberBE } from "@noble/curves/utils.js";
 import { createPublicClient, createWalletClient, http, parseAbi } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { anvil } from "viem/chains";
-import { describe, expect, it } from "vitest"; // or '@jest/globals'
+import { describe, expect, it } from "vitest";
 import { OnchainCoordinator } from "./coordinator.js";
 import { linkClientToCoordinator } from "./events.js";
-import { KeyGenClient } from "./keygen/client.js";
+import { KeyGenClient } from "./keyGen/client.js";
 import { calculateParticipantsRoot } from "./merkle.js";
 import { InMemoryStorage } from "./storage.js";
 import type { Participant } from "./types.js";

@@ -1,5 +1,5 @@
 import { hexToBytes } from "viem";
-import { describe, expect, it } from "vitest"; // or '@jest/globals'
+import { describe, expect, it } from "vitest";
 import { h1, h2, h3, h4, h5, keyGenChallenge } from "./hashes.js";
 import { toPoint } from "./math.js";
 
