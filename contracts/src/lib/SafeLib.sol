@@ -5,7 +5,7 @@ library SafeLib {
     /**
      * @notice A Safe transaction operation.
      * @custom:variant Call The Safe transaction is executed with the `CALL` opcode.
-     * @custom:variant Delegatecall The Safe transaction is executed with the `DELEGATECALL` opcode.
+     * @custom:variant DelegateCall The Safe transaction is executed with the `DELEGATECALL` opcode.
      */
     enum Operation {
         Call,
@@ -42,6 +42,9 @@ library SafeLib {
 
             // Compute the domain separator.
             domainHash := keccak256(ptr, 96)
+
+            // Update free memory pointer
+            mstore(0x40, add(ptr, 96))
         }
         /* solhint-enable no-inline-assembly */
     }
@@ -111,6 +114,8 @@ library SafeLib {
             mstore(add(ptr, 32), domainHash)
             // Calculate the hash.
             txHash := keccak256(add(ptr, 30), 66)
+            // Update free memory pointer
+            mstore(0x40, add(ptr, 64))
         }
         /* solhint-enable no-inline-assembly */
     }

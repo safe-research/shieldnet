@@ -11,7 +11,7 @@ contract Consensus {
     // STRUCTS & ENUMS
     // ============================================================
 
-    /*
+    /**
      * @notice Represents information about a specific epoch
      */
     struct EpochInfo {
@@ -19,7 +19,7 @@ contract Consensus {
         EpochState state; // Current state of the epoch
     }
 
-    /*
+    /**
      * @notice Defines the lifecycle states of an epoch
      */
     enum EpochState {
@@ -33,37 +33,37 @@ contract Consensus {
     // STORAGE VARIABLES
     // ============================================================
 
-    /*
+    /**
      * @notice Number of participants in the validator set
      */
     uint64 public immutable PARTICIPANT_COUNT;
 
-    /*
+    /**
      * @notice Current active epoch number (0 = not yet initialized)
      */
     uint64 public currentEpoch;
 
-    /*
+    /**
      * @notice Next epoch number for which KeyGen is in progress
      */
     uint64 public nextEpoch;
 
-    /*
+    /**
      * @notice Duration of each epoch in seconds
      */
     uint64 public immutable EPOCH_DURATION;
 
-    /*
+    /**
      * @notice Reference to FROSTCoordinator for KeyGen ceremonies
      */
     FROSTCoordinator public immutable FROST_COORDINATOR;
 
-    /*
+    /**
      * @notice Merkle root of the validator set for this consensus contract
      */
     bytes32 public immutable PARTICIPANT_HASH;
 
-    /*
+    /**
      * @notice Bootstrap GroupId used for first epoch verification
      */
     FROSTCoordinator.GroupId public immutable BOOTSTRAP_GROUP_ID;
@@ -72,12 +72,12 @@ contract Consensus {
     // MAPPINGS
     // ============================================================
 
-    /*
+    /**
      * @notice Stores epoch information including GroupId and state
      */
     mapping(uint64 epoch => EpochInfo) public epochs;
 
-    /*
+    /**
      * @notice Maps Safe transaction hash to block number where it was proposed
      */
     mapping(bytes32 safeTxHash => uint256 blockNumber) public transactions;
@@ -86,12 +86,12 @@ contract Consensus {
     // EVENTS
     // ============================================================
 
-    /*
+    /**
      * @notice Emitted when a KeyGen ceremony is initiated for an epoch
      */
     event KeyGenInitiated(uint64 indexed epoch, uint64 threshold, uint64 participantCount, bytes32 participantHash);
 
-    /*
+    /**
      * @notice Emitted when a Safe transaction is proposed for validator observation
      */
     event TransactionProposed(
@@ -112,7 +112,7 @@ contract Consensus {
         uint256 epoch
     );
 
-    /*
+    /**
      * @notice Emitted when validators initiate signing ceremony for epoch handover
      */
     event EpochGroupSigned(
@@ -122,14 +122,14 @@ contract Consensus {
         bytes32 message
     );
 
-    /*
+    /**
      * @notice Emitted when an epoch is finalized and becomes active
      */
     event EpochFinalized(
         uint256 indexed epoch, FROSTCoordinator.GroupId indexed groupId, bytes32 indexed participantHash
     );
 
-    /*
+    /**
      * @notice Emitted when an epoch expires and transitions to Expired state
      */
     event EpochExpired(uint256 indexed epoch);
@@ -138,42 +138,42 @@ contract Consensus {
     // ERRORS
     // ============================================================
 
-    /*
+    /**
      * @notice Thrown when trying to initiate KeyGen for an epoch that already has KeyGen initiated
      */
     error KeyGenAlreadyInitiated();
 
-    /*
+    /**
      * @notice Thrown when trying to propose a transaction but currentEpoch is not in Active state
      */
     error EpochNotActive();
 
-    /*
+    /**
      * @notice Thrown when epoch is in wrong state for the operation
      */
     error InvalidEpochState();
 
-    /*
+    /**
      * @notice Thrown when transaction parameters are invalid
      */
     error InvalidTransaction();
 
-    /*
+    /**
      * @notice Thrown for invalid input parameters (e.g., zero addresses)
      */
     error InvalidParameter();
 
-    /*
+    /**
      * @notice Thrown when FROST signature verification fails
      */
     error InvalidSignature();
 
-    /*
+    /**
      * @notice Thrown when epoch number is invalid or doesn't match expected value
      */
     error InvalidEpoch();
 
-    /*
+    /**
      * @notice Thrown when trying to propose a transaction hash that was already proposed
      */
     error AlreadyProposed();
@@ -190,7 +190,7 @@ contract Consensus {
         uint64 _epochDuration
     ) {
         // Validate parameters
-        require(_participantCount / 2 != 0, InvalidParameter());
+        require(_participantCount > 1, InvalidParameter()); // At least 2 or more participants required for FROST
         require(_frostCoordinator != address(0), InvalidParameter());
         require(_participantHash != bytes32(0), InvalidParameter());
         require(FROSTCoordinator.GroupId.unwrap(_bootstrapGroupId) != bytes32(0), InvalidParameter());
@@ -211,7 +211,7 @@ contract Consensus {
     // EXTERNAL FUNCTIONS - EPOCH MANAGEMENT
     // ============================================================
 
-    /*
+    /**
      * @notice Manually initiates KeyGen for the next epoch
      * @dev Can be called by anyone if automatic initiation fails or for manual control
      */
@@ -221,7 +221,7 @@ contract Consensus {
         _initiateKeyGen(calculatedNextEpoch);
     }
 
-    /*
+    /**
      * @notice Initiates FROST signing ceremony for epoch handover
      * @dev Validators sign: keccak256(abi.encode(nextEpoch, groupKey(nextEpoch)))
      *      This proves validators completed KeyGen and agree on the group key
@@ -243,13 +243,15 @@ contract Consensus {
         emit EpochGroupSigned(currentEpoch, nextEpoch, signatureId, message);
     }
 
-    /*
+    /**
      * @notice Finalizes the epoch handover with FROST signature verification
      * @param signature FROST signature encoded as abi.encode(Secp256k1.Point r, uint256 z)
      * @dev Transitions nextEpoch from KeyGen -> Active, currentEpoch -> Expired
      *      Automatically initiates KeyGen for the following epoch
      */
     function finalizeEpoch(bytes calldata signature) external {
+        require(epochs[nextEpoch].state == EpochState.KeyGen, InvalidEpochState());
+
         // Decode FROST signature
         (Secp256k1.Point memory r, uint256 z) = abi.decode(signature, (Secp256k1.Point, uint256));
 
@@ -296,7 +298,7 @@ contract Consensus {
     // EXTERNAL FUNCTIONS - TRANSACTION PROPOSALS
     // ============================================================
 
-    /*
+    /**
      * @notice Propose a Safe transaction for validator observation
      * @param safeAddress The Safe wallet this transaction is for
      * @param to Target address for the transaction
@@ -378,29 +380,29 @@ contract Consensus {
     // VIEW FUNCTIONS
     // ============================================================
 
-    /*
+    /**
      * @notice Returns the group public key for a specific epoch
      * @param epoch The epoch number
      * @return The group public key as a secp256k1 point
      */
-    function getEpochGroupKey(uint64 epoch) external view returns (Secp256k1.Point memory) {
+    function getEpochGroupKey(uint64 epoch) public view returns (Secp256k1.Point memory) {
         FROSTCoordinator.GroupId groupId = _groupId(epoch);
         return FROST_COORDINATOR.groupKey(groupId);
     }
 
-    /*
+    /**
      * @notice Returns the group public key for the current active epoch
      * @return The current group public key as a secp256k1 point
      */
     function getCurrentGroupKey() external view returns (Secp256k1.Point memory) {
-        return this.getEpochGroupKey(currentEpoch);
+        return getEpochGroupKey(currentEpoch);
     }
 
     // ============================================================
     // INTERNAL FUNCTIONS
     // ============================================================
 
-    /*
+    /**
      * @notice Internal function to initiate KeyGen ceremony for a specific epoch
      * @param epoch The epoch number for which to initiate KeyGen
      * @dev Sets nextEpoch storage variable and updates epoch state
@@ -425,7 +427,7 @@ contract Consensus {
         emit KeyGenInitiated(epoch, threshold, PARTICIPANT_COUNT, PARTICIPANT_HASH);
     }
 
-    /*
+    /**
      * @notice Calculates the GroupId for a given epoch
      * @param epoch The epoch number
      * @return The GroupId for the epoch
@@ -436,7 +438,7 @@ contract Consensus {
         return FROSTCoordinator.GroupId.wrap(bytes32((uint256(epoch) << 192) | uint256(uint160(address(this)))));
     }
 
-    /*
+    /**
      * @notice Calculates the message hash for epoch handover signing
      * @param epoch The epoch number
      * @param groupKey The group public key for the epoch
@@ -463,6 +465,9 @@ contract Consensus {
 
             // Calculate keccak256 of the 96 bytes (0x60)
             message := keccak256(ptr, 0x60)
+
+            // Update free memory pointer
+            mstore(0x40, add(ptr, 0x60))
         }
     }
 }
