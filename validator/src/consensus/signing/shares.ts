@@ -1,22 +1,22 @@
 import { addmod, mulmod } from "../../frost/math.js";
 import type { SecretNonceCommitments } from "./nonces.js";
 
-export const lagrangeChallange = (
-	langrangeCoefficient: bigint,
+export const lagrangeChallenge = (
+	lagrangeCoefficient: bigint,
 	challenge: bigint,
-): bigint => mulmod(challenge, langrangeCoefficient);
+): bigint => mulmod(challenge, lagrangeCoefficient);
 
 export const createSignatureShare = (
 	privateKeyShare: bigint,
 	nonces: SecretNonceCommitments,
 	bindingFactor: bigint,
-	lagrangeChallange: bigint,
+	lagrangeChallenge: bigint,
 ): bigint => {
 	return addmod(
 		nonces.hidingNonce,
 		addmod(
 			mulmod(nonces.bindingNonce, bindingFactor),
-			mulmod(lagrangeChallange, privateKeyShare),
+			mulmod(lagrangeChallenge, privateKeyShare),
 		),
 	);
 };

@@ -20,11 +20,11 @@ export const verifySignature = (
 export const verifySignatureShare = (
 	signatureShare: bigint,
 	verificationShare: FrostPoint,
-	lagrangeChallange: bigint,
+	lagrangeChallenge: bigint,
 	groupCommitmentShare: FrostPoint,
 ) => {
 	const sG = g(signatureShare);
-	const pki = verificationShare.multiply(lagrangeChallange);
+	const pki = verificationShare.multiply(lagrangeChallenge);
 	const r = groupCommitmentShare.add(pki);
 	if (sG.x !== r.x) {
 		throw Error("Invalid signature share");

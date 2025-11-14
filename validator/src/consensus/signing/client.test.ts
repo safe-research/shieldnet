@@ -172,7 +172,7 @@ describe("signing", () => {
 					_signingParticipantsHash: Hex,
 					groupCommitementShare: FrostPoint,
 					signatureShare: bigint,
-					_lagrangeChallange: bigint,
+					_lagrangeChallenge: bigint,
 					_signingParticipantsProof: Hex[],
 				): Promise<Hex> => {
 					signatureShareEvents.push({

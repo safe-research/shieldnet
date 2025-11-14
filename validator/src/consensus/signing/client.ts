@@ -16,7 +16,7 @@ import {
 	nonceCommitmentsWithProof,
 	type PublicNonceCommitments,
 } from "./nonces.js";
-import { createSignatureShare, lagrangeChallange } from "./shares.js";
+import { createSignatureShare, lagrangeChallenge } from "./shares.js";
 import { verifySignatureShare } from "./verify.js";
 
 export class SigningClient {
@@ -145,7 +145,7 @@ export class SigningClient {
 				throw Error(`Missing nonce commitments for ${signerId}`);
 			const r = groupCommitmentShares[index];
 			const coeff = lagrangeCoefficient(signers, signerId);
-			const cl = lagrangeChallange(coeff, challenge);
+			const cl = lagrangeChallenge(coeff, challenge);
 			const node = keccak256(
 				encodePacked(
 					["uint256", "uint256", "uint256", "uint256"],

@@ -47,7 +47,7 @@ export type SigningCoordinator = {
 		signingParticipantsHash: Hex,
 		groupCommitementShare: FrostPoint, // add(d, mul(bindingFactor, e)
 		signatureShare: bigint,
-		lagrangeChallange: bigint,
+		lagrangeChallenge: bigint,
 		signingParticipantsProof: Hex[],
 	): Promise<Hex>;
 };

@@ -254,7 +254,7 @@ export class InMemoryStorage
 	): void {
 		// Check if group is known, otherwise this will throw
 		this.groupInfo(groupId);
-		if (this.#signatureRequests.has(groupId))
+		if (this.#signatureRequests.has(signatureId))
 			throw Error(`SignatureRequest for ${signatureId} already registered!`);
 		this.#signatureRequests.set(signatureId, {
 			groupId,
