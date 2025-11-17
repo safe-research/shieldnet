@@ -12,8 +12,8 @@ import type {
 	ProofOfKnowledge,
 	SignatureId,
 } from "../frost/types.js";
+import type { PublicNonceCommitments } from "./signing/nonces.js";
 import type { FrostCoordinator } from "./types.js";
-import { PublicNonceCommitments } from "./signing/nonces.js";
 
 export const COORDINATOR_FUNCTIONS = parseAbi([
 	"error InvalidKeyGenCommitment()",
@@ -22,7 +22,7 @@ export const COORDINATOR_FUNCTIONS = parseAbi([
 	"function keyGenSecretShare(bytes32 id, ((uint256 x, uint256 y) y, uint256[] f) calldata share) external",
 	"function preprocess(bytes32 id, bytes32 commitment) external returns (uint32 chunk)",
 	"function signRevealNonces(bytes32 sid, ((uint256 x, uint256 y) d, (uint256 x, uint256 y) e) calldata nonces, bytes32[] calldata proof) external",
-	"function signShare(bytes32 sid, bytes32 root, (uint256 x, uint256 y) memory r, uint256 z, uint256 cl, bytes32[] calldata proof) external"
+	"function signShare(bytes32 sid, bytes32 root, (uint256 x, uint256 y) memory r, uint256 z, uint256 cl, bytes32[] calldata proof) external",
 ]);
 
 export class OnchainCoordinator implements FrostCoordinator {
@@ -87,21 +87,25 @@ export class OnchainCoordinator implements FrostCoordinator {
 		return this.#signingClient.writeContract(request);
 	}
 
-	async publishNonceCommitmentsHash(groupId: GroupId, nonceCommitmentsHash: Hex): Promise<Hex> {
+	async publishNonceCommitmentsHash(
+		groupId: GroupId,
+		nonceCommitmentsHash: Hex,
+	): Promise<Hex> {
 		const { request } = await this.#publicClient.simulateContract({
 			address: this.#address,
 			abi: COORDINATOR_FUNCTIONS,
 			functionName: "preprocess",
-			args: [
-				groupId,
-				nonceCommitmentsHash,
-			],
+			args: [groupId, nonceCommitmentsHash],
 			account: this.#signingClient.account,
 		});
 		return this.#signingClient.writeContract(request);
 	}
 
-	async publishNonceCommitments(signatureId: SignatureId, nonceCommitments: PublicNonceCommitments, nonceProof: Hex[]): Promise<Hex> {
+	async publishNonceCommitments(
+		signatureId: SignatureId,
+		nonceCommitments: PublicNonceCommitments,
+		nonceProof: Hex[],
+	): Promise<Hex> {
 		const { request } = await this.#publicClient.simulateContract({
 			address: this.#address,
 			abi: COORDINATOR_FUNCTIONS,
@@ -110,16 +114,23 @@ export class OnchainCoordinator implements FrostCoordinator {
 				signatureId,
 				{
 					d: nonceCommitments.hidingNonceCommitment,
-					e: nonceCommitments.bindingNonceCommitment
+					e: nonceCommitments.bindingNonceCommitment,
 				},
-				nonceProof
+				nonceProof,
 			],
 			account: this.#signingClient.account,
 		});
 		return this.#signingClient.writeContract(request);
 	}
 
-	async publishSignatureShare(signatureId: SignatureId, signingParticipantsHash: Hex, groupCommitementShare: FrostPoint, signatureShare: bigint, lagrangeChallenge: bigint, signingParticipantsProof: Hex[]): Promise<Hex> {
+	async publishSignatureShare(
+		signatureId: SignatureId,
+		signingParticipantsHash: Hex,
+		groupCommitementShare: FrostPoint,
+		signatureShare: bigint,
+		lagrangeChallenge: bigint,
+		signingParticipantsProof: Hex[],
+	): Promise<Hex> {
 		const { request } = await this.#publicClient.simulateContract({
 			address: this.#address,
 			abi: COORDINATOR_FUNCTIONS,
@@ -130,7 +141,7 @@ export class OnchainCoordinator implements FrostCoordinator {
 				groupCommitementShare,
 				signatureShare,
 				lagrangeChallenge,
-				signingParticipantsProof
+				signingParticipantsProof,
 			],
 			account: this.#signingClient.account,
 		});

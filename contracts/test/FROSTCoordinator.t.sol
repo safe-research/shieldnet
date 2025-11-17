@@ -349,7 +349,7 @@ contract FROSTCoordinatorTest is Test {
             bytes32[] memory proof = commitmentShares.proof(i);
 
             vm.expectEmit();
-            emit FROSTCoordinator.SignShare(sid, FROST.newIdentifier(identifier), shares[i]);
+            emit FROSTCoordinator.SignShare(sid, FROST.newIdentifier(identifier), shares[i], root);
             vm.prank(participants.addr(identifier));
             coordinator.signShare(sid, root, cs[i].r, shares[i], cs[i].cl, proof);
         }

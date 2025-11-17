@@ -80,7 +80,7 @@ export const nonceCommitmentsSchema = z.object({
 export const nonceCommitmentsEventSchema = z.object({
 	sid: hexDataSchema,
 	identifier: z.bigint().positive(),
-	nonces: nonceCommitmentsSchema
+	nonces: nonceCommitmentsSchema,
 });
 
 export const signatureShareEventSchema = z.object({

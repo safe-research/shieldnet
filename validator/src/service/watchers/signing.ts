@@ -1,6 +1,6 @@
-import type { Address, Hex, Log, PublicClient } from "viem";
+import type { Address, Hex, PublicClient } from "viem";
 import { COORDINATOR_EVENTS } from "../../types/abis.js";
-import { AbiPoint } from "../../types/interfaces.js";
+import type { AbiPoint } from "../../types/interfaces.js";
 
 export const watchSignEvents = ({
 	client,
@@ -28,9 +28,9 @@ export const watchSignEvents = ({
 	onNonceCommitmentsRevealed: (args: {
 		sid?: Hex;
 		identifier?: bigint;
-		nonces?: { d: AbiPoint, e: AbiPoint };
+		nonces?: { d: AbiPoint; e: AbiPoint };
 	}) => Promise<void>;
-	onSignatureShare: (args: {
+	onSignatureShare?: (args: {
 		sid?: Hex;
 		identifier?: bigint;
 		z?: bigint;
@@ -55,7 +55,7 @@ export const watchSignEvents = ({
 						onNonceCommitmentsRevealed(log.args).catch(onError);
 						return;
 					case "SignShare":
-						onSignatureShare(log.args)?.catch(onError);
+						onSignatureShare?.(log.args)?.catch(onError);
 						return;
 					default:
 						// Event unrelated to signing flow

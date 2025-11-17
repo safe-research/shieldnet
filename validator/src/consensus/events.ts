@@ -1,14 +1,19 @@
 import type { Address, PublicClient } from "viem";
 import { toPoint } from "../frost/math.js";
+import { watchKeyGenEvents } from "../service/watchers/keyGen.js";
+import { watchSignEvents } from "../service/watchers/signing.js";
 import {
 	keyGenCommittedEventSchema,
 	keyGenEventSchema,
 	keyGenSecretSharedEventSchema,
+	nonceCommitmentsEventSchema,
+	nonceCommitmentsHashEventSchema,
+	signRequestEventSchema,
 } from "../types/schemas.js";
 import type { KeyGenClient } from "./keyGen/client.js";
-import { watchKeyGenEvents } from "../service/watchers/keyGen.js";
+import type { SigningClient } from "./signing/client.js";
 
-export const linkClientToCoordinator = (
+export const linkKeyGenClientToCoordinator = (
 	frostClient: KeyGenClient,
 	publicClient: PublicClient,
 	coordinatorAddress: Address,
@@ -43,6 +48,43 @@ export const linkClientToCoordinator = (
 				event.gid,
 				event.identifier,
 				event.share.f,
+			);
+		},
+		onError: console.error,
+	});
+};
+
+export const linkSigningClientToCoordinator = (
+	frostClient: SigningClient,
+	publicClient: PublicClient,
+	coordinatorAddress: Address,
+) => {
+	watchSignEvents({
+		client: publicClient,
+		target: coordinatorAddress,
+		onNewNonceCommitmentsHash: async (e) => {
+			const event = nonceCommitmentsHashEventSchema.parse(e);
+			return frostClient.handleNonceCommitmentsHash(
+				event.gid,
+				event.identifier,
+				event.commitment,
+				BigInt(event.chunk),
+			);
+		},
+		onNonceCommitmentsRevealed: async (e) => {
+			const event = nonceCommitmentsEventSchema.parse(e);
+			return frostClient.handleNonceCommitments(event.sid, event.identifier, {
+				hidingNonceCommitment: toPoint(event.nonces.d),
+				bindingNonceCommitment: toPoint(event.nonces.e),
+			});
+		},
+		onSignRequest: async (e) => {
+			const event = signRequestEventSchema.parse(e);
+			return frostClient.handleSignatureRequest(
+				event.gid,
+				event.sid,
+				event.message,
+				event.sequence,
 			);
 		},
 		onError: console.error,

@@ -1,5 +1,5 @@
-import type { Address, Hex, Log, PublicClient } from "viem";
-import { CONSENSUS_CORE_EVENTS, COORDINATOR_EVENTS } from "../types/abis.js";
+import type { Address, Log, PublicClient } from "viem";
+import { CONSENSUS_CORE_EVENTS } from "../types/abis.js";
 
 export const watchConsensusEvents = ({
 	client,

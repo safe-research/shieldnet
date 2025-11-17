@@ -1,6 +1,6 @@
-import type { Address, Hex, Log, PublicClient } from "viem";
+import type { Address, Hex, PublicClient } from "viem";
 import { COORDINATOR_EVENTS } from "../../types/abis.js";
-import { AbiPoint } from "../../types/interfaces.js";
+import type { AbiPoint } from "../../types/interfaces.js";
 
 export const watchKeyGenEvents = ({
 	client,
@@ -32,7 +32,7 @@ export const watchKeyGenEvents = ({
 }): (() => void) => {
 	// TODO: Allow to specify "fromBlock" to pick up on past events
 	// TODO: Provide callback for "last block processed" for service recovery
-    // TODO: Add keygen aborted
+	// TODO: Add keygen aborted
 	return client.watchContractEvent({
 		address: target,
 		abi: COORDINATOR_EVENTS,
@@ -49,7 +49,7 @@ export const watchKeyGenEvents = ({
 						onKeyGenSecrets(log.args).catch(onError);
 						return;
 					default:
-                        // TODO: Add keygen aborted
+						// TODO: Add keygen aborted
 						// Event unrelated to keygen flow
 						return;
 				}
