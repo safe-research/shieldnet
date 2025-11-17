@@ -68,7 +68,7 @@ export const linkSigningClientToCoordinator = (
 				event.gid,
 				event.identifier,
 				event.commitment,
-				BigInt(event.chunk),
+				event.chunk,
 			);
 		},
 		onNonceCommitmentsRevealed: async (e) => {
@@ -84,7 +84,7 @@ export const linkSigningClientToCoordinator = (
 				event.gid,
 				event.sid,
 				event.message,
-				BigInt(event.sequence),
+				event.sequence,
 			);
 		},
 		onError: console.error,

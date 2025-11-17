@@ -61,7 +61,7 @@ export const keyGenSecretSharedEventSchema = z.object({
 export const nonceCommitmentsHashEventSchema = z.object({
 	gid: hexDataSchema,
 	identifier: z.bigint().positive(),
-	chunk: z.number().nonnegative(),
+	chunk: z.bigint().nonnegative(),
 	commitment: hexDataSchema,
 });
 
@@ -69,7 +69,7 @@ export const signRequestEventSchema = z.object({
 	gid: hexDataSchema,
 	sid: hexDataSchema,
 	message: hexDataSchema,
-	sequence: z.number().nonnegative(),
+	sequence: z.bigint().nonnegative(),
 });
 
 export const nonceCommitmentsSchema = z.object({

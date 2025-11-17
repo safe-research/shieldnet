@@ -1,5 +1,6 @@
 import { type Address, type Hex, keccak256, stringToBytes } from "viem";
 import { describe, expect, it } from "vitest";
+import { log } from "../../__tests__/logging.js";
 import { addmod, g, toPoint } from "../../frost/math.js";
 import type { FrostPoint, GroupId, SignatureId } from "../../frost/types.js";
 import { InMemoryStorage } from "../storage.js";
@@ -121,9 +122,6 @@ const NONCE_TREES = [
 // --- Tests ---
 describe("signing", () => {
 	it("e2e signing flow", async () => {
-		const log = (msg: unknown) => {
-			if (process.env.VERBOSE) console.log(msg);
-		};
 		const nonceCommitmentsEvents: {
 			groupId: GroupId;
 			index: bigint;

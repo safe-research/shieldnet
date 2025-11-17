@@ -1,6 +1,7 @@
 import { type Hex, keccak256 } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { describe, it } from "vitest";
+import { log } from "../../__tests__/logging.js";
 import type {
 	FrostPoint,
 	GroupId,
@@ -21,9 +22,6 @@ const createRandomAccount = () => privateKeyToAccount(generatePrivateKey());
 // --- Tests ---
 describe("keyGen", () => {
 	it("e2e keygen flow", async () => {
-		const log = (msg: unknown) => {
-			if (process.env.VERBOSE) console.log(msg);
-		};
 		const count = 3n;
 		const threshold = count / 2n + 1n;
 		const validatorAddresses = Array.from({ length: Number(count) }, () =>
