@@ -265,7 +265,7 @@ contract FROSTCoordinatorTest is Test {
         bytes32 message = keccak256("Hello, Shieldnet!");
         {
             vm.expectEmit();
-            emit FROSTCoordinator.Sign(gid, sid, message, 0);
+            emit FROSTCoordinator.Sign(gid, message, sid, 0);
             FROSTCoordinator.SignatureId actualSid = coordinator.sign(gid, message);
             assertEq(FROSTCoordinator.SignatureId.unwrap(sid), FROSTCoordinator.SignatureId.unwrap(actualSid));
         }
@@ -349,7 +349,7 @@ contract FROSTCoordinatorTest is Test {
             bytes32[] memory proof = commitmentShares.proof(i);
 
             vm.expectEmit();
-            emit FROSTCoordinator.SignShare(sid, FROST.newIdentifier(identifier), shares[i]);
+            emit FROSTCoordinator.SignShare(sid, FROST.newIdentifier(identifier), shares[i], root);
             vm.prank(participants.addr(identifier));
             coordinator.signShare(sid, root, cs[i].r, shares[i], cs[i].cl, proof);
         }

@@ -19,16 +19,28 @@ import {
 import { createSignatureShare, lagrangeChallenge } from "./shares.js";
 import { verifySignatureShare } from "./verify.js";
 
+export type SigningCallbacks = {
+	onRequestSigned?: (
+		signatureId: SignatureId,
+		signerId: ParticipantId,
+		message: Hex,
+	) => void;
+	onDebug?: (log: string) => void;
+};
+
 export class SigningClient {
 	#storage: GroupInfoStorage & SignatureRequestStorage;
 	#coordinator: SigningCoordinator;
+	#callbacks: SigningCallbacks;
 
 	constructor(
 		storage: GroupInfoStorage & SignatureRequestStorage,
 		coordinator: SigningCoordinator,
+		callbacks: SigningCallbacks = {},
 	) {
 		this.#storage = storage;
 		this.#coordinator = coordinator;
+		this.#callbacks = callbacks;
 	}
 
 	async commitNonces(groupId: GroupId) {
@@ -193,5 +205,6 @@ export class SigningClient {
 			signerPart.cl,
 			signingParticipantsProof,
 		);
+		this.#callbacks.onRequestSigned?.(signatureId, signerId, message);
 	}
 }

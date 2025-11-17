@@ -21,8 +21,8 @@ import {
 } from "../../frost/vss.js";
 import { generateParticipantProof } from "../merkle.js";
 import type {
-	FrostCoordinator,
 	GroupInfoStorage,
+	KeyGenCoordinator,
 	KeyGenInfoStorage,
 	Participant,
 } from "../types.js";
@@ -31,12 +31,17 @@ export type KeygenInfo = {
 	groupId: GroupId;
 	participants: Participant[];
 	coefficients: bigint[];
-	participantIndex: bigint;
+	participantId: bigint;
 	commitments: Map<bigint, readonly FrostPoint[]>;
 	secretShares: Map<bigint, bigint>;
 	verificationShare?: FrostPoint;
 	groupPublicKey?: FrostPoint;
 	signingShare?: bigint;
+};
+
+export type KeyGenCallbacks = {
+	onGroupSetup?: (groupId: GroupId, participantId: ParticipantId) => void;
+	onDebug?: (log: string) => void;
 };
 
 /**
@@ -49,15 +54,18 @@ export type KeygenInfo = {
  *   a. receive secret shares
  */
 export class KeyGenClient {
-	#coordinator: FrostCoordinator;
+	#coordinator: KeyGenCoordinator;
 	#storage: GroupInfoStorage & KeyGenInfoStorage;
+	#callbacks: KeyGenCallbacks;
 
 	constructor(
 		storage: GroupInfoStorage & KeyGenInfoStorage,
-		coordinator: FrostCoordinator,
+		coordinator: KeyGenCoordinator,
+		callbacks: KeyGenCallbacks = {},
 	) {
 		this.#storage = storage;
 		this.#coordinator = coordinator;
+		this.#callbacks = callbacks;
 	}
 
 	participationId(groupId: GroupId): bigint {
@@ -118,9 +126,9 @@ export class KeyGenClient {
 		peerCommitments: readonly FrostPoint[],
 		pok: ProofOfKnowledge,
 	) {
-		const participantIndex = this.#storage.participantId(groupId);
-		if (senderId === participantIndex) {
-			console.info("Do not verify own commitments");
+		const participantId = this.#storage.participantId(groupId);
+		if (senderId === participantId) {
+			this.#callbacks.onDebug?.("Do not verify own commitments");
 			return;
 		}
 		verifyCommitments(senderId, peerCommitments, pok);
@@ -174,7 +182,7 @@ export class KeyGenClient {
 		);
 	}
 
-	// `senderIndex` is the index of sending local participant in the participants set
+	// `senderId` is the index of sending local participant in the participants set
 	// `peerShares` are the calculated and encrypted shares (also defined as `f`)
 	async handleKeygenSecrets(
 		groupId: GroupId,
@@ -187,7 +195,7 @@ export class KeyGenClient {
 		}
 		const participantId = this.#storage.participantId(groupId);
 		if (senderId === participantId) {
-			console.info("Do not handle own share");
+			this.#callbacks.onDebug?.("Do not handle own share");
 			return;
 		}
 		const commitment = this.#storage.commitments(groupId, senderId);
@@ -215,7 +223,7 @@ export class KeyGenClient {
 			this.#storage.registerSigningShare(groupId, signingShare);
 			this.#storage.clearKeyGen(groupId);
 			const participantId = this.#storage.participantId(groupId);
-			console.info(`Final signing key for ${participantId} calculated`);
+			this.#callbacks.onGroupSetup?.(groupId, participantId);
 		}
 	}
 }
