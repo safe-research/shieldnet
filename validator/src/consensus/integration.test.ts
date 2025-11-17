@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { bytesToNumberBE } from "@noble/curves/utils.js";
 import {
+	Address,
 	createPublicClient,
 	createWalletClient,
 	type Hex,
@@ -62,7 +63,7 @@ describe("integration", () => {
 		const deploymentInfo = JSON.parse(
 			fs.readFileSync(deploymentInfoFile, "utf-8"),
 		);
-		const coordinatorAddress = deploymentInfo.returns["0"].value as Hex;
+		const coordinatorAddress = deploymentInfo.returns["0"].value as Address;
 		log(`Use coordinator at ${coordinatorAddress}`);
 
 		// Private keys from Anvil testnet

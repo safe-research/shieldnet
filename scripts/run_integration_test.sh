@@ -7,7 +7,7 @@ ANVIL_RPC_URL="http://127.0.0.1:8545"
 # --- 1. Start Anvil in the background ---
 echo "Starting Anvil..."
 # Mute anvil logs
-anvil > /dev/null & 
+anvil > ./anvil_logs.txt & 
 ANVIL_PID=$!
 echo "Anvil started with PID $ANVIL_PID"
 

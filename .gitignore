@@ -3,4 +3,5 @@ node_modules/
 build/
 .DS_Store
 .env
+anvil_logs.txt
 foundry.lock
