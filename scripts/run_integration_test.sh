@@ -20,7 +20,8 @@ sleep 2
 echo "Deploying contracts..."
 forge script DeployScript \
     --rpc-url $ANVIL_RPC_URL \
-    --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
+    --unlocked \
+    --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
     --broadcast
 
 # --- 4. Run Client Integration Tests ---

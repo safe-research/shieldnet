@@ -1,9 +1,9 @@
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { bytesToNumberBE } from "@noble/curves/utils.js";
 import {
-	Address,
+	type Address,
+	bytesToHex,
 	createPublicClient,
 	createWalletClient,
 	type Hex,
@@ -35,7 +35,7 @@ import type { Participant } from "./types.js";
 describe("integration", () => {
 	it("keygen and signing flow", { timeout: 30000 }, async ({ skip }) => {
 		// Make sure to first start the Anvil testnode (run `anvil` in the root)
-		// and run the deployment script: forge script DeployScript --rpc-url --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d http://127.0.0.1:8545 --broadcast
+		// and run the deployment script: forge script DeployScript --rpc-url --unlocked --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 http://127.0.0.1:8545 --broadcast
 		const deploymentInfoFile = path.join(
 			process.cwd(),
 			"..",
@@ -127,7 +127,7 @@ describe("integration", () => {
 		});
 		const abi = parseAbi([
 			"function groupKey(bytes32 id) external view returns ((uint256 x, uint256 y) memory key)",
-			"function keyGen(uint64 domain, bytes32 participants, uint64 count, uint64 threshold) external",
+			"function keyGen(bytes32 participants, uint64 count, uint64 threshold, bytes32 context) external",
 			"function sign(bytes32 gid, bytes32 message) external returns (bytes32 sid)",
 			"function groupSignature(bytes32 sid, bytes32 root) external view returns ((uint256 x, uint256 y) memory r, uint256 z)",
 		]);
@@ -136,10 +136,10 @@ describe("integration", () => {
 			abi: abi,
 			functionName: "keyGen",
 			args: [
-				bytesToNumberBE(randomBytes(8)),
 				calculateParticipantsRoot(participants),
 				BigInt(accounts.length),
 				BigInt(Math.ceil(accounts.length / 2)),
+				bytesToHex(randomBytes(32)),
 			],
 		});
 		await new Promise((resolve) => setTimeout(resolve, 7000));
@@ -177,7 +177,7 @@ describe("integration", () => {
 			const signEvents = await readClient.getLogs({
 				address: coordinatorAddress,
 				event: parseAbiItem(
-					"event Sign(bytes32 indexed gid, bytes32 indexed message, bytes32 sid, uint32 sequence)",
+					"event Sign(address indexed initiator, bytes32 indexed gid, bytes32 indexed message, bytes32 sid, uint64 sequence)",
 				),
 				args: {
 					gid: groupId,
@@ -192,7 +192,7 @@ describe("integration", () => {
 			const signShareEvent = await readClient.getLogs({
 				address: coordinatorAddress,
 				event: parseAbiItem(
-					"event SignShare(bytes32 indexed sid, uint256 identifier, uint256 z, bytes32 signersRoot)",
+					"event SignShare(bytes32 indexed sid, uint256 identifier, uint256 z, bytes32 root)",
 				),
 				args: {
 					sid,
@@ -201,8 +201,8 @@ describe("integration", () => {
 				toBlock: "latest",
 			});
 			expect(signShareEvent.length).toBeGreaterThan(0);
-			const signersRoot = signShareEvent[0].args.signersRoot;
-			expect(signersRoot).toBeDefined();
+			const root = signShareEvent[0].args.root;
+			expect(root).toBeDefined();
 			const groupKey = await readClient.readContract({
 				address: coordinatorAddress,
 				abi: abi,
@@ -213,7 +213,7 @@ describe("integration", () => {
 				address: coordinatorAddress,
 				abi: abi,
 				functionName: "groupSignature",
-				args: [sid as Hex, signersRoot as Hex],
+				args: [sid as Hex, root as Hex],
 			});
 			expect(
 				verifySignature(

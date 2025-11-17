@@ -17,6 +17,7 @@ export const watchKeyGenEvents = ({
 		participants?: Hex;
 		count?: bigint;
 		threshold?: bigint;
+		context?: Hex;
 	}) => Promise<void>;
 	onKeyGenCommitment: (args: {
 		gid?: Hex;

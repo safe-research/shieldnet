@@ -16,14 +16,14 @@ export const watchSignEvents = ({
 	onNewNonceCommitmentsHash: (args: {
 		gid?: Hex;
 		identifier?: bigint;
-		chunk?: number;
+		chunk?: bigint;
 		commitment?: Hex;
 	}) => Promise<void>;
 	onSignRequest: (args: {
 		gid?: Hex;
 		sid?: Hex;
 		message?: Hex;
-		sequence?: number;
+		sequence?: bigint;
 	}) => Promise<void>;
 	onNonceCommitmentsRevealed: (args: {
 		sid?: Hex;
