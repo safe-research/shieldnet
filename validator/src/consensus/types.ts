@@ -52,7 +52,7 @@ export type SigningCoordinator = {
 	): Promise<Hex>;
 };
 
-export type FrostCoordinator = KeyGenCoordinator;
+export type FrostCoordinator = KeyGenCoordinator & SigningCoordinator;
 
 export type GroupInfoStorage = {
 	knownGroups(): GroupId[];
