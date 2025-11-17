@@ -214,6 +214,7 @@ contract FROSTCoordinator {
         return $groups[gid].participants.getKey(identifier);
     }
 
+    /// @notice Computes the signature ID for a group and sequence.
     function signatureId(GroupId gid, uint64 sequence) public pure returns (SignatureId sid) {
         // We encode `sequence + 1` in the signature ID. This allows us to tell
         // whether an ID belongs to a group or a signature by non-zero value in
