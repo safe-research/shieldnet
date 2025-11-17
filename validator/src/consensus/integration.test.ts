@@ -1,4 +1,6 @@
 import { randomBytes } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import { bytesToNumberBE } from "@noble/curves/utils.js";
 import {
 	createPublicClient,
@@ -13,6 +15,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { anvil } from "viem/chains";
 import { describe, expect, it } from "vitest";
+import { log } from "../__tests__/logging.js";
 import { toPoint } from "../frost/math.js";
 import type { GroupId } from "../frost/types.js";
 import { OnchainCoordinator } from "./coordinator.js";
@@ -29,10 +32,40 @@ import type { Participant } from "./types.js";
 
 // --- Tests ---
 describe("integration", () => {
-	it.skip("keygen and signing flow", { timeout: 30000 }, async () => {
+	it("keygen and signing flow", { timeout: 30000 }, async ({ skip }) => {
 		// Make sure to first start the Anvil testnode (run `anvil` in the root)
-		// and run the deployment script: forge script DeployScript --rpc-url http://127.0.0.1:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast
-		// Private key from Anvil testnet
+		// and run the deployment script: forge script DeployScript --rpc-url --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d http://127.0.0.1:8545 --broadcast
+		const deploymentInfoFile = path.join(
+			process.cwd(),
+			"..",
+			"contracts",
+			"build",
+			"broadcast",
+			"Deploy.s.sol",
+			"31337",
+			"run-latest.json",
+		);
+		if (!fs.existsSync(deploymentInfoFile)) {
+			// Deployment info not present
+			skip();
+		}
+		const readClient = createPublicClient({
+			chain: anvil,
+			transport: http(),
+		});
+		try {
+			await readClient.getBlockNumber();
+		} catch {
+			// Anvil not running
+			skip();
+		}
+		const deploymentInfo = JSON.parse(
+			fs.readFileSync(deploymentInfoFile, "utf-8"),
+		);
+		const coordinatorAddress = deploymentInfo.returns["0"].value as Hex;
+		log(`Use coordinator at ${coordinatorAddress}`);
+
+		// Private keys from Anvil testnet
 		const accounts = [
 			privateKeyToAccount(
 				"0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
@@ -47,7 +80,6 @@ describe("integration", () => {
 		const participants: Participant[] = accounts.map((a, i) => {
 			return { id: BigInt(i + 1), address: a.address };
 		});
-		const coordinatorAddress = "0x7aC204851B6138fB8d7c7c786025b93C01B5721c";
 		const clients = accounts.map((a) => {
 			const publicClient = createPublicClient({
 				chain: anvil,
@@ -67,16 +99,14 @@ describe("integration", () => {
 			const storage = new InMemoryStorage(a.address);
 			const sc = new SigningClient(storage, coordinator, {
 				onRequestSigned: (signatureId, participantId, message) => {
-					console.log(
+					log(
 						`Participant ${participantId} signed request ${signatureId} for ${message}`,
 					);
 				},
 			});
 			const kc = new KeyGenClient(storage, coordinator, {
 				onGroupSetup: (groupId, participantId) => {
-					console.log(
-						`Participant ${participantId} is setup for group ${groupId}`,
-					);
+					log(`Participant ${participantId} is setup for group ${groupId}`);
 					sc.commitNonces(groupId).catch(console.error);
 				},
 			});
@@ -111,12 +141,7 @@ describe("integration", () => {
 				BigInt(Math.ceil(accounts.length / 2)),
 			],
 		});
-		await new Promise((resolve) => setTimeout(resolve, 10000));
-
-		const readClient = createPublicClient({
-			chain: anvil,
-			transport: http(),
-		});
+		await new Promise((resolve) => setTimeout(resolve, 7000));
 		const groups: Set<GroupId> = new Set();
 		for (const { kc } of clients) {
 			const knownGroups = kc.knownGroups();
@@ -146,7 +171,7 @@ describe("integration", () => {
 				args: [groupId, message],
 			});
 		}
-		await new Promise((resolve) => setTimeout(resolve, 10000));
+		await new Promise((resolve) => setTimeout(resolve, 3000));
 		for (const groupId of groups) {
 			const signEvents = await readClient.getLogs({
 				address: coordinatorAddress,
