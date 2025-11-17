@@ -23,7 +23,7 @@ export const watchSignEvents = ({
 		gid?: Hex;
 		sid?: Hex;
 		message?: Hex;
-		sequence?: bigint;
+		sequence?: number;
 	}) => Promise<void>;
 	onNonceCommitmentsRevealed: (args: {
 		sid?: Hex;

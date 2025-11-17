@@ -265,7 +265,7 @@ contract FROSTCoordinatorTest is Test {
         bytes32 message = keccak256("Hello, Shieldnet!");
         {
             vm.expectEmit();
-            emit FROSTCoordinator.Sign(gid, sid, message, 0);
+            emit FROSTCoordinator.Sign(gid, message, sid, 0);
             FROSTCoordinator.SignatureId actualSid = coordinator.sign(gid, message);
             assertEq(FROSTCoordinator.SignatureId.unwrap(sid), FROSTCoordinator.SignatureId.unwrap(actualSid));
         }

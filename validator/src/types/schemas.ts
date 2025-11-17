@@ -69,7 +69,7 @@ export const signRequestEventSchema = z.object({
 	gid: hexDataSchema,
 	sid: hexDataSchema,
 	message: hexDataSchema,
-	sequence: z.bigint().nonnegative(),
+	sequence: z.number().nonnegative(),
 });
 
 export const nonceCommitmentsSchema = z.object({

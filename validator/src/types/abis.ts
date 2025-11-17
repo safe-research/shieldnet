@@ -12,7 +12,7 @@ export const COORDINATOR_EVENTS = parseAbi([
 	"event KeyGenCommitted(bytes32 indexed gid, uint256 identifier, ((uint256 x, uint256 y)[] c, (uint256 x, uint256 y) r, uint256 mu) commitment)",
 	"event KeyGenSecretShared(bytes32 indexed gid, uint256 identifier, ((uint256 x, uint256 y) y, uint256[] f) share)",
 	"event Preprocess(bytes32 indexed gid, uint256 identifier, uint32 chunk, bytes32 commitment)",
-	"event Sign(bytes32 indexed gid, bytes32 sid, bytes32 indexed message, uint256 sequence)",
+	"event Sign(bytes32 indexed gid, bytes32 indexed message, bytes32 sid, uint32 sequence)",
 	"event SignRevealedNonces(bytes32 indexed sid, uint256 identifier, ((uint256 x, uint256 y) d, (uint256 x, uint256 y) e) nonces)",
 	"event SignShare(bytes32 indexed sid, uint256 identifier, uint256 z, bytes32 signersRoot)",
 ]);

@@ -55,7 +55,7 @@ contract FROSTCoordinator {
     event KeyGenCommitted(GroupId indexed gid, FROST.Identifier identifier, KeyGenCommitment commitment);
     event KeyGenSecretShared(GroupId indexed gid, FROST.Identifier identifier, KeyGenSecretShare share);
     event Preprocess(GroupId indexed gid, FROST.Identifier identifier, uint32 chunk, bytes32 commitment);
-    event Sign(GroupId indexed gid, SignatureId sid, bytes32 indexed message, uint256 sequence);
+    event Sign(GroupId indexed gid, bytes32 indexed message, SignatureId sid, uint32 sequence);
     event SignRevealedNonces(SignatureId indexed sid, FROST.Identifier identifier, SignNonces nonces);
     event SignShare(SignatureId indexed sid, FROST.Identifier identifier, uint256 z, bytes32 signersRoot);
 
@@ -137,7 +137,7 @@ contract FROSTCoordinator {
         uint32 sequence = parameters.sequence++;
         sid = _signatureId(gid, sequence);
         group.parameters = parameters;
-        emit Sign(gid, sid, message, sequence);
+        emit Sign(gid, message, sid, sequence);
     }
 
     /// @notice Reveal a nonce pair for a signing ceremony.

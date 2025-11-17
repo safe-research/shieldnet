@@ -47,7 +47,7 @@ describe("integration", () => {
 		const participants: Participant[] = accounts.map((a, i) => {
 			return { id: BigInt(i + 1), address: a.address };
 		});
-		const coordinatorAddress = "0xC7756D613DdFD54c051BFbb7A3f5cD5a16448A14";
+		const coordinatorAddress = "0x7aC204851B6138fB8d7c7c786025b93C01B5721c";
 		const clients = accounts.map((a) => {
 			const publicClient = createPublicClient({
 				chain: anvil,
@@ -151,7 +151,7 @@ describe("integration", () => {
 			const signEvents = await readClient.getLogs({
 				address: coordinatorAddress,
 				event: parseAbiItem(
-					"event Sign(bytes32 indexed gid, bytes32 sid, bytes32 indexed message, uint256 sequence)",
+					"event Sign(bytes32 indexed gid, bytes32 indexed message, bytes32 sid, uint32 sequence)",
 				),
 				args: {
 					gid: groupId,

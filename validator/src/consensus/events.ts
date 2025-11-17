@@ -84,7 +84,7 @@ export const linkSigningClientToCoordinator = (
 				event.gid,
 				event.sid,
 				event.message,
-				event.sequence,
+				BigInt(event.sequence),
 			);
 		},
 		onError: console.error,
