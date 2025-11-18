@@ -1,5 +1,6 @@
 import type { Address, PublicClient } from "viem";
 import { toPoint } from "../frost/math.js";
+import { watchConsensusEvents } from "../service/watchers/consensus.js";
 import { watchKeyGenEvents } from "../service/watchers/keyGen.js";
 import { watchSignEvents } from "../service/watchers/signing.js";
 import {
@@ -13,9 +14,8 @@ import {
 } from "../types/schemas.js";
 import type { KeyGenClient } from "./keyGen/client.js";
 import type { SigningClient } from "./signing/client.js";
-import { watchConsensusEvents } from "../service/watchers/consensus.js";
-import { VerificationEngine } from "./verify/engine.js";
-import { EpochRolloverPacket } from "./verify/rollover/schemas.js";
+import type { VerificationEngine } from "./verify/engine.js";
+import type { EpochRolloverPacket } from "./verify/rollover/schemas.js";
 
 export const linkKeyGenClientToCoordinator = (
 	frostClient: KeyGenClient,
@@ -26,12 +26,14 @@ export const linkKeyGenClientToCoordinator = (
 		client: publicClient,
 		target: coordinatorAddress,
 		onKeyGenInit: async (e) => {
+			// TODO: Disable in favor of keyGenAndCommit
 			const event = keyGenEventSchema.parse(e);
 			return frostClient.handleKeygenInit(
 				event.gid,
 				event.participants,
 				event.count,
 				event.threshold,
+				event.context,
 			);
 		},
 		onKeyGenCommitment: async (e) => {
@@ -109,18 +111,18 @@ export const linkSigningClientToConsensus = (
 				type: "epoch_rollover_packet",
 				domain: {
 					chain: BigInt(publicClient.chain?.id ?? 0),
-					consensus: consensusAddress
+					consensus: consensusAddress,
 				},
 				rollover: {
 					activeEpoch: event.activeEpoch,
 					proposedEpoch: event.proposedEpoch,
 					rolloverAt: event.timestamp,
 					groupKeyX: event.groupKey.x,
-					groupKeyY: event.groupKey.y
-				}
-			}
-			await verificationEngine.verify(packet)
+					groupKeyY: event.groupKey.y,
+				},
+			};
+			await verificationEngine.verify(packet);
 		},
 		onError: console.error,
-	})
-}
+	});
+};

@@ -44,6 +44,7 @@ export const keyGenEventSchema = z.object({
 	participants: hexDataSchema,
 	count: z.bigint().positive(),
 	threshold: z.bigint().positive(),
+	context: hexDataSchema,
 });
 
 export const keyGenCommittedEventSchema = z.object({
@@ -95,4 +96,3 @@ export const epochProposedEventSchema = z.object({
 	timestamp: z.bigint().positive(),
 	groupKey: frostPointSchema,
 });
-

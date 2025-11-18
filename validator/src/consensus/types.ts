@@ -15,6 +15,17 @@ export type Participant = {
 };
 
 export type KeyGenCoordinator = {
+	triggerKeygenAndCommit(
+		participants: Hex,
+		count: bigint,
+		threshold: bigint,
+		context: Hex,
+		index: bigint,
+		commits: FrostPoint[],
+		pok: ProofOfKnowledge,
+		poap: ProofOfAttestationParticipation,
+	): Promise<Hex>;
+
 	publishKeygenCommitments(
 		groupId: GroupId,
 		index: bigint,
@@ -68,7 +79,9 @@ export type Consensus = {
 	): Promise<Hex>;
 };
 
-export type ShieldnetCoordinator = KeyGenCoordinator & SigningCoordinator & Consensus;
+export type ShieldnetCoordinator = KeyGenCoordinator &
+	SigningCoordinator &
+	Consensus;
 
 export type GroupInfoStorage = {
 	knownGroups(): GroupId[];

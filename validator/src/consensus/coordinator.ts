@@ -18,6 +18,7 @@ import type { ShieldnetCoordinator } from "./types.js";
 export const COORDINATOR_FUNCTIONS = parseAbi([
 	"error InvalidKeyGenCommitment()",
 	"error NotParticipating()",
+	"function keyGenAndCommit(bytes32 participants, uint64 count, uint64 threshold, bytes32 context, uint256 index, bytes32[] poap, ((uint256 x, uint256 y)[] c, (uint256 x, uint256 y) r, uint256 mu) commitment) external",
 	"function keyGenCommit(bytes32 id, uint256 index, bytes32[] poap, ((uint256 x, uint256 y)[] c, (uint256 x, uint256 y) r, uint256 mu) commitment) external",
 	"function keyGenSecretShare(bytes32 id, ((uint256 x, uint256 y) y, uint256[] f) share) external",
 	"function preprocess(bytes32 id, bytes32 commitment) external returns (uint32 chunk)",
@@ -28,7 +29,7 @@ export const COORDINATOR_FUNCTIONS = parseAbi([
 export const CONSENSUS_FUNCTIONS = parseAbi([
 	"error InvalidRollover()",
 	"function proposeEpoch(uint64 proposedEpoch, uint64 rolloverAt, bytes32 group) external",
-	"function stageEpoch(uint64 proposedEpoch, uint64 rolloverAt, bytes32 group, ((uint256 x, uint256 y) r, uint256 z) signature) external"
+	"function stageEpoch(uint64 proposedEpoch, uint64 rolloverAt, bytes32 group, ((uint256 x, uint256 y) r, uint256 z) signature) external",
 ]);
 
 export class OnchainCoordinator implements ShieldnetCoordinator {
@@ -48,10 +49,41 @@ export class OnchainCoordinator implements ShieldnetCoordinator {
 		this.#consensus = consensus;
 		this.#coordinator = coordinator;
 	}
+	async triggerKeygenAndCommit(
+		participants: Hex,
+		count: bigint,
+		threshold: bigint,
+		context: Hex,
+		id: bigint,
+		commits: FrostPoint[],
+		pok: ProofOfKnowledge,
+		poap: ProofOfAttestationParticipation,
+	): Promise<Hex> {
+		const { request } = await this.#publicClient.simulateContract({
+			address: this.#coordinator,
+			abi: COORDINATOR_FUNCTIONS,
+			functionName: "keyGenAndCommit",
+			args: [
+				participants,
+				count,
+				threshold,
+				context,
+				id,
+				poap,
+				{
+					c: commits,
+					r: pok.r,
+					mu: pok.mu,
+				},
+			],
+			account: this.#signingClient.account,
+		});
+		return this.#signingClient.writeContract(request);
+	}
 
 	async publishKeygenCommitments(
 		groupId: GroupId,
-		index: bigint,
+		id: bigint,
 		commits: FrostPoint[],
 		pok: ProofOfKnowledge,
 		poap: ProofOfAttestationParticipation,
@@ -62,7 +94,7 @@ export class OnchainCoordinator implements ShieldnetCoordinator {
 			functionName: "keyGenCommit",
 			args: [
 				groupId,
-				index,
+				id,
 				poap,
 				{
 					c: commits,
@@ -157,22 +189,28 @@ export class OnchainCoordinator implements ShieldnetCoordinator {
 		return this.#signingClient.writeContract(request);
 	}
 
-	async proposeEpoch(proposedEpoch: bigint, rolloverAt: bigint, group: GroupId): Promise<Hex> {
+	async proposeEpoch(
+		proposedEpoch: bigint,
+		rolloverAt: bigint,
+		group: GroupId,
+	): Promise<Hex> {
 		const { request } = await this.#publicClient.simulateContract({
 			address: this.#consensus,
 			abi: CONSENSUS_FUNCTIONS,
 			functionName: "proposeEpoch",
-			args: [
-				proposedEpoch,
-				rolloverAt,
-				group
-			],
+			args: [proposedEpoch, rolloverAt, group],
 			account: this.#signingClient.account,
 		});
 		return this.#signingClient.writeContract(request);
 	}
 
-	async stageEpoch(proposedEpoch: bigint, rolloverAt: bigint, group: GroupId, groupCommitment: FrostPoint, groupSignature: bigint): Promise<Hex> {
+	async stageEpoch(
+		proposedEpoch: bigint,
+		rolloverAt: bigint,
+		group: GroupId,
+		groupCommitment: FrostPoint,
+		groupSignature: bigint,
+	): Promise<Hex> {
 		const { request } = await this.#publicClient.simulateContract({
 			address: this.#consensus,
 			abi: CONSENSUS_FUNCTIONS,
@@ -183,8 +221,8 @@ export class OnchainCoordinator implements ShieldnetCoordinator {
 				group,
 				{
 					r: groupCommitment,
-					z: groupSignature
-				}
+					z: groupSignature,
+				},
 			],
 			account: this.#signingClient.account,
 		});

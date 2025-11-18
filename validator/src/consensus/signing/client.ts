@@ -69,9 +69,8 @@ export class SigningClient {
 		message: Hex,
 		sequence: bigint,
 	) {
-		// TODO: check if we really want to sign the message
-
 		const participants = this.#storage.participants(groupId);
+		// TODO: add check for unhonest signers
 		const signers = participants.map((p) => p.id).sort();
 		this.#storage.registerSignatureRequest(
 			signatureId,

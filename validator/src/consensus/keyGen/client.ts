@@ -1,4 +1,4 @@
-import type { Hex } from "viem";
+import { encodePacked, type Hex, keccak256 } from "viem";
 import {
 	createSigningShare,
 	createVerificationShare,
@@ -88,8 +88,8 @@ export class KeyGenClient {
 		this.#storage.unregisterGroup(groupId);
 	}
 
-	async handleKeygenInit(
-		groupId: GroupId,
+	private setupGroup(
+		groupId: Hex,
 		participantsRoot: Hex,
 		count: bigint,
 		threshold: bigint,
@@ -110,6 +110,57 @@ export class KeyGenClient {
 			groupId,
 			participantId,
 			evalPoly(coefficients, participantId),
+		);
+		return {
+			participantId,
+			pok,
+			poap,
+			localCommitments,
+		};
+	}
+
+	async triggerKeygenAndCommit(
+		participantsRoot: Hex,
+		count: bigint,
+		threshold: bigint,
+		context: Hex,
+	) {
+		const groupId = keccak256(
+			encodePacked(
+				["bytes32", "uint256", "uint256", "bytes32"],
+				[participantsRoot, count, threshold, context],
+			),
+		);
+		const { participantId, pok, poap, localCommitments } = this.setupGroup(
+			groupId,
+			participantsRoot,
+			count,
+			threshold,
+		);
+		await this.#coordinator.triggerKeygenAndCommit(
+			participantsRoot,
+			count,
+			threshold,
+			context,
+			participantId,
+			localCommitments,
+			pok,
+			poap,
+		);
+	}
+
+	async handleKeygenInit(
+		groupId: GroupId,
+		participantsRoot: Hex,
+		count: bigint,
+		threshold: bigint,
+		_context: Hex,
+	) {
+		const { participantId, pok, poap, localCommitments } = this.setupGroup(
+			groupId,
+			participantsRoot,
+			count,
+			threshold,
 		);
 		await this.#coordinator.publishKeygenCommitments(
 			groupId,
