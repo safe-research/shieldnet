@@ -8,8 +8,7 @@ const safeMetaTransactionSchema = z.object({
 	operation: z.union([z.literal(0), z.literal(1)]),
 });
 
-const partialSafeTransactionSchema = z.object({
-	...safeMetaTransactionSchema.shape,
+const partialSafeTransactionSchema = safeMetaTransactionSchema.extend({
 	nonce: z.bigint().nonnegative(),
 });
 
