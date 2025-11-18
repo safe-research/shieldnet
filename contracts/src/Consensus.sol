@@ -31,9 +31,9 @@ contract Consensus {
     /// @custom:precomputed keccak256("EIP712Domain(uint256 chainId,address verifyingContract)
     bytes32 private constant _DOMAIN_TYPEHASH = hex"47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218";
 
-    /// @custom:precomputed keccak256("EpochRollover(uint64 activeEpoch,uint64 proposedEpoch,uint256 groupKeyX,uint256 groupKeyY)")
+    /// @custom:precomputed keccak256("EpochRollover(uint64 activeEpoch,uint64 proposedEpoch,uint64 rolloverAt,uint256 groupKeyX,uint256 groupKeyY)")
     bytes32 private constant _EPOCH_ROLLOVER_TYPEHASH =
-        hex"daf33da8bc0e06ba8513baac6f2f425cc19516c389e24ceb1ac581d719a52724";
+        hex"0d6c6e1100d6b156230ad2ed7a6f7f9b1c2e03d20d5ed86d36323486bb3773a6";
 
     FROSTCoordinator private immutable _COORDINATOR;
 
@@ -76,7 +76,7 @@ contract Consensus {
         (Epochs memory epochs, FROSTCoordinator.GroupId activeGroup) = _processRollover();
         _requireValidRollover(epochs, proposedEpoch, rolloverAt);
         Secp256k1.Point memory groupKey = _COORDINATOR.groupKey(group);
-        bytes32 message = _epochRolloverMessage(epochs.active, proposedEpoch, rolloverAt, groupKey);
+        bytes32 message = epochRolloverMessage(epochs.active, proposedEpoch, rolloverAt, groupKey);
         emit EpochProposed(epochs.active, proposedEpoch, rolloverAt, groupKey);
         _COORDINATOR.sign(activeGroup, message);
     }
@@ -91,40 +91,19 @@ contract Consensus {
         (Epochs memory epochs, FROSTCoordinator.GroupId activeGroup) = _processRollover();
         _requireValidRollover(epochs, proposedEpoch, rolloverAt);
         Secp256k1.Point memory groupKey = _COORDINATOR.groupKey(group);
-        bytes32 message = _epochRolloverMessage(epochs.active, proposedEpoch, rolloverAt, groupKey);
+        bytes32 message = epochRolloverMessage(epochs.active, proposedEpoch, rolloverAt, groupKey);
         _COORDINATOR.groupVerify(activeGroup, signature, message);
         $epochs = Epochs({active: epochs.active, staged: proposedEpoch, rolloverAt: rolloverAt, _padding: 0});
         $groups.staged = group;
         emit EpochStaged(epochs.active, proposedEpoch, rolloverAt, groupKey);
     }
 
-    function _processRollover() private returns (Epochs memory epochs, FROSTCoordinator.GroupId activeGroup) {
-        epochs = $epochs;
-        if (_epochsShouldRollover(epochs)) {
-            epochs.active = epochs.staged;
-            epochs.staged = 0;
-            $epochs = epochs;
-            activeGroup = $groups.staged;
-            $groups.active = activeGroup;
-        } else {
-            activeGroup = $groups.staged;
-        }
-    }
-
-    function _epochsShouldRollover(Epochs memory epochs) private view returns (bool result) {
-        return epochs.staged != 0 && epochs.rolloverAt <= block.timestamp;
-    }
-
-    function _requireValidRollover(Epochs memory epochs, uint64 proposedEpoch, uint64 rolloverAt) private view {
-        require(epochs.active < proposedEpoch && rolloverAt > block.timestamp && epochs.staged == 0, InvalidRollover());
-    }
-
-    function _epochRolloverMessage(
+    function epochRolloverMessage(
         uint64 activeEpoch,
         uint64 proposedEpoch,
         uint64 rolloverAt,
         Secp256k1.Point memory groupKey
-    ) private view returns (bytes32 message) {
+    ) public view returns (bytes32 message) {
         bytes32 domain = domainSeparator();
         assembly ("memory-safe") {
             let ptr := mload(0x40)
@@ -138,5 +117,30 @@ contract Consensus {
             mstore(add(ptr, 0x02), domain)
             message := keccak256(ptr, 0x42)
         }
+    }
+
+    function _processRollover() private returns (Epochs memory epochs, FROSTCoordinator.GroupId activeGroup) {
+        epochs = $epochs;
+        if (_epochsShouldRollover(epochs)) {
+            epochs.active = epochs.staged;
+            epochs.staged = 0;
+            $epochs = epochs;
+            activeGroup = $groups.staged;
+            $groups.active = activeGroup;
+            // Note that we intentionally don't reset `$epochs.rolloverAt` and
+            // `$groups.staged` since the `$epochs.staged == 0` uniquely
+            // determines whether or not there is staged rollover.
+            emit EpochRolledOver(epochs.active);
+        } else {
+            activeGroup = $groups.active;
+        }
+    }
+
+    function _epochsShouldRollover(Epochs memory epochs) private view returns (bool result) {
+        return epochs.staged != 0 && epochs.rolloverAt <= block.timestamp;
+    }
+
+    function _requireValidRollover(Epochs memory epochs, uint64 proposedEpoch, uint64 rolloverAt) private view {
+        require(epochs.active < proposedEpoch && rolloverAt > block.timestamp && epochs.staged == 0, InvalidRollover());
     }
 }
