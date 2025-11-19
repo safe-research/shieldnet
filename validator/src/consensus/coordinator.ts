@@ -18,8 +18,8 @@ import type { ShieldnetCoordinator } from "./types.js";
 export const COORDINATOR_FUNCTIONS = parseAbi([
 	"error InvalidKeyGenCommitment()",
 	"error NotParticipating()",
-	"function keyGenAndCommit(bytes32 participants, uint64 count, uint64 threshold, bytes32 context, uint256 index, bytes32[] poap, ((uint256 x, uint256 y)[] c, (uint256 x, uint256 y) r, uint256 mu) commitment) external",
-	"function keyGenCommit(bytes32 id, uint256 index, bytes32[] poap, ((uint256 x, uint256 y)[] c, (uint256 x, uint256 y) r, uint256 mu) commitment) external",
+	"function keyGenAndCommit(bytes32 participants, uint64 count, uint64 threshold, bytes32 context, uint256 identifier, bytes32[] poap, ((uint256 x, uint256 y)[] c, (uint256 x, uint256 y) r, uint256 mu) commitment) external",
+	"function keyGenCommit(bytes32 id, uint256 identifier, bytes32[] poap, ((uint256 x, uint256 y)[] c, (uint256 x, uint256 y) r, uint256 mu) commitment) external",
 	"function keyGenSecretShare(bytes32 id, ((uint256 x, uint256 y) y, uint256[] f) share) external",
 	"function preprocess(bytes32 id, bytes32 commitment) external returns (uint32 chunk)",
 	"function signRevealNonces(bytes32 sid, ((uint256 x, uint256 y) d, (uint256 x, uint256 y) e) nonces, bytes32[] proof) external",

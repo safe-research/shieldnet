@@ -124,18 +124,18 @@ describe("signing", () => {
 	it("e2e signing flow", async () => {
 		const nonceCommitmentsEvents: {
 			groupId: GroupId;
-			index: bigint;
+			signerId: bigint;
 			chunk: bigint;
 			commitment: Hex;
 		}[] = [];
 		const nonceRevealEvent: {
 			signatureId: SignatureId;
-			index: bigint;
+			signerId: bigint;
 			nonces: PublicNonceCommitments;
 		}[] = [];
 		const signatureShareEvents: {
 			signatureId: SignatureId;
-			index: bigint;
+			signerId: bigint;
 			z: bigint;
 			r: FrostPoint;
 		}[] = [];
@@ -147,7 +147,7 @@ describe("signing", () => {
 				): Promise<Hex> => {
 					nonceCommitmentsEvents.push({
 						groupId: groupId,
-						index: a.participantId,
+						signerId: a.participantId,
 						chunk: 0n,
 						commitment: nonceCommitmentsHash,
 					});
@@ -160,7 +160,7 @@ describe("signing", () => {
 				): Promise<Hex> => {
 					nonceRevealEvent.push({
 						signatureId,
-						index: a.participantId,
+						signerId: a.participantId,
 						nonces: nonceCommitments,
 					});
 					return Promise.resolve("0x");
@@ -175,7 +175,7 @@ describe("signing", () => {
 				): Promise<Hex> => {
 					signatureShareEvents.push({
 						signatureId,
-						index: a.participantId,
+						signerId: a.participantId,
 						z: signatureShare,
 						r: groupCommitementShare,
 					});
@@ -236,9 +236,13 @@ describe("signing", () => {
 		for (const e of nonceRevealEvent) {
 			for (const { client, storage } of clients) {
 				log(
-					`>>>> Nonce reveal from ${e.index} to ${storage.participantId(groupId)} >>>>`,
+					`>>>> Nonce reveal from ${e.signerId} to ${storage.participantId(groupId)} >>>>`,
 				);
-				await client.handleNonceCommitments(e.signatureId, e.index, e.nonces);
+				await client.handleNonceCommitments(
+					e.signatureId,
+					e.signerId,
+					e.nonces,
+				);
 			}
 		}
 		log("------------------------ Verify Shares ------------------------");

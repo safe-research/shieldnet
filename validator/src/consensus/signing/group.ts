@@ -24,7 +24,7 @@ export const lagrangeCoefficient = (signers: bigint[], id: bigint): bigint => {
 	let denominator = 1n;
 
 	for (const signer of signers) {
-		// Skip the participant index.
+		// Skip the participant id.
 		if (signer === id) continue;
 		numerator = mulmod(numerator, signer);
 		denominator = mulmod(denominator, submod(signer, id));

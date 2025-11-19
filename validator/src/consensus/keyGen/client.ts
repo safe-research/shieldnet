@@ -233,7 +233,7 @@ export class KeyGenClient {
 		);
 	}
 
-	// `senderId` is the index of sending local participant in the participants set
+	// `senderId` is the id of sending local participant in the participants set
 	// `peerShares` are the calculated and encrypted shares (also defined as `f`)
 	async handleKeygenSecrets(
 		groupId: GroupId,
@@ -252,7 +252,7 @@ export class KeyGenClient {
 		const commitment = this.#storage.commitments(groupId, senderId);
 		if (commitment === undefined)
 			throw Error(`Commitments for ${groupId}:${senderId} are not available!`);
-		// TODO: check if we should use a reasonable limit for the index (current uint256)
+		// TODO: check if we should use a reasonable limit for the id (current uint256)
 		const shareIndex =
 			participantId < senderId ? participantId : participantId - 1n;
 		// Note: Number(shareIndex) is theoretically an unsafe cast
