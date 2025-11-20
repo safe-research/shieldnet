@@ -15,12 +15,14 @@ export type Participant = {
 };
 
 export type KeyGenCoordinator = {
+	chainId(): bigint;
+	coordinator(): Address;
 	triggerKeygenAndCommit(
 		participants: Hex,
 		count: bigint,
 		threshold: bigint,
 		context: Hex,
-		index: bigint,
+		id: bigint,
 		commits: FrostPoint[],
 		pok: ProofOfKnowledge,
 		poap: ProofOfAttestationParticipation,
@@ -28,7 +30,7 @@ export type KeyGenCoordinator = {
 
 	publishKeygenCommitments(
 		groupId: GroupId,
-		index: bigint,
+		id: bigint,
 		commits: FrostPoint[],
 		pok: ProofOfKnowledge,
 		poap: ProofOfAttestationParticipation,
@@ -42,6 +44,8 @@ export type KeyGenCoordinator = {
 };
 
 export type SigningCoordinator = {
+	chainId(): bigint;
+	coordinator(): Address;
 	publishNonceCommitmentsHash(
 		groupId: GroupId,
 		nonceCommitmentsHash: Hex,
@@ -56,14 +60,17 @@ export type SigningCoordinator = {
 	publishSignatureShare(
 		signatureId: SignatureId,
 		signingParticipantsHash: Hex,
+		signingParticipantsProof: Hex[],
+		groupCommitement: FrostPoint,
 		groupCommitementShare: FrostPoint, // add(d, mul(bindingFactor, e)
 		signatureShare: bigint,
-		lagrangeChallenge: bigint,
-		signingParticipantsProof: Hex[],
+		lagrange: bigint,
 	): Promise<Hex>;
 };
 
 export type Consensus = {
+	chainId(): bigint;
+	consensus(): Address;
 	proposeEpoch(
 		proposedEpoch: bigint,
 		rolloverAt: bigint,
@@ -74,12 +81,11 @@ export type Consensus = {
 		proposedEpoch: bigint,
 		rolloverAt: bigint,
 		group: GroupId,
-		groupCommitment: FrostPoint,
-		groupSignature: bigint,
+		signature: SignatureId,
 	): Promise<Hex>;
 };
 
-export type ShieldnetCoordinator = KeyGenCoordinator &
+export type ShieldnetProtocol = KeyGenCoordinator &
 	SigningCoordinator &
 	Consensus;
 
@@ -88,6 +94,7 @@ export type GroupInfoStorage = {
 	registerGroup(
 		groupId: GroupId,
 		participants: readonly Participant[],
+		threshold: bigint,
 	): ParticipantId;
 	registerVerification(
 		groupId: GroupId,
@@ -99,6 +106,7 @@ export type GroupInfoStorage = {
 	participantId(groupId: GroupId): ParticipantId;
 	publicKey(groupId: GroupId): FrostPoint | undefined;
 	participants(groupId: GroupId): readonly Participant[];
+	threshold(groupId: GroupId): bigint;
 	signingShare(groupId: GroupId): bigint | undefined;
 	verificationShare(groupId: GroupId): FrostPoint;
 	unregisterGroup(groupId: GroupId): void;

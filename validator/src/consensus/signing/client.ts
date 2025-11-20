@@ -43,12 +43,13 @@ export class SigningClient {
 		this.#callbacks = callbacks;
 	}
 
-	async commitNonces(groupId: GroupId) {
+	async commitNonces(groupId: GroupId): Promise<Hex> {
 		const signingShare = this.#storage.signingShare(groupId);
 		if (signingShare === undefined) throw Error(`No info for ${groupId}`);
 		const nonceTree = createNonceTree(signingShare);
 		const nonceTreeHash = this.#storage.registerNonceTree(nonceTree);
 		await this.#coordinator.publishNonceCommitmentsHash(groupId, nonceTreeHash);
+		return nonceTreeHash;
 	}
 
 	async handleNonceCommitmentsHash(
@@ -103,11 +104,11 @@ export class SigningClient {
 		signatureId: SignatureId,
 		peerId: ParticipantId,
 		nonceCommitments: PublicNonceCommitments,
-	) {
+	): Promise<Hex | undefined> {
 		const groupId = this.#storage.signingGroup(signatureId);
 		const signerId = this.#storage.participantId(groupId);
 		// Skip own commits
-		if (signerId === peerId) return;
+		if (signerId === peerId) return undefined;
 		this.#storage.registerNonceCommitments(
 			signatureId,
 			peerId,
@@ -115,11 +116,12 @@ export class SigningClient {
 		);
 
 		if (this.#storage.checkIfNoncesComplete(signatureId)) {
-			await this.submitSignature(signatureId);
+			return await this.submitSignature(signatureId);
 		}
+		return undefined;
 	}
 
-	private async submitSignature(signatureId: SignatureId) {
+	private async submitSignature(signatureId: SignatureId): Promise<Hex> {
 		const groupId = this.#storage.signingGroup(signatureId);
 		const signers = this.#storage.signers(signatureId);
 		const signerId = this.#storage.participantId(groupId);
@@ -159,13 +161,14 @@ export class SigningClient {
 			const cl = lagrangeChallenge(coeff, challenge);
 			const node = keccak256(
 				encodePacked(
-					["uint256", "uint256", "uint256", "uint256"],
-					[signerId, r.x, r.y, cl],
+					["uint256", "uint256", "uint256", "uint256", "uint256", "uint256"],
+					[signerId, r.x, r.y, coeff, groupCommitment.x, groupCommitment.y],
 				),
 			);
 			return {
 				signerId,
 				r,
+				l: coeff,
 				cl,
 				node,
 			};
@@ -176,6 +179,7 @@ export class SigningClient {
 		const nonceTree = this.#storage.nonceTree(groupId, chunk);
 		// Calculate information specific to this signer
 		const nonceCommitments = nonceTree.commitments[Number(offset)];
+		// TODO: check if nonce was burned
 		const signerPart = signerParts[signerIndex];
 		const signatureShare = createSignatureShare(
 			signingShare,
@@ -196,14 +200,44 @@ export class SigningClient {
 			signerPart.r,
 		);
 
-		await this.#coordinator.publishSignatureShare(
+		// TODO: burn nonce
+		const submissionId = await this.#coordinator.publishSignatureShare(
 			signatureId,
 			signingParticipantsHash,
+			signingParticipantsProof,
+			groupCommitment,
 			signerPart.r,
 			signatureShare,
-			signerPart.cl,
-			signingParticipantsProof,
+			signerPart.l,
 		);
 		this.#callbacks.onRequestSigned?.(signatureId, signerId, message);
+		return submissionId;
+	}
+
+	availableNoncesCount(groupId: GroupId, chunk: bigint): bigint {
+		try {
+			const nonceTree = this.#storage.nonceTree(groupId, chunk);
+			return BigInt(nonceTree.leaves.length);
+		} catch {
+			return 0n;
+		}
+	}
+
+	message(signatureId: SignatureId): Hex {
+		return this.#storage.message(signatureId);
+	}
+
+	threshold(signatureId: SignatureId): bigint {
+		const groupId = this.#storage.signingGroup(signatureId);
+		return this.#storage.threshold(groupId);
+	}
+
+	requiredShareCount(signatureId: SignatureId): bigint {
+		return BigInt(this.#storage.signers(signatureId).length);
+	}
+
+	participantId(signatureId: SignatureId): bigint {
+		const groupId = this.#storage.signingGroup(signatureId);
+		return this.#storage.participantId(groupId);
 	}
 }

@@ -8,7 +8,6 @@ import {
 } from "viem";
 import { gnosis } from "viem/chains";
 import type { ConsensusConfig } from "../types/interfaces.js";
-import { watchConsensusEvents } from "./watchers.js";
 
 export class ValidatorService {
 	#config: ConsensusConfig;
@@ -25,13 +24,6 @@ export class ValidatorService {
 
 	async start() {
 		if (this.#unwatch !== null) throw Error("Already started!");
-		this.#unwatch = watchConsensusEvents({
-			client: this.#client,
-			target: this.#config.coreAddress,
-			onApprove: console.log,
-			onTransfer: console.log,
-			onError: console.error,
-		});
 	}
 
 	stop() {

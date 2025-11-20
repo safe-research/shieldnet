@@ -1,10 +1,4 @@
-import {
-	type Address,
-	type Hex,
-	type PublicClient,
-	parseAbi,
-	type WalletClient,
-} from "viem";
+import type { Address, Hex, PublicClient, WalletClient } from "viem";
 import type {
 	FrostPoint,
 	GroupId,
@@ -12,28 +6,11 @@ import type {
 	ProofOfKnowledge,
 	SignatureId,
 } from "../frost/types.js";
+import { CONSENSUS_FUNCTIONS, COORDINATOR_FUNCTIONS } from "../types/abis.js";
 import type { PublicNonceCommitments } from "./signing/nonces.js";
-import type { ShieldnetCoordinator } from "./types.js";
+import type { ShieldnetProtocol } from "./types.js";
 
-export const COORDINATOR_FUNCTIONS = parseAbi([
-	"error AlreadyRegistered()",
-	"error InvalidKeyGenCommitment()",
-	"error NotParticipating()",
-	"function keyGenAndCommit(bytes32 participants, uint64 count, uint64 threshold, bytes32 context, uint256 identifier, bytes32[] poap, ((uint256 x, uint256 y)[] c, (uint256 x, uint256 y) r, uint256 mu) commitment) external",
-	"function keyGenCommit(bytes32 id, uint256 identifier, bytes32[] poap, ((uint256 x, uint256 y)[] c, (uint256 x, uint256 y) r, uint256 mu) commitment) external",
-	"function keyGenSecretShare(bytes32 id, ((uint256 x, uint256 y) y, uint256[] f) share) external",
-	"function preprocess(bytes32 id, bytes32 commitment) external returns (uint32 chunk)",
-	"function signRevealNonces(bytes32 sid, ((uint256 x, uint256 y) d, (uint256 x, uint256 y) e) nonces, bytes32[] proof) external",
-	"function signShare(bytes32 sid, bytes32 root, (uint256 x, uint256 y) r, uint256 z, uint256 cl, bytes32[] proof) external",
-]);
-
-export const CONSENSUS_FUNCTIONS = parseAbi([
-	"error InvalidRollover()",
-	"function proposeEpoch(uint64 proposedEpoch, uint64 rolloverAt, bytes32 group) external",
-	"function stageEpoch(uint64 proposedEpoch, uint64 rolloverAt, bytes32 group, ((uint256 x, uint256 y) r, uint256 z) signature) external",
-]);
-
-export class OnchainCoordinator implements ShieldnetCoordinator {
+export class OnchainProtocol implements ShieldnetProtocol {
 	#publicClient: PublicClient;
 	#signingClient: WalletClient;
 	#consensus: Address;
@@ -49,6 +26,19 @@ export class OnchainCoordinator implements ShieldnetCoordinator {
 		this.#signingClient = signingClient;
 		this.#consensus = consensus;
 		this.#coordinator = coordinator;
+	}
+	chainId(): bigint {
+		const chainId = this.#signingClient.chain?.id;
+		if (chainId === undefined) {
+			throw Error("Unknown chain id");
+		}
+		return BigInt(chainId);
+	}
+	consensus(): Address {
+		return this.#consensus;
+	}
+	coordinator(): Address {
+		return this.#consensus;
 	}
 	async triggerKeygenAndCommit(
 		participants: Hex,
@@ -77,6 +67,7 @@ export class OnchainCoordinator implements ShieldnetCoordinator {
 					mu: pok.mu,
 				},
 			],
+			gas: 250_000n, // TODO: this seems to be wrongly estimated
 			account: this.#signingClient.account,
 		});
 		return this.#signingClient.writeContract(request);
@@ -168,10 +159,11 @@ export class OnchainCoordinator implements ShieldnetCoordinator {
 	async publishSignatureShare(
 		signatureId: SignatureId,
 		signingParticipantsHash: Hex,
+		signingParticipantsProof: Hex[],
+		groupCommitement: FrostPoint,
 		groupCommitementShare: FrostPoint,
 		signatureShare: bigint,
-		lagrangeChallenge: bigint,
-		signingParticipantsProof: Hex[],
+		lagrange: bigint,
 	): Promise<Hex> {
 		const { request } = await this.#publicClient.simulateContract({
 			address: this.#coordinator,
@@ -179,13 +171,19 @@ export class OnchainCoordinator implements ShieldnetCoordinator {
 			functionName: "signShare",
 			args: [
 				signatureId,
-				signingParticipantsHash,
-				groupCommitementShare,
-				signatureShare,
-				lagrangeChallenge,
+				{
+					r: groupCommitement,
+					root: signingParticipantsHash,
+				},
+				{
+					r: groupCommitementShare,
+					z: signatureShare,
+					l: lagrange,
+				},
 				signingParticipantsProof,
 			],
 			account: this.#signingClient.account,
+			gas: 400_000n,
 		});
 		return this.#signingClient.writeContract(request);
 	}
@@ -209,22 +207,13 @@ export class OnchainCoordinator implements ShieldnetCoordinator {
 		proposedEpoch: bigint,
 		rolloverAt: bigint,
 		group: GroupId,
-		groupCommitment: FrostPoint,
-		groupSignature: bigint,
+		signature: SignatureId,
 	): Promise<Hex> {
 		const { request } = await this.#publicClient.simulateContract({
 			address: this.#consensus,
 			abi: CONSENSUS_FUNCTIONS,
 			functionName: "stageEpoch",
-			args: [
-				proposedEpoch,
-				rolloverAt,
-				group,
-				{
-					r: groupCommitment,
-					z: groupSignature,
-				},
-			],
+			args: [proposedEpoch, rolloverAt, group, signature],
 			account: this.#signingClient.account,
 		});
 		return this.#signingClient.writeContract(request);

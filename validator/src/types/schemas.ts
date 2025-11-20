@@ -51,12 +51,14 @@ export const keyGenCommittedEventSchema = z.object({
 	gid: hexDataSchema,
 	identifier: z.bigint().positive(),
 	commitment: frostCommitmentSchema,
+	committed: z.boolean(),
 });
 
 export const keyGenSecretSharedEventSchema = z.object({
 	gid: hexDataSchema,
 	identifier: z.bigint().positive(),
 	share: frostShareSchema,
+	completed: z.boolean(),
 });
 
 export const nonceCommitmentsHashEventSchema = z.object({
@@ -67,6 +69,7 @@ export const nonceCommitmentsHashEventSchema = z.object({
 });
 
 export const signRequestEventSchema = z.object({
+	initiator: checkedAddressSchema,
 	gid: hexDataSchema,
 	sid: hexDataSchema,
 	message: hexDataSchema,
@@ -90,8 +93,18 @@ export const signatureShareEventSchema = z.object({
 	z: z.bigint().nonnegative(),
 });
 
+export const signatureSchema = z.object({
+	z: z.bigint().positive(),
+	r: frostPointSchema,
+});
+
+export const signedEventSchema = z.object({
+	sid: hexDataSchema,
+	signature: signatureSchema,
+});
+
 export const epochProposedEventSchema = z.object({
-	activeEpoch: z.bigint().positive(),
+	activeEpoch: z.bigint().nonnegative(),
 	proposedEpoch: z.bigint().positive(),
 	timestamp: z.bigint().positive(),
 	groupKey: frostPointSchema,

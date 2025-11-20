@@ -1,4 +1,4 @@
-import { encodePacked, type Hex, keccak256 } from "viem";
+import type { Hex } from "viem";
 import {
 	createSigningShare,
 	createVerificationShare,
@@ -69,11 +69,11 @@ export class KeyGenClient {
 		this.#callbacks = callbacks;
 	}
 
-	participationId(groupId: GroupId): bigint {
+	participantId(groupId: GroupId): bigint {
 		return this.#storage.participantId(groupId);
 	}
 
-	knownGroups(): Hex[] {
+	knownGroups(): GroupId[] {
 		return this.#storage.knownGroups();
 	}
 
@@ -81,8 +81,8 @@ export class KeyGenClient {
 		return this.#storage.publicKey(groupId);
 	}
 
-	registerParticipants(participants: Participant[]) {
-		this.#storage.registerParticipants(participants);
+	registerParticipants(participants: Participant[]): Hex {
+		return this.#storage.registerParticipants(participants);
 	}
 
 	abortKeygen(groupId: GroupId) {
@@ -100,7 +100,11 @@ export class KeyGenClient {
 			throw Error(
 				`Unexpected participant count ${participantsRoot}! (Expected ${participants.length} got ${count})`,
 			);
-		const participantId = this.#storage.registerGroup(groupId, participants);
+		const participantId = this.#storage.registerGroup(
+			groupId,
+			participants,
+			threshold,
+		);
 		const coefficients = createCoefficients(threshold);
 		this.#storage.registerKeyGen(groupId, coefficients);
 		const pok = createProofOfKnowledge(participantId, coefficients);
@@ -125,7 +129,7 @@ export class KeyGenClient {
 		count: bigint,
 		threshold: bigint,
 		context: Hex,
-	) {
+	): Promise<GroupId> {
 		const groupId = calcGroupId(participantsRoot, count, threshold, context);
 		const { participantId, pok, poap, localCommitments } = this.setupGroup(
 			groupId,
@@ -143,13 +147,14 @@ export class KeyGenClient {
 			pok,
 			poap,
 		);
+		return groupId;
 	}
 
 	async handleKeygenInit(
 		groupId: GroupId,
 		participantsRoot: Hex,
 		count: bigint,
-		threshold: bigint
+		threshold: bigint,
 	) {
 		const { participantId, pok, poap, localCommitments } = this.setupGroup(
 			groupId,
@@ -171,7 +176,7 @@ export class KeyGenClient {
 		senderId: ParticipantId,
 		peerCommitments: readonly FrostPoint[],
 		pok: ProofOfKnowledge,
-	) {
+	): Promise<Hex | undefined> {
 		const participantId = this.#storage.participantId(groupId);
 		if (senderId === participantId) {
 			this.#callbacks.onDebug?.("Do not verify own commitments");
@@ -180,12 +185,15 @@ export class KeyGenClient {
 		verifyCommitments(senderId, peerCommitments, pok);
 		this.#storage.registerCommitments(groupId, senderId, peerCommitments);
 		if (this.#storage.checkIfCommitmentsComplete(groupId)) {
-			await this.prepareAndPublishKeygenSecretShares(groupId);
+			return await this.prepareAndPublishKeygenSecretShares(groupId);
 		}
+		return undefined;
 	}
 
 	// Round 2.1
-	private async prepareAndPublishKeygenSecretShares(groupId: GroupId) {
+	private async prepareAndPublishKeygenSecretShares(
+		groupId: GroupId,
+	): Promise<Hex> {
 		const commitments = this.#storage.commitmentsMap(groupId);
 		const groupPublicKey = createVerificationShare(commitments, 0n);
 		// Will be published as y
@@ -221,7 +229,7 @@ export class KeyGenClient {
 		if (shares.length !== participants.length - 1) {
 			throw Error("Unexpect f length");
 		}
-		await this.#coordinator.publishKeygenSecretShares(
+		return await this.#coordinator.publishKeygenSecretShares(
 			groupId,
 			verificationShare,
 			shares,
@@ -234,7 +242,7 @@ export class KeyGenClient {
 		groupId: GroupId,
 		senderId: ParticipantId,
 		peerShares: readonly bigint[],
-	) {
+	): Promise<boolean> {
 		const participants = this.#storage.participants(groupId);
 		if (peerShares.length !== participants.length - 1) {
 			throw Error("Unexpect f length");
@@ -242,7 +250,7 @@ export class KeyGenClient {
 		const participantId = this.#storage.participantId(groupId);
 		if (senderId === participantId) {
 			this.#callbacks.onDebug?.("Do not handle own share");
-			return;
+			return false;
 		}
 		const commitment = this.#storage.commitments(groupId, senderId);
 		if (commitment === undefined)
@@ -270,6 +278,8 @@ export class KeyGenClient {
 			this.#storage.clearKeyGen(groupId);
 			const participantId = this.#storage.participantId(groupId);
 			this.#callbacks.onGroupSetup?.(groupId, participantId);
+			return true;
 		}
+		return false;
 	}
 }

@@ -114,7 +114,7 @@ contract FROSTCoordinatorTest is Test {
             FROSTCoordinator.KeyGenCommitment memory commitment = commitments[identifier];
 
             vm.expectEmit();
-            emit FROSTCoordinator.KeyGenCommitted(gid, FROST.newIdentifier(identifier), commitment);
+            emit FROSTCoordinator.KeyGenCommitted(gid, FROST.newIdentifier(identifier), commitment, identifier == COUNT);
             vm.prank(participant);
             coordinator.keyGenCommit(gid, FROST.newIdentifier(identifier), poap, commitment);
         }
@@ -175,7 +175,7 @@ contract FROSTCoordinatorTest is Test {
             }
 
             vm.expectEmit();
-            emit FROSTCoordinator.KeyGenSecretShared(gid, FROST.newIdentifier(identifier), share);
+            emit FROSTCoordinator.KeyGenSecretShared(gid, FROST.newIdentifier(identifier), share, identifier == COUNT);
             vm.prank(participants.addr(identifier));
             coordinator.keyGenSecretShare(gid, share);
         }

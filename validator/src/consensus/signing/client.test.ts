@@ -1,4 +1,10 @@
-import { type Address, type Hex, keccak256, stringToBytes } from "viem";
+import {
+	type Address,
+	type Hex,
+	keccak256,
+	stringToBytes,
+	zeroAddress,
+} from "viem";
 import { describe, expect, it } from "vitest";
 import { log } from "../../__tests__/logging.js";
 import { addmod, g, toPoint } from "../../frost/math.js";
@@ -181,9 +187,15 @@ describe("signing", () => {
 					});
 					return Promise.resolve("0x");
 				},
+				chainId: (): bigint => 0n,
+				coordinator: (): Address => zeroAddress,
 			};
 			const storage = new InMemoryStorage(a.account);
-			storage.registerGroup(TEST_GROUP.groupId, TEST_GROUP.participants);
+			storage.registerGroup(
+				TEST_GROUP.groupId,
+				TEST_GROUP.participants,
+				BigInt(TEST_GROUP.participants.length),
+			);
 			storage.registerVerification(
 				TEST_GROUP.groupId,
 				TEST_GROUP.publicKey,

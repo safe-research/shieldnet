@@ -1,4 +1,4 @@
-import { encodePacked, type Hex, keccak256 } from "viem";
+import { type Address, type Hex, keccak256, zeroAddress } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { describe, expect, it } from "vitest";
 import { log } from "../../__tests__/logging.js";
@@ -116,6 +116,8 @@ describe("keyGen", () => {
 					});
 					return Promise.resolve("0x");
 				},
+				chainId: (): bigint => 0n,
+				coordinator: (): Address => zeroAddress,
 			};
 			const storage = new InMemoryStorage(a.address);
 			const client = new KeyGenClient(storage, coordinator);
@@ -143,7 +145,7 @@ describe("keyGen", () => {
 		for (const { client } of clients) {
 			for (const e of commitmentEvents) {
 				log(
-					`>>>> Keygen commitment from ${e.id} to ${client.participationId(e.groupId)} >>>>`,
+					`>>>> Keygen commitment from ${e.id} to ${client.participantId(e.groupId)} >>>>`,
 				);
 				await client.handleKeygenCommitment(e.groupId, e.id, e.commits, e.pok);
 			}
@@ -152,7 +154,7 @@ describe("keyGen", () => {
 		for (const { client } of clients) {
 			for (const e of shareEvents) {
 				log(
-					`>>>> Keygen secrets from ${e.id} to ${client.participationId(e.groupId)} >>>>`,
+					`>>>> Keygen secrets from ${e.id} to ${client.participantId(e.groupId)} >>>>`,
 				);
 				await client.handleKeygenSecrets(e.groupId, e.id, e.peerShares);
 			}

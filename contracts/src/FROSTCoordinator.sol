@@ -66,8 +66,8 @@ contract FROSTCoordinator {
     }
 
     event KeyGen(FROSTGroupId.T indexed gid, bytes32 participants, uint64 count, uint64 threshold, bytes32 context);
-    event KeyGenCommitted(FROSTGroupId.T indexed gid, FROST.Identifier identifier, KeyGenCommitment commitment);
-    event KeyGenSecretShared(FROSTGroupId.T indexed gid, FROST.Identifier identifier, KeyGenSecretShare share);
+    event KeyGenCommitted(FROSTGroupId.T indexed gid, FROST.Identifier identifier, KeyGenCommitment commitment, bool committed);
+    event KeyGenSecretShared(FROSTGroupId.T indexed gid, FROST.Identifier identifier, KeyGenSecretShare share, bool completed);
     event Preprocess(FROSTGroupId.T indexed gid, FROST.Identifier identifier, uint64 chunk, bytes32 commitment);
     event Sign(
         address indexed initiator,
@@ -136,7 +136,7 @@ contract FROSTCoordinator {
         group.participants.register(identifier, msg.sender, poap);
         group.parameters = parameters;
         group.key = Secp256k1.add(group.key, commitment.c[0]);
-        emit KeyGenCommitted(gid, identifier, commitment);
+        emit KeyGenCommitted(gid, identifier, commitment, committed);
     }
 
     /// @notice Initiate, if not already initialized, a distributed key
@@ -173,7 +173,7 @@ contract FROSTCoordinator {
         }
         FROST.Identifier identifier = group.participants.set(msg.sender, share.y);
         group.parameters = parameters;
-        emit KeyGenSecretShared(gid, identifier, share);
+        emit KeyGenSecretShared(gid, identifier, share, completed);
     }
 
     /// @notice Submit participants secret shares. This method is the same as
