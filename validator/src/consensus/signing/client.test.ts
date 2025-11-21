@@ -8,7 +8,12 @@ import {
 import { describe, expect, it } from "vitest";
 import { log } from "../../__tests__/logging.js";
 import { addmod, g, toPoint } from "../../frost/math.js";
-import type { FrostPoint, GroupId, SignatureId } from "../../frost/types.js";
+import type {
+	FrostPoint,
+	GroupId,
+	ParticipantId,
+	SignatureId,
+} from "../../frost/types.js";
 import { InMemoryStorage } from "../storage.js";
 import type { SigningCoordinator } from "../types.js";
 import { SigningClient } from "./client.js";
@@ -130,18 +135,18 @@ describe("signing", () => {
 	it("e2e signing flow", async () => {
 		const nonceCommitmentsEvents: {
 			groupId: GroupId;
-			signerId: bigint;
+			signerId: ParticipantId;
 			chunk: bigint;
 			commitment: Hex;
 		}[] = [];
 		const nonceRevealEvent: {
 			signatureId: SignatureId;
-			signerId: bigint;
+			signerId: ParticipantId;
 			nonces: PublicNonceCommitments;
 		}[] = [];
 		const signatureShareEvents: {
 			signatureId: SignatureId;
-			signerId: bigint;
+			signerId: ParticipantId;
 			z: bigint;
 			r: FrostPoint;
 		}[] = [];
@@ -174,10 +179,11 @@ describe("signing", () => {
 				publishSignatureShare: (
 					signatureId: SignatureId,
 					_signingParticipantsHash: Hex,
-					groupCommitementShare: FrostPoint,
-					signatureShare: bigint,
-					_lagrangeChallenge: bigint,
 					_signingParticipantsProof: Hex[],
+					_groupCommitement: FrostPoint,
+					groupCommitementShare: FrostPoint, // add(d, mul(bindingFactor, e)
+					signatureShare: bigint,
+					_lagrange: bigint,
 				): Promise<Hex> => {
 					signatureShareEvents.push({
 						signatureId,
