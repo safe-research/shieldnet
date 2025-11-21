@@ -19,14 +19,19 @@ describe("safeTx handler", () => {
 				type: "safe_transaction_packet",
 				domain: {
 					chain: 23n,
-					safe: "0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97",
+					consensus: "0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97",
 				},
-				transaction: {
-					to: "0x22Cb221caE98D6097082C80158B1472C45FEd729",
-					value: 0n,
-					data: "0xbaddad42",
-					operation: 1,
-					nonce: 0n,
+				proposal: {
+					epoch: 11n,
+					transaction: {
+						chainId: 1n,
+						account: "0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97",
+						to: "0x22Cb221caE98D6097082C80158B1472C45FEd729",
+						value: 0n,
+						data: "0xbaddad42",
+						operation: 1,
+						nonce: 0n,
+					},
 				},
 			}),
 		).rejects.toStrictEqual(Error("Delegatecall not allowed"));
@@ -39,18 +44,23 @@ describe("safeTx handler", () => {
 				type: "safe_transaction_packet",
 				domain: {
 					chain: 23n,
-					safe: "0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97",
+					consensus: "0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97",
 				},
-				transaction: {
-					to: "0x22Cb221caE98D6097082C80158B1472C45FEd729",
-					value: 0n,
-					data: "0xbaddad42",
-					operation: 0,
-					nonce: 0n,
+				proposal: {
+					epoch: 11n,
+					transaction: {
+						chainId: 1n,
+						account: "0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97",
+						to: "0x22Cb221caE98D6097082C80158B1472C45FEd729",
+						value: 0n,
+						data: "0xbaddad42",
+						operation: 0,
+						nonce: 0n,
+					},
 				},
 			}),
 		).resolves.toBe(
-			"0x1545182417c12df28ad6e413a98a8da6ec3e5d37e2700df76f3f6eb3795352fc",
+			"0x35ea25a4b798dcc97b2ec8b2c1f87e44e77213340965099255e504f217a75436",
 		);
 	});
 });

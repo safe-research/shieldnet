@@ -18,6 +18,7 @@ type GroupInfo = {
 	groupId: GroupId;
 	participants: readonly Participant[];
 	participantId: bigint;
+	threshold: bigint;
 	verificationShare?: FrostPoint;
 	groupPublicKey?: FrostPoint;
 	signingShare?: bigint;
@@ -177,6 +178,7 @@ export class InMemoryStorage
 	registerGroup(
 		groupId: GroupId,
 		participants: readonly Participant[],
+		threshold: bigint,
 	): ParticipantId {
 		if (this.#groupInfo.has(groupId))
 			throw Error(`Group ${groupId} already registered!`);
@@ -189,6 +191,7 @@ export class InMemoryStorage
 			participantId,
 			groupId,
 			participants,
+			threshold,
 		});
 		return participantId;
 	}
@@ -220,6 +223,9 @@ export class InMemoryStorage
 	}
 	participants(groupId: GroupId): readonly Participant[] {
 		return this.groupInfo(groupId).participants;
+	}
+	threshold(groupId: GroupId): bigint {
+		return this.groupInfo(groupId).threshold;
 	}
 	signingShare(groupId: GroupId): bigint | undefined {
 		return this.groupInfo(groupId).signingShare;
