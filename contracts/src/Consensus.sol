@@ -30,7 +30,9 @@ contract Consensus is IFROSTCoordinatorCallback {
         uint64 indexed activeEpoch, uint64 indexed proposedEpoch, uint64 rolloverBlock, Secp256k1.Point groupKey
     );
     event EpochRolledOver(uint64 indexed newActiveEpoch);
-    event TransactionProposed(bytes32 indexed message, uint64 epoch, MetaTransaction.T transaction);
+    event TransactionProposed(
+        bytes32 indexed message, bytes32 indexed transactionHash, uint64 epoch, MetaTransaction.T transaction
+    );
     event TransactionAttested(bytes32 indexed message);
 
     error InvalidRollover();
@@ -117,8 +119,9 @@ contract Consensus is IFROSTCoordinatorCallback {
 
     function proposeTransaction(MetaTransaction.T memory transaction) external returns (bytes32 message) {
         Epochs memory epochs = _processRollover();
-        message = domainSeparator().transactionProposal(epochs.active, transaction.hash());
-        emit TransactionProposed(message, epochs.active, transaction);
+        bytes32 transactionHash = transaction.hash();
+        message = domainSeparator().transactionProposal(epochs.active, transactionHash);
+        emit TransactionProposed(message, transactionHash, epochs.active, transaction);
         _COORDINATOR.sign($groups[epochs.active], message);
     }
 
