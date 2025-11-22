@@ -17,6 +17,7 @@ import {
 	signedEventSchema,
 	signRequestEventSchema,
 } from "../types/schemas.js";
+import { Queue } from "./queue.js";
 
 const BLOCKS_PER_EPOCH = (24n * 60n * 60n) / 5n; // ~ blocks for 1 day
 const NONCE_THRESHOLD = 100n;
@@ -60,6 +61,19 @@ type SigningState =
 			id: "signed";
 	  };
 
+export type StateTransition =
+	| {
+			type: "block";
+			block: bigint;
+	  }
+	| {
+			type: "event";
+			block: bigint;
+			index: number;
+			eventName: string;
+			eventArgs: unknown;
+	  };
+
 export class ShieldnetStateMachine {
 	#participants: Participant[];
 	#protocol: ShieldnetProtocol;
@@ -81,6 +95,9 @@ export class ShieldnetStateMachine {
 	#epochGroups = new Map<bigint, GroupId>();
 	#groupSequence = new Map<GroupId, bigint>();
 	#groupPendingNonces = new Set<GroupId>();
+
+	#transitionQueue = new Queue<StateTransition>();
+	#currentTransition?: StateTransition;
 
 	constructor({
 		participants,
@@ -111,12 +128,46 @@ export class ShieldnetStateMachine {
 		this.#blocksPerEpoch = blocksPerEpoch ?? BLOCKS_PER_EPOCH;
 	}
 
-	async progressToBlock(block: bigint) {
-		if (block < this.#lastProcessedBlock) {
-			throw Error(`There is no going back!`);
+	transition(transition: StateTransition) {
+		this.#logger?.(`Enqueue ${transition.type} at ${transition.block}`);
+		this.#transitionQueue.push(transition);
+		this.checkNextTransition();
+	}
+
+	private checkNextTransition() {
+		// Still processing
+		if (this.#currentTransition !== undefined) return;
+		const transition = this.#transitionQueue.pop();
+		// Nothing queued
+		if (transition === undefined) return;
+		this.#currentTransition = transition;
+		this.performTransition(transition)
+			.catch(this.#logger)
+			.finally(() => {
+				this.#currentTransition = undefined;
+				this.checkNextTransition();
+			});
+	}
+
+	private async performTransition(transition: StateTransition) {
+		switch (transition.type) {
+			case "block":
+				return this.progressToBlock(transition.block);
+			case "event":
+				return this.processBlockEvent(
+					transition.block,
+					transition.index,
+					transition.eventName,
+					transition.eventArgs,
+				);
 		}
+	}
+
+	private async progressToBlock(block: bigint) {
 		// Check if we are already up to date
-		if (block === this.#lastProcessedBlock) return;
+		if (block <= this.#lastProcessedBlock) {
+			return;
+		}
 		this.#lastProcessedBlock = block;
 
 		await this.checkGenesis();
@@ -128,7 +179,7 @@ export class ShieldnetStateMachine {
 		// Check signing timeouts
 	}
 
-	async processBlockEvent(
+	private async processBlockEvent(
 		block: bigint,
 		index: number,
 		eventName: string,
@@ -295,6 +346,20 @@ export class ShieldnetStateMachine {
 				// The signature process has been started
 				// Parse event from raw data
 				const event = signRequestEventSchema.parse(eventArgs);
+				// TODO: Is this is a problem?
+				// Check that it has the expected sequence
+				const currentSequence = this.#groupSequence.get(event.gid) ?? 0n;
+				if (currentSequence !== event.sequence) {
+					this.#logger?.(`Unexpected sequence ${event.sequence}!`);
+					return;
+				}
+				this.#groupSequence.set(event.gid, currentSequence + 1n);
+				const status = this.#signingState.get(event.sid);
+				// Check that state for signature id is "not_started"
+				if (status !== undefined) {
+					this.#logger?.(`Alreay started signing ${event.sid}!`);
+					return;
+				}
 				// Check that signing was initiated via consensus contract
 				if (event.initiator !== this.#protocol.consensus()) {
 					this.#logger?.(`Unexpected initiator ${event.initiator}!`);
@@ -305,19 +370,6 @@ export class ShieldnetStateMachine {
 					this.#logger?.(`Message ${event.message} not verified!`);
 					return;
 				}
-				const status = this.#signingState.get(event.sid);
-				// Check that state for signature id is "not_started"
-				if (status !== undefined) {
-					this.#logger?.(`Alreay started signing ${event.sid}!`);
-					return;
-				}
-				// Check that it has the expected sequence
-				const currentSequence = this.#groupSequence.get(event.gid) ?? 0n;
-				if (currentSequence !== event.sequence) {
-					this.#logger?.(`Unexpected sequence ${event.sequence}!`);
-					return;
-				}
-				this.#groupSequence.set(event.gid, currentSequence + 1n);
 				await this.#signingClient.handleSignatureRequest(
 					event.gid,
 					event.sid,
@@ -433,6 +485,7 @@ export class ShieldnetStateMachine {
 			threshold,
 			context,
 		);
+		this.#logger?.(`Triggered key gen for epoch ${epoch} with ${groupId}`);
 		this.#epochGroups.set(epoch, groupId);
 		this.#keyGenState = {
 			id: "collecting_commitments",

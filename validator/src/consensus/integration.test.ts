@@ -153,34 +153,25 @@ describe("integration", () => {
 					abi: [...CONSENSUS_EVENTS, ...COORDINATOR_EVENTS],
 					onLogs: async (logs) => {
 						for (const log of logs) {
-							logger?.("New event at block ", log.blockNumber);
-							try {
-								await sm.processBlockEvent(
-									log.blockNumber,
-									log.logIndex,
-									log.eventName,
-									log.args,
-								);
-							} catch (e) {
-								console.error(e);
-							}
-							logger?.("Handled event at block ", log.blockNumber);
+							sm.transition({
+								type: "event",
+								block: log.blockNumber,
+								index: log.logIndex,
+								eventName: log.eventName,
+								eventArgs: log.args,
+							});
 						}
 					},
-					onError: console.error,
+					onError: logger,
 				});
 				publicClient.watchBlockNumber({
 					onBlockNumber: (block) => {
-						logger?.("New block ", block);
 						// We delay the processing to avoid potential race conditions for now
-						setTimeout(async () => {
-							logger?.("Process block ", block);
-							try {
-								await sm.progressToBlock(block);
-							} catch (_e) {
-								// Ignore erros here
-							}
-							logger?.("Processed block ", block);
+						setTimeout(() => {
+							sm.transition({
+								type: "block",
+								block,
+							});
 						}, 2000);
 					},
 				});
@@ -190,33 +181,42 @@ describe("integration", () => {
 					sm,
 				};
 			});
-			const currentBlock = await readClient.getBlockNumber();
-			for (const { sm } of clients) {
-				await sm.progressToBlock(currentBlock);
-			}
 			// Setup done ... SchildNetz läuft ... lets send some signature requests
 			const abi = parseAbi([
+				"function proposeTransaction((uint256 chainId, address account, address to, uint256 value, uint8 operation, bytes data, uint256 nonce) transaction) external",
 				"function groupKey(bytes32 id) external view returns ((uint256 x, uint256 y) memory key)",
 				"function sign(bytes32 gid, bytes32 message) external returns (bytes32 sid)",
 				"function groupSignature(bytes32 sid, bytes32 root) external view returns ((uint256 x, uint256 y) memory r, uint256 z)",
 			]);
-			/*
-		setTimeout(async () => {
-			const initiatorClient = createWalletClient({
-				chain: anvil,
-				transport: http(),
-				account: accounts[0],
-			});
+			setTimeout(
+				async () => {
+					const initiatorClient = createWalletClient({
+						chain: anvil,
+						transport: http(),
+						account: privateKeyToAccount(
+							"0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6",
+						),
+					});
 
-			const message = keccak256(stringToBytes("Hello, Shieldnet!"));
-			await initiatorClient.writeContract({
-				address: consensusAddress,
-				abi: abi,
-				functionName: "sign",
-				args: [message],
-			});
-		}, 22000)
-		*/
+					await initiatorClient.writeContract({
+						address: consensusAddress,
+						abi: abi,
+						functionName: "proposeTransaction",
+						args: [
+							{
+								chainId: 1n,
+								account: "0xb3D9cf8E163bbc840195a97E81F8A34E295B8f39",
+								to: "0x74F665BE90ffcd9ce9dcA68cB5875570B711CEca",
+								value: 0n,
+								data: "0x5afe5afe",
+								operation: 1,
+								nonce: 0n,
+							},
+						],
+					});
+				},
+				(TEST_RUNTIME_IN_SECONDS / 3) * 1000,
+			);
 			await new Promise((resolve) =>
 				setTimeout(resolve, TEST_RUNTIME_IN_SECONDS * 1000),
 			);
