@@ -209,7 +209,7 @@ describe("integration", () => {
 								to: "0x74F665BE90ffcd9ce9dcA68cB5875570B711CEca",
 								value: 0n,
 								data: "0x5afe5afe",
-								operation: 1,
+								operation: 0,
 								nonce: 0n,
 							},
 						],

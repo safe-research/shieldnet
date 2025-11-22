@@ -12,7 +12,7 @@ const partialSafeTransactionSchema = safeMetaTransactionSchema.extend({
 	nonce: z.bigint().nonnegative(),
 });
 
-const safeTransactionSchema = partialSafeTransactionSchema.extend({
+export const safeTransactionSchema = partialSafeTransactionSchema.extend({
 	chainId: z.bigint().nonnegative(),
 	account: checkedAddressSchema,
 });

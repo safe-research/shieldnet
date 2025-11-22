@@ -1,12 +1,5 @@
 import { type Address, encodePacked, type Hex, zeroAddress } from "viem";
 import type { KeyGenClient } from "../consensus/keyGen/client.js";
-import type { SigningClient } from "../consensus/signing/client.js";
-import { decodeSequence } from "../consensus/signing/nonces.js";
-import type { Participant, ShieldnetProtocol } from "../consensus/types.js";
-import type { VerificationEngine } from "../consensus/verify/engine.js";
-import type { EpochRolloverPacket } from "../consensus/verify/rollover/schemas.js";
-import { toPoint } from "../frost/math.js";
-import type { GroupId, ParticipantId, SignatureId } from "../frost/types.js";
 import {
 	epochProposedEventSchema,
 	keyGenCommittedEventSchema,
@@ -16,7 +9,16 @@ import {
 	signatureShareEventSchema,
 	signedEventSchema,
 	signRequestEventSchema,
-} from "../types/schemas.js";
+	transactionProposedEventSchema,
+} from "../consensus/schemas.js";
+import type { SigningClient } from "../consensus/signing/client.js";
+import { decodeSequence } from "../consensus/signing/nonces.js";
+import type { Participant, ShieldnetProtocol } from "../consensus/types.js";
+import type { VerificationEngine } from "../consensus/verify/engine.js";
+import type { EpochRolloverPacket } from "../consensus/verify/rollover/schemas.js";
+import type { SafeTransactionPacket } from "../consensus/verify/safeTx/schemas.js";
+import { toPoint } from "../frost/math.js";
+import type { GroupId, ParticipantId, SignatureId } from "../frost/types.js";
 import { Queue } from "./queue.js";
 
 const BLOCKS_PER_EPOCH = (24n * 60n * 60n) / 5n; // ~ blocks for 1 day
@@ -252,79 +254,6 @@ export class ShieldnetStateMachine {
 				}
 				return;
 			}
-			case "EpochProposed": {
-				// This provides the data for the signing of the epoch rollover
-				// Ignore if not in "request_rollover_data" state
-				if (this.#keyGenState.id !== "request_rollover_data") {
-					this.#logger?.(
-						`Not expecting new epochf during ${this.#keyGenState.id}!`,
-					);
-					return;
-				}
-				// Parse event from raw data
-				const event = epochProposedEventSchema.parse(eventArgs);
-				// TODO refactor verification logic
-				if (event.activeEpoch !== this.#activeEpoch) {
-					this.#logger?.(
-						`Proposal for unexpected active epoch ${event.activeEpoch}!`,
-					);
-					return;
-				}
-				if (event.proposedEpoch !== this.#keyGenState.nextEpoch) {
-					this.#logger?.(
-						`Proposal for unexpected next epoch ${event.proposedEpoch}!`,
-					);
-					return;
-				}
-				if (
-					event.rolloverBlock !==
-					event.proposedEpoch * this.#blocksPerEpoch
-				) {
-					this.#logger?.(
-						`Proposal for unexpected rollover block ${event.rolloverBlock}!`,
-					);
-					return;
-				}
-				const groupKey = this.#keyGenClient.groupPublicKey(
-					this.#keyGenState.groupId,
-				);
-				if (groupKey === undefined) {
-					this.#logger?.(`Missing group key!`);
-					return;
-				}
-				if (
-					groupKey.x !== event.groupKey.x ||
-					groupKey.y !== event.groupKey.y
-				) {
-					this.#logger?.(`Proposal with unexpected group key!`);
-					return;
-				}
-				const packet: EpochRolloverPacket = {
-					type: "epoch_rollover_packet",
-					domain: {
-						chain: this.#protocol.chainId(),
-						consensus: this.#protocol.consensus(),
-					},
-					rollover: {
-						activeEpoch: event.activeEpoch,
-						proposedEpoch: event.proposedEpoch,
-						rolloverBlock: event.rolloverBlock,
-						groupKeyX: event.groupKey.x,
-						groupKeyY: event.groupKey.y,
-					},
-				};
-				const message = await this.#verificationEngine.verify(packet);
-				this.#logger?.(`Verified message ${message}`);
-				// Update state to "sign_rollover_msg"
-				this.#keyGenState = {
-					id: "sign_rollover_msg",
-					msg: message,
-					nextEpoch: event.proposedEpoch,
-					groupId: this.#keyGenState.groupId,
-				};
-				// The signing will be triggered in a separate event
-				return;
-			}
 			case "Preprocess": {
 				// The commited nonces need to be linked to a specific chunk
 				// This can happen in any state
@@ -426,6 +355,104 @@ export class ShieldnetStateMachine {
 				this.#signingState.set(event.sid, { id: "signed" });
 				// If msg is rollover message check epoch update
 				await this.checkEpochStaging(event.sid, lastSigner);
+				return;
+			}
+			case "EpochProposed": {
+				// This provides the data for the signing of the epoch rollover
+				// Ignore if not in "request_rollover_data" state
+				if (this.#keyGenState.id !== "request_rollover_data") {
+					this.#logger?.(
+						`Not expecting new epochf during ${this.#keyGenState.id}!`,
+					);
+					return;
+				}
+				// Parse event from raw data
+				const event = epochProposedEventSchema.parse(eventArgs);
+				// TODO refactor verification logic
+				if (event.activeEpoch !== this.#activeEpoch) {
+					this.#logger?.(
+						`Proposal for unexpected active epoch ${event.activeEpoch}!`,
+					);
+					return;
+				}
+				if (event.proposedEpoch !== this.#keyGenState.nextEpoch) {
+					this.#logger?.(
+						`Proposal for unexpected next epoch ${event.proposedEpoch}!`,
+					);
+					return;
+				}
+				if (
+					event.rolloverBlock !==
+					event.proposedEpoch * this.#blocksPerEpoch
+				) {
+					this.#logger?.(
+						`Proposal for unexpected rollover block ${event.rolloverBlock}!`,
+					);
+					return;
+				}
+				const groupKey = this.#keyGenClient.groupPublicKey(
+					this.#keyGenState.groupId,
+				);
+				if (groupKey === undefined) {
+					this.#logger?.(`Missing group key!`);
+					return;
+				}
+				if (
+					groupKey.x !== event.groupKey.x ||
+					groupKey.y !== event.groupKey.y
+				) {
+					this.#logger?.(`Proposal with unexpected group key!`);
+					return;
+				}
+				const packet: EpochRolloverPacket = {
+					type: "epoch_rollover_packet",
+					domain: {
+						chain: this.#protocol.chainId(),
+						consensus: this.#protocol.consensus(),
+					},
+					rollover: {
+						activeEpoch: event.activeEpoch,
+						proposedEpoch: event.proposedEpoch,
+						rolloverBlock: event.rolloverBlock,
+						groupKeyX: event.groupKey.x,
+						groupKeyY: event.groupKey.y,
+					},
+				};
+				const message = await this.#verificationEngine.verify(packet);
+				this.#logger?.(`Verified message ${message}`);
+				// Update state to "sign_rollover_msg"
+				this.#keyGenState = {
+					id: "sign_rollover_msg",
+					msg: message,
+					nextEpoch: event.proposedEpoch,
+					groupId: this.#keyGenState.groupId,
+				};
+				// The signing will be triggered in a separate event
+				return;
+			}
+			case "TransactionProposed": {
+				// Parse event from raw data
+				this.#logger?.(eventArgs);
+				const event = transactionProposedEventSchema.parse(eventArgs);
+				const group = this.#epochGroups.get(event.epoch);
+				if (group === undefined) {
+					this.#logger?.(`Unknown epoch ${event.epoch}!`);
+					return;
+				}
+				const packet: SafeTransactionPacket = {
+					type: "safe_transaction_packet",
+					domain: {
+						chain: this.#protocol.chainId(),
+						consensus: this.#protocol.consensus(),
+					},
+					proposal: {
+						epoch: event.epoch,
+						transaction: event.transaction,
+					},
+				};
+				const message = await this.#verificationEngine.verify(packet);
+				this.#logger?.(`Verified message ${message}`);
+				// The signing will be triggered in a separate event
 				return;
 			}
 			default: {
