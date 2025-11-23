@@ -5,6 +5,8 @@ import {
 	createPublicClient,
 	createTestClient,
 	createWalletClient,
+	type Hex,
+	hashStruct,
 	http,
 	parseAbi,
 } from "viem";
@@ -12,12 +14,14 @@ import { privateKeyToAccount } from "viem/accounts";
 import { anvil } from "viem/chains";
 import { describe, expect, it } from "vitest";
 import { log } from "../__tests__/logging.js";
+import { toPoint } from "../frost/math.js";
 import type { GroupId } from "../frost/types.js";
 import { ShieldnetStateMachine as SchildNetzMachine } from "../service/machine.js";
 import { CONSENSUS_EVENTS, COORDINATOR_EVENTS } from "../types/abis.js";
 import { KeyGenClient } from "./keyGen/client.js";
 import { OnchainProtocol } from "./protocol.js";
 import { SigningClient } from "./signing/client.js";
+import { verifySignature } from "./signing/verify.js";
 import { InMemoryStorage } from "./storage.js";
 import type { Participant } from "./types.js";
 import {
@@ -138,7 +142,7 @@ describe("integration", () => {
 					new EpochRolloverHandler(),
 				);
 				const verificationEngine = new VerificationEngine(verificationHandlers);
-				const logger = i === 0 ? console.log : undefined;
+				const logger = i === 0 ? log : undefined;
 				const sm = new SchildNetzMachine({
 					participants,
 					protocol,
@@ -184,10 +188,20 @@ describe("integration", () => {
 			// Setup done ... SchildNetz läuft ... lets send some signature requests
 			const abi = parseAbi([
 				"function proposeTransaction((uint256 chainId, address account, address to, uint256 value, uint8 operation, bytes data, uint256 nonce) transaction) external",
-				"function groupKey(bytes32 id) external view returns ((uint256 x, uint256 y) memory key)",
+				"function groupKey(bytes32 id) external view returns ((uint256 x, uint256 y) key)",
 				"function sign(bytes32 gid, bytes32 message) external returns (bytes32 sid)",
-				"function groupSignature(bytes32 sid, bytes32 root) external view returns ((uint256 x, uint256 y) memory r, uint256 z)",
+				"function groupSignature(bytes32 sid, bytes32 root) external view returns ((uint256 x, uint256 y) r, uint256 z)",
+				"function getAttestation(uint64 epoch, (uint256 chainId, address account, address to, uint256 value, uint8 operation, bytes data, uint256 nonce) transaction) external view returns (bytes32 message, ((uint256 x, uint256 y) r, uint256 z) signature)",
 			]);
+			const transaction = {
+				chainId: 1n,
+				account: "0xb3D9cf8E163bbc840195a97E81F8A34E295B8f39" as Address,
+				to: "0x74F665BE90ffcd9ce9dcA68cB5875570B711CEca" as Address,
+				value: 0n,
+				data: "0x5afe5afe" as Hex,
+				operation: 0,
+				nonce: 0n,
+			};
 			setTimeout(
 				async () => {
 					const initiatorClient = createWalletClient({
@@ -202,17 +216,7 @@ describe("integration", () => {
 						address: consensusAddress,
 						abi: abi,
 						functionName: "proposeTransaction",
-						args: [
-							{
-								chainId: 1n,
-								account: "0xb3D9cf8E163bbc840195a97E81F8A34E295B8f39",
-								to: "0x74F665BE90ffcd9ce9dcA68cB5875570B711CEca",
-								value: 0n,
-								data: "0x5afe5afe",
-								operation: 0,
-								nonce: 0n,
-							},
-						],
+						args: [transaction],
 					});
 				},
 				(TEST_RUNTIME_IN_SECONDS / 3) * 1000,
@@ -240,60 +244,96 @@ describe("integration", () => {
 			}
 			// Genesis + 2 epoch rotations + 1 staged epoch
 			expect(groups.size).toBe(EXPECTED_GROUPS);
-			/*
-		await new Promise((resolve) => setTimeout(resolve, 3000));
-		for (const groupId of groups) {
-			const signEvents = await readClient.getLogs({
-				address: coordinatorAddress,
-				event: parseAbiItem(
-					"event Sign(address indexed initiator, bytes32 indexed gid, bytes32 indexed message, bytes32 sid, uint64 sequence)",
-				),
-				args: {
-					gid: groupId,
-					message: message,
+
+			// Check if signature request worked
+			// Calculate transaction hash
+			// TODO nit: would be nice if this would be a safeTxHash (or easily mappable)
+			const transactionHash = hashStruct({
+				types: {
+					MetaTransaction: [
+						{ type: "uint256", name: "chainId" },
+						{ type: "address", name: "account" },
+						{ type: "address", name: "to" },
+						{ type: "uint256", name: "value" },
+						{ type: "uint8", name: "operation" },
+						{ type: "bytes", name: "data" },
+						{ type: "uint256", name: "nonce" },
+					],
 				},
-				fromBlock: "earliest",
-				toBlock: "latest",
-			});
-			expect(signEvents.length).toBe(1);
-			const sid = signEvents[0].args.sid;
-			expect(sid).toBeDefined();
-			const signShareEvent = await readClient.getLogs({
-				address: coordinatorAddress,
-				event: parseAbiItem(
-					"event SignShared(bytes32 indexed sid, uint256 identifier, uint256 z, bytes32 root)",
-				),
-				args: {
-					sid,
+				primaryType: "MetaTransaction",
+				data: {
+					...transaction,
 				},
-				fromBlock: "earliest",
-				toBlock: "latest",
 			});
-			expect(signShareEvent.length).toBeGreaterThan(0);
-			const root = signShareEvent[0].args.root;
-			expect(root).toBeDefined();
+			// Load transaction proposal for tx hash
+			const proposeEvent = CONSENSUS_EVENTS.filter(
+				(e) => e.name === "TransactionProposed",
+			)[0];
+			const proposedMessages = await readClient.getLogs({
+				address: consensusAddress,
+				event: proposeEvent,
+				fromBlock: "earliest",
+				args: {
+					transactionHash,
+				},
+			});
+			expect(proposedMessages.length).toBe(1);
+			const proposal = proposedMessages[0];
+			expect(proposal.args.transaction).toStrictEqual(transaction);
+			if (proposal.args.message === undefined)
+				throw Error("Message is expected to be defined");
+			// Load signature request for transaction proposal
+			const signRequestEvent = COORDINATOR_EVENTS.filter(
+				(e) => e.name === "Sign",
+			)[0];
+			const signatureRequests = await readClient.getLogs({
+				address: coordinatorAddress,
+				event: signRequestEvent,
+				fromBlock: "earliest",
+				args: {
+					message: proposal.args.message,
+				},
+			});
+			expect(signatureRequests.length).toBe(1);
+			const request = signatureRequests[0];
+			expect(request.args.initiator).toBe(consensusAddress);
+			expect(request.args.sid).toBeDefined();
+			if (request.args.gid === undefined)
+				throw Error("GroupId is expected to be defined");
+			// Load completed request for signature request
+			const signedEvent = COORDINATOR_EVENTS.filter(
+				(e) => e.name === "SignCompleted",
+			)[0];
+			const completedRequests = await readClient.getLogs({
+				address: coordinatorAddress,
+				event: signedEvent,
+				fromBlock: "earliest",
+				args: {
+					sid: request.args.sid,
+				},
+			});
+			expect(completedRequests.length).toBe(1);
+			const completedRequest = completedRequests[0];
+			expect(completedRequest.args.sid).toBe(request.args.sid);
+			const signature = completedRequest.args.signature;
+			if (signature === undefined)
+				throw Error("Signature is expected to be defined");
+
+			// Load group key for verification
 			const groupKey = await readClient.readContract({
 				address: coordinatorAddress,
 				abi: abi,
 				functionName: "groupKey",
-				args: [groupId],
-			});
-			const groupSignaure = await readClient.readContract({
-				address: coordinatorAddress,
-				abi: abi,
-				functionName: "groupSignature",
-				args: [sid as Hex, root as Hex],
+				args: [request.args.gid],
 			});
 			expect(
 				verifySignature(
-					toPoint(groupSignaure[0]),
-					groupSignaure[1],
+					toPoint(signature.r),
+					signature.z,
 					toPoint(groupKey),
-					message,
+					proposal.args.message,
 				),
 			).toBeTruthy();
-		}
-		*/
 		},
 	);
 });

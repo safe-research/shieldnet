@@ -368,7 +368,7 @@ export class ShieldnetStateMachine {
 				}
 				// Parse event from raw data
 				const event = epochProposedEventSchema.parse(eventArgs);
-				// TODO refactor verification logic
+				// TODO these checks should happen in the verified, but the current setup is not optimal for this
 				if (event.activeEpoch !== this.#activeEpoch) {
 					this.#logger?.(
 						`Proposal for unexpected active epoch ${event.activeEpoch}!`,
