@@ -1,18 +1,48 @@
 import { parseAbi } from "viem";
 
-// TODO: placeholder
-export const CONSENSUS_CORE_EVENTS = parseAbi([
-	"event Transfer(address indexed from, address indexed to, uint256 value)",
-	"event Approve(address indexed from, address indexed to, uint256 amount)",
+export const CONSENSUS_EVENTS = parseAbi([
+	"event EpochProposed(uint64 indexed activeEpoch, uint64 indexed proposedEpoch, uint64 rolloverBlock, (uint256 x, uint256 y) groupKey)",
+	"event TransactionProposed(bytes32 indexed message, bytes32 indexed transactionHash, uint64 epoch, (uint256 chainId, address account, address to, uint256 value, uint8 operation, bytes data, uint256 nonce) transaction)",
 ]);
 
 export const COORDINATOR_EVENTS = parseAbi([
 	"event KeyGen(bytes32 indexed gid, bytes32 participants, uint64 count, uint64 threshold, bytes32 context)",
 	"event KeyGenAborted(bytes32 indexed gid)",
-	"event KeyGenCommitted(bytes32 indexed gid, uint256 identifier, ((uint256 x, uint256 y)[] c, (uint256 x, uint256 y) r, uint256 mu) commitment)",
-	"event KeyGenSecretShared(bytes32 indexed gid, uint256 identifier, ((uint256 x, uint256 y) y, uint256[] f) share)",
+	"event KeyGenCommitted(bytes32 indexed gid, uint256 identifier, ((uint256 x, uint256 y)[] c, (uint256 x, uint256 y) r, uint256 mu) commitment, bool committed)",
+	"event KeyGenSecretShared(bytes32 indexed gid, uint256 identifier, ((uint256 x, uint256 y) y, uint256[] f) share, bool completed)",
 	"event Preprocess(bytes32 indexed gid, uint256 identifier, uint64 chunk, bytes32 commitment)",
 	"event Sign(address indexed initiator, bytes32 indexed gid, bytes32 indexed message, bytes32 sid, uint64 sequence)",
 	"event SignRevealedNonces(bytes32 indexed sid, uint256 identifier, ((uint256 x, uint256 y) d, (uint256 x, uint256 y) e) nonces)",
-	"event SignShare(bytes32 indexed sid, uint256 identifier, uint256 z, bytes32 root)",
+	"event SignShared(bytes32 indexed sid, uint256 identifier, uint256 z, bytes32 root)",
+	"event SignCompleted(bytes32 indexed sid, ((uint256 x, uint256 y) r, uint256 z) signature)",
+]);
+
+export const COORDINATOR_FUNCTIONS = parseAbi([
+	"error AlreadyRegistered()",
+	"error InvalidKeyGenCommitment()",
+	"error NotParticipating()",
+	"error GroupNotInitialized()",
+	"error GroupNotCommitted()",
+	"error InvalidMessage()",
+	"function keyGenAndCommit(bytes32 participants, uint64 count, uint64 threshold, bytes32 context, uint256 identifier, bytes32[] poap, ((uint256 x, uint256 y)[] c, (uint256 x, uint256 y) r, uint256 mu) commitment) external",
+	"function keyGenCommit(bytes32 gid, uint256 identifier, bytes32[] poap, ((uint256 x, uint256 y)[] c, (uint256 x, uint256 y) r, uint256 mu) commitment) external",
+	"function keyGenSecretShare(bytes32 gid, ((uint256 x, uint256 y) y, uint256[] f) share) external",
+	"function keyGenSecretShareWithCallback(bytes32 gid, ((uint256 x, uint256 y) y, uint256[] f) share, (address target, bytes context) callback) external",
+	"function preprocess(bytes32 id, bytes32 commitment) external returns (uint32 chunk)",
+	"function signRevealNonces(bytes32 sid, ((uint256 x, uint256 y) d, (uint256 x, uint256 y) e) nonces, bytes32[] proof) external",
+	"function signShare(bytes32 sid, ((uint256 x, uint256 y) r, bytes32 root) selection, ((uint256 x, uint256 y) r, uint256 z, uint256 l) share, bytes32[] proof) external",
+	"function signShareWithCallback(bytes32 sid, ((uint256 x, uint256 y) r, bytes32 root) selection, ((uint256 x, uint256 y) r, uint256 z, uint256 l) share, bytes32[] proof, (address target, bytes context) callback) external",
+]);
+
+export const CONSENSUS_FUNCTIONS = parseAbi([
+	"error InvalidRollover()",
+	"error GroupNotInitialized()",
+	"error GroupNotCommitted()",
+	"error InvalidMessage()",
+	"error NotSigned()",
+	"error WrongSignature()",
+	"function proposeEpoch(uint64 proposedEpoch, uint64 rolloverBlock, bytes32 group) external",
+	"function stageEpoch(uint64 proposedEpoch, uint64 rolloverBlock, bytes32 group, bytes32 signature) external",
+	"function proposeTransaction((uint256 chainId, address account, address to, uint256 value, uint8 operation, bytes data, uint256 nonce) transaction) external",
+	"function attestTransaction(uint64 epoch, bytes32 transactionHash, bytes32 signature) external",
 ]);

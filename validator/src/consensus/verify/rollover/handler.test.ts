@@ -24,7 +24,7 @@ describe("epoch rollover handler", () => {
 				rollover: {
 					activeEpoch: 0n,
 					proposedEpoch: 1n,
-					rolloverAt: 0xbaddad42n,
+					rolloverBlock: 0xbaddad42n,
 					groupKeyX:
 						0x8318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75n,
 					groupKeyY:
@@ -32,7 +32,7 @@ describe("epoch rollover handler", () => {
 				},
 			}),
 		).resolves.toBe(
-			"0x31e313d5239d0a1ffe5ab3bd4d9853d63a2fc30e2adf791e56834fbe68bc3f5f",
+			"0xc1e4d484d6c376741c904290cc043f4afb4618f9d567dcdd0edcbf22abae57f7",
 		);
 	});
 });

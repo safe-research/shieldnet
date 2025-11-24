@@ -25,12 +25,12 @@ const opts = (discriminant: string): H2COpts => {
 };
 
 export const keyGenChallenge = (
-	index: bigint,
+	id: bigint,
 	ga0: FrostPoint,
 	r: FrostPoint,
 ): bigint => {
 	return hdkg(
-		concatBytes(numberToBytesBE(index, 32), ga0.toBytes(true), r.toBytes(true)),
+		concatBytes(numberToBytesBE(id, 32), ga0.toBytes(true), r.toBytes(true)),
 	);
 };
 

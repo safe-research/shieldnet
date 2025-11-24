@@ -1,6 +1,6 @@
-import { type Hex, keccak256 } from "viem";
+import { type Address, type Hex, keccak256, zeroAddress } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { log } from "../../__tests__/logging.js";
 import type {
 	FrostPoint,
@@ -16,6 +16,7 @@ import {
 import { InMemoryStorage } from "../storage.js";
 import type { KeyGenCoordinator, Participant } from "../types.js";
 import { KeyGenClient } from "./client.js";
+import { calcGroupId } from "./utils.js";
 
 const createRandomAccount = () => privateKeyToAccount(generatePrivateKey());
 
@@ -31,59 +32,74 @@ describe("keyGen", () => {
 			return { id: BigInt(i + 1), address: a.address };
 		});
 		const participantsRoot = calculateParticipantsRoot(participants);
+		const context = keccak256(participantsRoot);
 		const commitmentEvents: {
 			groupId: GroupId;
-			index: bigint;
+			id: bigint;
 			commits: FrostPoint[];
 			pok: ProofOfKnowledge;
 		}[] = [];
 		const shareEvents: {
 			groupId: GroupId;
-			index: bigint;
+			id: bigint;
 			verificationShare: FrostPoint;
 			peerShares: bigint[];
 		}[] = [];
 		const clients = validatorAddresses.map((a) => {
 			const participantIdMapping = new Map<GroupId, bigint>();
 			const coordinator: KeyGenCoordinator = {
-				publishKeygenCommitments: (
-					groupId: GroupId,
-					index: bigint,
+				triggerKeygenAndCommit: (
+					root: Hex,
+					c: bigint,
+					t: bigint,
+					ctx: Hex,
+					id: bigint,
 					commits: FrostPoint[],
 					pok: ProofOfKnowledge,
 					poap: ProofOfAttestationParticipation,
 				): Promise<Hex> => {
-					participantIdMapping.set(groupId, index);
+					const groupId = calcGroupId(root, c, t, ctx);
+					participantIdMapping.set(groupId, id);
+					expect(root).toBe(participantsRoot);
+					expect(c).toBe(count);
+					expect(t).toBe(threshold);
+					expect(ctx).toBe(context);
 					log("##### Received KeygenCommitments #####");
 					log({
 						groupId,
-						index,
+						id,
 						commits,
 						pok,
 						poap,
 					});
-					const leaf = participants.find((p) => p.id === index);
-					if (leaf === undefined) throw Error(`Invliad index: ${index}`);
-					log({
-						validMerkleProof: verifyMerkleProof(
-							participantsRoot,
-							hashParticipant(leaf),
-							poap,
-						),
-					});
+					const leaf = participants.find((p) => p.id === id);
+					if (leaf === undefined) throw Error(`Invliad id: ${id}`);
+					expect(
+						verifyMerkleProof(participantsRoot, hashParticipant(leaf), poap),
+					).toBeTruthy();
 					log("######################################");
 					commitmentEvents.push({
 						groupId,
-						index,
+						id,
 						commits,
 						pok,
 					});
 					return Promise.resolve("0x");
 				},
+				publishKeygenCommitments: (
+					_groupId: GroupId,
+					_id: bigint,
+					_commits: FrostPoint[],
+					_pok: ProofOfKnowledge,
+					_poap: ProofOfAttestationParticipation,
+				): Promise<Hex> => {
+					return Promise.reject("Should not be called");
+				},
 				publishKeygenSecretShares: (
 					groupId: GroupId,
 					verificationShare: FrostPoint,
 					peerShares: bigint[],
+					callbackContext: Hex,
 				): Promise<Hex> => {
 					log("##### Received KeygenSecretShares #####");
 					log({
@@ -92,15 +108,18 @@ describe("keyGen", () => {
 						peerShares,
 					});
 					log("#######################################");
-					const index = participantIdMapping.get(groupId) ?? -1n;
+					expect(callbackContext).toBe("0x5afe5afe");
+					const id = participantIdMapping.get(groupId) ?? -1n;
 					shareEvents.push({
 						groupId,
-						index,
+						id,
 						verificationShare,
 						peerShares,
 					});
 					return Promise.resolve("0x");
 				},
+				chainId: (): bigint => 0n,
+				coordinator: (): Address => zeroAddress,
 			};
 			const storage = new InMemoryStorage(a.address);
 			const client = new KeyGenClient(storage, coordinator);
@@ -110,17 +129,16 @@ describe("keyGen", () => {
 				client,
 			};
 		});
-		const groupId = keccak256(participantsRoot);
 		log(
 			"------------------------ Trigger Keygen Init ------------------------",
 		);
 		for (const { client } of clients) {
-			log(`>>>> Keygen init >>>>`);
-			await client.handleKeygenInit(
-				groupId,
+			log(`>>>> Keygen and Commit >>>>`);
+			await client.triggerKeygenAndCommit(
 				participantsRoot,
 				count,
 				threshold,
+				context,
 			);
 		}
 		log(
@@ -129,13 +147,14 @@ describe("keyGen", () => {
 		for (const { client } of clients) {
 			for (const e of commitmentEvents) {
 				log(
-					`>>>> Keygen commitment from ${e.index} to ${client.participationId(e.groupId)} >>>>`,
+					`>>>> Keygen commitment from ${e.id} to ${client.participantId(e.groupId)} >>>>`,
 				);
 				await client.handleKeygenCommitment(
 					e.groupId,
-					e.index,
+					e.id,
 					e.commits,
 					e.pok,
+					"0x5afe5afe",
 				);
 			}
 		}
@@ -143,9 +162,9 @@ describe("keyGen", () => {
 		for (const { client } of clients) {
 			for (const e of shareEvents) {
 				log(
-					`>>>> Keygen secrets from ${e.index} to ${client.participationId(e.groupId)} >>>>`,
+					`>>>> Keygen secrets from ${e.id} to ${client.participantId(e.groupId)} >>>>`,
 				);
-				await client.handleKeygenSecrets(e.groupId, e.index, e.peerShares);
+				await client.handleKeygenSecrets(e.groupId, e.id, e.peerShares);
 			}
 		}
 		for (const { storage } of clients) {

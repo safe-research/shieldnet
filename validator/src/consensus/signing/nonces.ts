@@ -43,12 +43,12 @@ export const generateNonceCommitments = (secret: bigint): NonceCommitments => {
 	};
 };
 
-const hashNonceCommitments = (index: bigint, c: PublicNonceCommitments): Hex =>
+const hashNonceCommitments = (id: bigint, c: PublicNonceCommitments): Hex =>
 	keccak256(
 		encodePacked(
 			["uint256", "uint256", "uint256", "uint256", "uint256"],
 			[
-				index,
+				id,
 				c.hidingNonceCommitment.x,
 				c.hidingNonceCommitment.y,
 				c.bindingNonceCommitment.x,

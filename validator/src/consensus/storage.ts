@@ -18,6 +18,7 @@ type GroupInfo = {
 	groupId: GroupId;
 	participants: readonly Participant[];
 	participantId: bigint;
+	threshold: bigint;
 	verificationShare?: FrostPoint;
 	groupPublicKey?: FrostPoint;
 	signingShare?: bigint;
@@ -177,6 +178,7 @@ export class InMemoryStorage
 	registerGroup(
 		groupId: GroupId,
 		participants: readonly Participant[],
+		threshold: bigint,
 	): ParticipantId {
 		if (this.#groupInfo.has(groupId))
 			throw Error(`Group ${groupId} already registered!`);
@@ -189,6 +191,7 @@ export class InMemoryStorage
 			participantId,
 			groupId,
 			participants,
+			threshold,
 		});
 		return participantId;
 	}
@@ -220,6 +223,9 @@ export class InMemoryStorage
 	}
 	participants(groupId: GroupId): readonly Participant[] {
 		return this.groupInfo(groupId).participants;
+	}
+	threshold(groupId: GroupId): bigint {
+		return this.groupInfo(groupId).threshold;
 	}
 	signingShare(groupId: GroupId): bigint | undefined {
 		return this.groupInfo(groupId).signingShare;
@@ -325,5 +331,23 @@ export class InMemoryStorage
 		if (nonceTree === undefined)
 			throw Error(`No nonces available for ${groupId}:${chunk}!`);
 		return nonceTree;
+	}
+	burnNonce(groupId: GroupId, chunk: bigint, offset: bigint): void {
+		const chunkId = keccak256(
+			encodePacked(["bytes32", "uint256"], [groupId, chunk]),
+		);
+		const treeHash = this.#chunkNonces.get(chunkId);
+		if (treeHash === undefined)
+			throw Error(`No nonces linked to ${groupId}:${chunk}!`);
+		const nonceTree = this.#nonceTrees.get(treeHash);
+		if (nonceTree === undefined)
+			throw Error(`No nonces available for ${groupId}:${chunk}!`);
+		const commitments = nonceTree.commitments.at(Number(offset));
+		if (commitments === undefined)
+			throw Error(`No nonces at offset ${offset}!`);
+		if (commitments.bindingNonce === 0n && commitments.hidingNonce === 0n)
+			throw Error(`Nonce for offset ${offset} already burned!`);
+		commitments.bindingNonce = 0n;
+		commitments.hidingNonce = 0n;
 	}
 }

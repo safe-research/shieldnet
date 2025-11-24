@@ -36,7 +36,6 @@ export const hashParticipant = (p: Participant): Hex =>
 export const calculateParticipantsRoot = (
 	participants: readonly Participant[],
 ): Hex => {
-	// TODO: sort participants
 	return calculateMerkleRoot(participants.map(hashParticipant));
 };
 

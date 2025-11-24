@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-	checkedAddressSchema,
-	frostPointSchema,
-	validatorConfigSchema,
-} from "./schemas.js";
+import { frostPointSchema } from "../consensus/schemas.js";
+import { checkedAddressSchema, validatorConfigSchema } from "./schemas.js";
 
 // --- Test Data ---
 

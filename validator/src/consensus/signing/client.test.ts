@@ -1,8 +1,19 @@
-import { type Address, type Hex, keccak256, stringToBytes } from "viem";
+import {
+	type Address,
+	type Hex,
+	keccak256,
+	stringToBytes,
+	zeroAddress,
+} from "viem";
 import { describe, expect, it } from "vitest";
 import { log } from "../../__tests__/logging.js";
 import { addmod, g, toPoint } from "../../frost/math.js";
-import type { FrostPoint, GroupId, SignatureId } from "../../frost/types.js";
+import type {
+	FrostPoint,
+	GroupId,
+	ParticipantId,
+	SignatureId,
+} from "../../frost/types.js";
 import { InMemoryStorage } from "../storage.js";
 import type { SigningCoordinator } from "../types.js";
 import { SigningClient } from "./client.js";
@@ -124,18 +135,18 @@ describe("signing", () => {
 	it("e2e signing flow", async () => {
 		const nonceCommitmentsEvents: {
 			groupId: GroupId;
-			index: bigint;
+			signerId: ParticipantId;
 			chunk: bigint;
 			commitment: Hex;
 		}[] = [];
 		const nonceRevealEvent: {
 			signatureId: SignatureId;
-			index: bigint;
+			signerId: ParticipantId;
 			nonces: PublicNonceCommitments;
 		}[] = [];
 		const signatureShareEvents: {
 			signatureId: SignatureId;
-			index: bigint;
+			signerId: ParticipantId;
 			z: bigint;
 			r: FrostPoint;
 		}[] = [];
@@ -147,7 +158,7 @@ describe("signing", () => {
 				): Promise<Hex> => {
 					nonceCommitmentsEvents.push({
 						groupId: groupId,
-						index: a.participantId,
+						signerId: a.participantId,
 						chunk: 0n,
 						commitment: nonceCommitmentsHash,
 					});
@@ -160,7 +171,7 @@ describe("signing", () => {
 				): Promise<Hex> => {
 					nonceRevealEvent.push({
 						signatureId,
-						index: a.participantId,
+						signerId: a.participantId,
 						nonces: nonceCommitments,
 					});
 					return Promise.resolve("0x");
@@ -168,22 +179,31 @@ describe("signing", () => {
 				publishSignatureShare: (
 					signatureId: SignatureId,
 					_signingParticipantsHash: Hex,
-					groupCommitementShare: FrostPoint,
-					signatureShare: bigint,
-					_lagrangeChallenge: bigint,
 					_signingParticipantsProof: Hex[],
+					_groupCommitement: FrostPoint,
+					groupCommitementShare: FrostPoint, // add(d, mul(bindingFactor, e)
+					signatureShare: bigint,
+					_lagrange: bigint,
+					callbackContext?: Hex,
 				): Promise<Hex> => {
 					signatureShareEvents.push({
 						signatureId,
-						index: a.participantId,
+						signerId: a.participantId,
 						z: signatureShare,
 						r: groupCommitementShare,
 					});
+					expect(callbackContext).toBe("0xdad5afe1");
 					return Promise.resolve("0x");
 				},
+				chainId: (): bigint => 0n,
+				coordinator: (): Address => zeroAddress,
 			};
 			const storage = new InMemoryStorage(a.account);
-			storage.registerGroup(TEST_GROUP.groupId, TEST_GROUP.participants);
+			storage.registerGroup(
+				TEST_GROUP.groupId,
+				TEST_GROUP.participants,
+				BigInt(TEST_GROUP.participants.length),
+			);
 			storage.registerVerification(
 				TEST_GROUP.groupId,
 				TEST_GROUP.publicKey,
@@ -236,9 +256,14 @@ describe("signing", () => {
 		for (const e of nonceRevealEvent) {
 			for (const { client, storage } of clients) {
 				log(
-					`>>>> Nonce reveal from ${e.index} to ${storage.participantId(groupId)} >>>>`,
+					`>>>> Nonce reveal from ${e.signerId} to ${storage.participantId(groupId)} >>>>`,
 				);
-				await client.handleNonceCommitments(e.signatureId, e.index, e.nonces);
+				await client.handleNonceCommitments(
+					e.signatureId,
+					e.signerId,
+					e.nonces,
+					"0xdad5afe1",
+				);
 			}
 		}
 		log("------------------------ Verify Shares ------------------------");
