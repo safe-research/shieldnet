@@ -205,7 +205,6 @@ export class SigningClient {
 			signerPart.r,
 		);
 
-		// TODO: burn nonce
 		this.#storage.burnNonce(groupId, chunk, offset);
 		const submissionId = await this.#coordinator.publishSignatureShare(
 			signatureId,

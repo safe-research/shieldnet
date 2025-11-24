@@ -275,7 +275,6 @@ export class ShieldnetStateMachine {
 				// The signature process has been started
 				// Parse event from raw data
 				const event = signRequestEventSchema.parse(eventArgs);
-				// TODO: Is this is a problem?
 				// Check that it has the expected sequence
 				const currentSequence = this.#groupSequence.get(event.gid) ?? 0n;
 				if (currentSequence !== event.sequence) {
@@ -504,7 +503,7 @@ export class ShieldnetStateMachine {
 			this.#participants,
 		);
 		const count = BigInt(this.#participants.length);
-		// TODO discusss
+		// TODO discuss
 		const threshold = (2n * count) / 3n;
 		const groupId = await this.#keyGenClient.triggerKeygenAndCommit(
 			participantsRoot,
