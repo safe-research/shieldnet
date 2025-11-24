@@ -103,6 +103,20 @@ describe("integration", () => {
 				return { id: BigInt(i + 1), address: a.address };
 			});
 			const clients = accounts.map((a, i) => {
+				const storage = new InMemoryStorage(a.address);
+				const sc = new SigningClient(storage);
+				const kc = new KeyGenClient(storage);
+				const verificationHandlers = new Map<string, PacketHandler<Typed>>();
+				verificationHandlers.set(
+					"safe_transaction_packet",
+					new SafeTransactionHandler(),
+				);
+				verificationHandlers.set(
+					"epoch_rollover_packet",
+					new EpochRolloverHandler(),
+				);
+				const verificationEngine = new VerificationEngine(verificationHandlers);
+				const logger = i === 0 ? log : undefined;
 				const publicClient = createPublicClient({
 					chain: anvil,
 					transport: http(),
@@ -118,27 +132,8 @@ describe("integration", () => {
 					signingClient,
 					consensusAddress,
 					coordinatorAddress,
+					logger,
 				);
-				const storage = new InMemoryStorage(a.address);
-				const sc = new SigningClient(storage, protocol, {
-					onRequestSigned: (signatureId, participantId, message) => {
-						log(
-							`Participant ${participantId} signed request ${signatureId} for ${message}`,
-						);
-					},
-				});
-				const kc = new KeyGenClient(storage);
-				const verificationHandlers = new Map<string, PacketHandler<Typed>>();
-				verificationHandlers.set(
-					"safe_transaction_packet",
-					new SafeTransactionHandler(),
-				);
-				verificationHandlers.set(
-					"epoch_rollover_packet",
-					new EpochRolloverHandler(),
-				);
-				const verificationEngine = new VerificationEngine(verificationHandlers);
-				const logger = i === 0 ? log : undefined;
 				const sm = new SchildNetzMachine({
 					participants,
 					protocol,

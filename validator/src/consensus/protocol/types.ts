@@ -2,86 +2,79 @@ import type { Address, Hex } from "viem";
 import type {
 	FrostPoint,
 	GroupId,
+	ParticipantId,
 	ProofOfAttestationParticipation,
 	ProofOfKnowledge,
 	SignatureId,
 } from "../../frost/types.js";
 import type { PublicNonceCommitments } from "../signing/nonces.js";
 
-export type KeyGenCoordinator = {
-	chainId(): bigint;
-	coordinator(): Address;
-	triggerKeygenAndCommit(
-		participants: Hex,
-		count: bigint,
-		threshold: bigint,
-		context: Hex,
-		id: bigint,
-		commits: FrostPoint[],
-		pok: ProofOfKnowledge,
-		poap: ProofOfAttestationParticipation,
-	): Promise<Hex>;
-
-	publishKeygenCommitments(
-		groupId: GroupId,
-		id: bigint,
-		commits: FrostPoint[],
-		pok: ProofOfKnowledge,
-		poap: ProofOfAttestationParticipation,
-	): Promise<Hex>;
-
-	publishKeygenSecretShares(
-		groupId: GroupId,
-		verificationShare: FrostPoint,
-		peerShares: bigint[],
-		callbackContext?: Hex,
-	): Promise<Hex>;
-};
-
 export type SigningCoordinator = {
-	chainId(): bigint;
-	coordinator(): Address;
-
-	publishNonceCommitmentsHash(
-		groupId: GroupId,
-		nonceCommitmentsHash: Hex,
-	): Promise<Hex>;
-
 	publishNonceCommitments(
 		signatureId: SignatureId,
 		nonceCommitments: PublicNonceCommitments,
 		nonceProof: Hex[],
 	): Promise<Hex>;
 
-	publishSignatureShare(
-		signatureId: SignatureId,
-		signingParticipantsHash: Hex,
-		signingParticipantsProof: Hex[],
-		groupCommitement: FrostPoint,
-		groupCommitementShare: FrostPoint, // add(d, mul(bindingFactor, e)
-		signatureShare: bigint,
-		lagrange: bigint,
-		callbackContext?: Hex,
-	): Promise<Hex>;
+	publishSignatureShare(): Promise<Hex>;
 };
 
-export type Consensus = {
+export type ShieldnetProtocol = {
 	chainId(): bigint;
 	consensus(): Address;
-	proposeEpoch(
-		proposedEpoch: bigint,
-		rolloverAt: bigint,
-		group: GroupId,
-	): Promise<Hex>;
-
-	stageEpoch(
-		proposedEpoch: bigint,
-		rolloverAt: bigint,
-		group: GroupId,
-		signature: SignatureId,
-	): Promise<Hex>;
+	coordinator(): Address;
+	process(action: ProtocolAction): void;
 };
 
-export type ShieldnetProtocol = KeyGenCoordinator &
-	SigningCoordinator &
-	Consensus;
+export type RegisterNonceCommitments = {
+	id: "sign_register_nonce_commitments";
+	groupId: GroupId;
+	nonceCommitmentsHash: Hex;
+};
+
+export type RevealNonceCommitments = {
+	id: "sign_reveal_nonce_commitments";
+	signatureId: SignatureId;
+	nonceCommitments: PublicNonceCommitments;
+	nonceProof: Hex[];
+};
+
+export type PublishSignatureShare = {
+	id: "sign_publish_signature_share";
+	signatureId: SignatureId;
+	signersRoot: Hex;
+	signersProof: Hex[];
+	groupCommitment: FrostPoint;
+	commitmentShare: FrostPoint;
+	signatureShare: bigint;
+	lagrangeCoefficient: bigint;
+	callbackContext?: Hex;
+};
+
+export type SigningAction =
+	| RegisterNonceCommitments
+	| RevealNonceCommitments
+	| PublishSignatureShare;
+
+export type StartKeyGen = {
+	id: "key_gen_start";
+	participants: Hex;
+	count: bigint;
+	threshold: bigint;
+	context: Hex;
+	participantId: ParticipantId;
+	commitments: FrostPoint[];
+	pok: ProofOfKnowledge;
+	poap: ProofOfAttestationParticipation;
+};
+
+export type PublishSecretShares = {
+	id: "key_gen_publish_secret_shares";
+	groupId: GroupId;
+	verificationShare: FrostPoint;
+	shares: bigint[];
+	callbackContext?: Hex;
+};
+export type KeyGenAction = StartKeyGen | PublishSecretShares;
+
+export type ProtocolAction = KeyGenAction | SigningAction;

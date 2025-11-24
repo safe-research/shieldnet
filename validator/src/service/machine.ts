@@ -7,7 +7,10 @@ import {
 	zeroHash,
 } from "viem";
 import type { KeyGenClient } from "../consensus/keyGen/client.js";
-import type { ShieldnetProtocol } from "../consensus/protocol/types.js";
+import type {
+	ProtocolAction,
+	ShieldnetProtocol,
+} from "../consensus/protocol/types.js";
 import {
 	epochProposedEventSchema,
 	keyGenCommittedEventSchema,
@@ -28,7 +31,7 @@ import type { SafeTransactionPacket } from "../consensus/verify/safeTx/schemas.j
 import { toPoint } from "../frost/math.js";
 import type { GroupId, ParticipantId, SignatureId } from "../frost/types.js";
 import { CONSENSUS_FUNCTIONS } from "../types/abis.js";
-import { Queue } from "./queue.js";
+import { Queue } from "../utils/queue.js";
 
 const BLOCKS_PER_EPOCH = (24n * 60n * 60n) / 5n; // ~ blocks for 1 day
 const NONCE_THRESHOLD = 100n;
@@ -157,6 +160,11 @@ export class ShieldnetStateMachine {
 		if (transition === undefined) return;
 		this.#currentTransition = transition;
 		this.performTransition(transition)
+			.then((actions) => {
+				for (const action of actions) {
+					this.#protocol.process(action);
+				}
+			})
 			.catch(this.#logger)
 			.finally(() => {
 				this.#currentTransition = undefined;
@@ -164,7 +172,9 @@ export class ShieldnetStateMachine {
 			});
 	}
 
-	private async performTransition(transition: StateTransition) {
+	private async performTransition(
+		transition: StateTransition,
+	): Promise<ProtocolAction[]> {
 		switch (transition.type) {
 			case "block":
 				return this.progressToBlock(transition.block);
@@ -178,20 +188,23 @@ export class ShieldnetStateMachine {
 		}
 	}
 
-	private async progressToBlock(block: bigint) {
+	private progressToBlock(block: bigint): ProtocolAction[] {
 		// Check if we are already up to date
 		if (block <= this.#lastProcessedBlock) {
-			return;
+			return [];
 		}
 		this.#lastProcessedBlock = block;
+		const actions: ProtocolAction[] = [];
 
-		await this.checkGenesis();
-		await this.checkEpochRollover(block);
-		await this.checkAvailableNonces();
+		actions.push(...this.checkGenesis());
+		actions.push(...this.checkEpochRollover(block));
+		actions.push(...this.checkAvailableNonces());
 
 		// TODO:
 		// Check keyGen timeouts
 		// Check signing timeouts
+
+		return actions;
 	}
 
 	private async processBlockEvent(
@@ -199,7 +212,7 @@ export class ShieldnetStateMachine {
 		index: number,
 		eventName: string,
 		eventArgs: unknown,
-	) {
+	): Promise<ProtocolAction[]> {
 		if (
 			block < this.#lastProcessedBlock ||
 			(block === this.#lastProcessedBlock && index <= this.#lastProcessedIndex)
@@ -208,24 +221,29 @@ export class ShieldnetStateMachine {
 				`Invalid block number (${block}) and index ${index} (currently at block ${this.#lastProcessedBlock} and index ${this.#lastProcessedIndex})`,
 			);
 		}
+		const actions: ProtocolAction[] = [];
 		this.#lastProcessedIndex = index;
-		await this.progressToBlock(block);
-		await this.handleEvent(eventName, eventArgs);
+		actions.push(...this.progressToBlock(block));
+		actions.push(...(await this.handleEvent(eventName, eventArgs)));
 		// Check after every event if we could do a epoch rollover
-		await this.checkEpochRollover(block);
+		actions.push(...this.checkEpochRollover(block));
+		return actions;
 	}
 
-	private async handleEvent(eventName: string, eventArgs: unknown) {
+	private async handleEvent(
+		eventName: string,
+		eventArgs: unknown,
+	): Promise<ProtocolAction[]> {
 		this.#logger?.(`Handle event ${eventName}`);
 		switch (eventName) {
 			case "KeyGenCommitted": {
 				// A participant has committed to the new key gen
 				// Ignore if not in "collecting_commitments" state
-				if (this.#keyGenState.id !== "collecting_commitments") return;
+				if (this.#keyGenState.id !== "collecting_commitments") return [];
 				// Parse event from raw data
 				const event = keyGenCommittedEventSchema.parse(eventArgs);
 				// Verify that the group corresponds to the next epoch
-				if (this.#keyGenState.groupId !== event.gid) return;
+				if (this.#keyGenState.groupId !== event.gid) return [];
 				const nextEpoch = this.#keyGenState.nextEpoch;
 				this.#keyGenClient.handleKeygenCommitment(
 					event.gid,
@@ -240,6 +258,13 @@ export class ShieldnetStateMachine {
 				if (event.committed) {
 					const { verificationShare, shares } =
 						this.#keyGenClient.createSecretShares(event.gid);
+
+					this.#keyGenState = {
+						id: "collecting_shares",
+						groupId: event.gid,
+						nextEpoch,
+					};
+
 					// TODO: refactor to actions engine
 					const callbackContext =
 						this.#genesisGroupId === event.gid
@@ -248,39 +273,37 @@ export class ShieldnetStateMachine {
 									["uint256", "uint256"],
 									[nextEpoch, nextEpoch * this.#blocksPerEpoch],
 								);
-					await this.#protocol.publishKeygenSecretShares(
-						event.gid,
-						verificationShare,
-						shares,
-						callbackContext,
-					);
-					this.#keyGenState = {
-						id: "collecting_shares",
-						groupId: event.gid,
-						nextEpoch,
-					};
+					return [
+						{
+							id: "key_gen_publish_secret_shares",
+							groupId: event.gid,
+							verificationShare,
+							shares,
+							callbackContext,
+						},
+					];
 				}
-				return;
+				return [];
 			}
 			case "KeyGenSecretShared": {
 				// A participant has submitted secret share for new group
 				// Ignore if not in "collecting_shares" state
-				if (this.#keyGenState.id !== "collecting_shares") return;
+				if (this.#keyGenState.id !== "collecting_shares") return [];
 				// Parse event from raw data
 				const event = keyGenSecretSharedEventSchema.parse(eventArgs);
 				// Verify that the group corresponds to the next epoch
-				if (this.#keyGenState.groupId !== event.gid) return;
+				if (this.#keyGenState.groupId !== event.gid) return [];
 				this.#keyGenState.lastParticipant = event.identifier;
 				// Track identity that has submitted last share
-				await this.#keyGenClient.handleKeygenSecrets(
+				this.#keyGenClient.handleKeygenSecrets(
 					event.gid,
 					event.identifier,
 					event.share.f,
 				);
 				if (event.completed) {
-					await this.onGroupSetup(event.gid);
+					return this.onGroupSetup(event.gid);
 				}
-				return;
+				return [];
 			}
 			case "Preprocess": {
 				// The commited nonces need to be linked to a specific chunk
@@ -291,13 +314,13 @@ export class ShieldnetStateMachine {
 				if (this.#groupPendingNonces.has(event.gid)) {
 					this.#groupPendingNonces.delete(event.gid);
 				}
-				await this.#signingClient.handleNonceCommitmentsHash(
+				this.#signingClient.handleNonceCommitmentsHash(
 					event.gid,
 					event.identifier,
 					event.commitment,
 					event.chunk,
 				);
-				return;
+				return [];
 			}
 			case "Sign": {
 				// The signature process has been started
@@ -307,24 +330,24 @@ export class ShieldnetStateMachine {
 				const currentSequence = this.#groupSequence.get(event.gid) ?? 0n;
 				if (currentSequence !== event.sequence) {
 					this.#logger?.(`Unexpected sequence ${event.sequence}!`);
-					return;
+					return [];
 				}
 				this.#groupSequence.set(event.gid, currentSequence + 1n);
 				const status = this.#signingState.get(event.sid);
 				// Check that state for signature id is "not_started"
 				if (status !== undefined) {
 					this.#logger?.(`Alreay started signing ${event.sid}!`);
-					return;
+					return [];
 				}
 				// Check that signing was initiated via consensus contract
 				if (event.initiator !== this.#protocol.consensus()) {
 					this.#logger?.(`Unexpected initiator ${event.initiator}!`);
-					return;
+					return [];
 				}
 				// Check that message is verified
 				if (!this.#verificationEngine.isVerified(event.message)) {
 					this.#logger?.(`Message ${event.message} not verified!`);
-					return;
+					return [];
 				}
 				const { nonceCommitments, nonceProof } =
 					this.#signingClient.createNonceCommitments(
@@ -337,12 +360,15 @@ export class ShieldnetStateMachine {
 				this.#signingState.set(event.sid, {
 					id: "collect_nonce_commitments",
 				});
-				await this.#protocol.publishNonceCommitments(
-					event.sid,
-					nonceCommitments,
-					nonceProof,
-				);
-				return;
+
+				return [
+					{
+						id: "sign_reveal_nonce_commitments",
+						signatureId: event.sid,
+						nonceCommitments,
+						nonceProof,
+					},
+				];
 			}
 			case "SignRevealedNonces": {
 				// A participant has submitted nonces for a signature id
@@ -350,7 +376,7 @@ export class ShieldnetStateMachine {
 				const event = nonceCommitmentsEventSchema.parse(eventArgs);
 				// Check that state for signature id is "collect_nonce_commitments"
 				const status = this.#signingState.get(event.sid);
-				if (status?.id !== "collect_nonce_commitments") return;
+				if (status?.id !== "collect_nonce_commitments") return [];
 				const message = this.#signingClient.message(event.sid);
 				const readyToSubmit = this.#signingClient.handleNonceCommitments(
 					event.sid,
@@ -386,18 +412,22 @@ export class ShieldnetStateMachine {
 									],
 								})
 							: this.buildTransactionAttestationCallback(message);
-					await this.#protocol.publishSignatureShare(
-						event.sid,
-						signersRoot,
-						signersProof,
-						groupCommitment,
-						commitmentShare,
-						signatureShare,
-						lagrangeCoefficient,
-						callbackContext,
-					);
+
+					return [
+						{
+							id: "sign_publish_signature_share",
+							signatureId: event.sid,
+							signersRoot,
+							signersProof,
+							groupCommitment,
+							commitmentShare,
+							signatureShare,
+							lagrangeCoefficient,
+							callbackContext,
+						},
+					];
 				}
-				return;
+				return [];
 			}
 			case "SignShared": {
 				// A participant has submitted a singature share for a signature id
@@ -405,10 +435,10 @@ export class ShieldnetStateMachine {
 				const event = signatureShareEventSchema.parse(eventArgs);
 				// Check that state for signature id is "collect_signing_shares"
 				const status = this.#signingState.get(event.sid);
-				if (status?.id !== "collect_signing_shares") return;
+				if (status?.id !== "collect_signing_shares") return [];
 				// Track identity that has submitted last share
 				status.lastSigner = event.identifier;
-				return;
+				return [];
 			}
 			case "SignCompleted": {
 				// A participant has submitted a singature share for a signature id
@@ -416,12 +446,12 @@ export class ShieldnetStateMachine {
 				const event = signedEventSchema.parse(eventArgs);
 				// Check that state for signature id is "collect_signing_shares"
 				const status = this.#signingState.get(event.sid);
-				if (status?.id !== "collect_signing_shares") return;
+				if (status?.id !== "collect_signing_shares") return [];
 
 				this.#signingState.set(event.sid, { id: "signed" });
 				// If msg is rollover message check epoch update
 				this.checkEpochStaging(event.sid);
-				return;
+				return [];
 			}
 			case "EpochProposed": {
 				// This provides the data for the signing of the epoch rollover
@@ -430,7 +460,7 @@ export class ShieldnetStateMachine {
 					this.#logger?.(
 						`Not expecting new epochf during ${this.#keyGenState.id}!`,
 					);
-					return;
+					return [];
 				}
 				// Parse event from raw data
 				const event = epochProposedEventSchema.parse(eventArgs);
@@ -439,13 +469,13 @@ export class ShieldnetStateMachine {
 					this.#logger?.(
 						`Proposal for unexpected active epoch ${event.activeEpoch}!`,
 					);
-					return;
+					return [];
 				}
 				if (event.proposedEpoch !== this.#keyGenState.nextEpoch) {
 					this.#logger?.(
 						`Proposal for unexpected next epoch ${event.proposedEpoch}!`,
 					);
-					return;
+					return [];
 				}
 				if (
 					event.rolloverBlock !==
@@ -454,21 +484,21 @@ export class ShieldnetStateMachine {
 					this.#logger?.(
 						`Proposal for unexpected rollover block ${event.rolloverBlock}!`,
 					);
-					return;
+					return [];
 				}
 				const groupKey = this.#keyGenClient.groupPublicKey(
 					this.#keyGenState.groupId,
 				);
 				if (groupKey === undefined) {
 					this.#logger?.(`Missing group key!`);
-					return;
+					return [];
 				}
 				if (
 					groupKey.x !== event.groupKey.x ||
 					groupKey.y !== event.groupKey.y
 				) {
 					this.#logger?.(`Proposal with unexpected group key!`);
-					return;
+					return [];
 				}
 				const packet: EpochRolloverPacket = {
 					type: "epoch_rollover_packet",
@@ -494,7 +524,7 @@ export class ShieldnetStateMachine {
 					groupId: this.#keyGenState.groupId,
 				};
 				// The signing will be triggered in a separate event
-				return;
+				return [];
 			}
 			case "TransactionProposed": {
 				// Parse event from raw data
@@ -503,7 +533,7 @@ export class ShieldnetStateMachine {
 				const group = this.#epochGroups.get(event.epoch);
 				if (group === undefined) {
 					this.#logger?.(`Unknown epoch ${event.epoch}!`);
-					return;
+					return [];
 				}
 				const packet: SafeTransactionPacket = {
 					type: "safe_transaction_packet",
@@ -523,9 +553,10 @@ export class ShieldnetStateMachine {
 				});
 				this.#logger?.(`Verified message ${message}`);
 				// The signing will be triggered in a separate event
-				return;
+				return [];
 			}
 			default: {
+				return [];
 			}
 		}
 	}
@@ -543,19 +574,22 @@ export class ShieldnetStateMachine {
 		});
 	}
 
-	private async checkGenesis() {
+	private checkGenesis(): ProtocolAction[] {
 		if (
 			this.#keyGenState.id === "waiting_for_rollover" &&
 			this.#activeEpoch === 0n &&
 			this.#stagedEpoch === 0n
 		) {
 			this.#logger?.("Trigger Genesis Group Generation");
-			this.#genesisGroupId = await this.triggerKeyGen(0n, zeroAddress);
+			const { groupId, actions } = this.triggerKeyGen(0n, zeroAddress);
+			this.#genesisGroupId = groupId;
 			this.#logger?.(`Genesis group id: ${this.#genesisGroupId}`);
+			return actions;
 		}
+		return [];
 	}
 
-	private async checkEpochRollover(block: bigint) {
+	private checkEpochRollover(block: bigint): ProtocolAction[] {
 		const currentEpoch = block / this.#blocksPerEpoch;
 		if (this.#stagedEpoch > 0n && this.#stagedEpoch <= currentEpoch) {
 			this.#logger?.(
@@ -574,14 +608,16 @@ export class ShieldnetStateMachine {
 			// TODO discussed format, my proposal encodePacked(0x00000000, Consensus.address, nextEpoch) -> 4 bytes version, 20 bytes address, 8 bytes Epoch number)
 			const nextEpoch = currentEpoch + 1n;
 			this.#logger?.(`Trigger key gen for epoch ${nextEpoch}`);
-			await this.triggerKeyGen(nextEpoch);
+			const { actions } = this.triggerKeyGen(nextEpoch);
+			return actions;
 		}
+		return [];
 	}
 
-	private async triggerKeyGen(
+	private triggerKeyGen(
 		epoch: bigint,
 		consensus: Address = this.#protocol.consensus(),
-	): Promise<GroupId> {
+	): { groupId: GroupId; actions: ProtocolAction[] } {
 		const context = encodePacked(["address", "uint96"], [consensus, epoch]);
 		const participantsRoot = this.#keyGenClient.registerParticipants(
 			this.#participants,
@@ -597,17 +633,19 @@ export class ShieldnetStateMachine {
 				context,
 			);
 
-		// TODO: refactor to actions engine
-		await this.#protocol.triggerKeygenAndCommit(
-			participantsRoot,
-			count,
-			threshold,
-			context,
-			participantId,
-			commitments,
-			pok,
-			poap,
-		);
+		const actions: ProtocolAction[] = [
+			{
+				id: "key_gen_start",
+				participants: participantsRoot,
+				count,
+				threshold,
+				context,
+				participantId,
+				commitments,
+				pok,
+				poap,
+			},
+		];
 
 		this.#logger?.(`Triggered key gen for epoch ${epoch} with ${groupId}`);
 		this.#epochGroups.set(epoch, groupId);
@@ -616,39 +654,48 @@ export class ShieldnetStateMachine {
 			nextEpoch: epoch,
 			groupId,
 		};
-		return groupId;
+		return {
+			groupId,
+			actions,
+		};
 	}
 
-	private async onGroupSetup(groupId: GroupId) {
+	private onGroupSetup(groupId: GroupId): ProtocolAction[] {
 		if (
 			this.#keyGenState.id !== "collecting_shares" ||
 			this.#keyGenState.groupId !== groupId
 		)
-			return;
+			return [];
 
 		// If a group is setup start preprocess (aka nonce commitment)
 		this.#groupPendingNonces.add(groupId);
 		const nonceTreeRoot = this.#signingClient.generateNonceTree(groupId);
-		// TODO: refactor to actions engine
-		await this.#protocol.publishNonceCommitmentsHash(groupId, nonceTreeRoot);
+		const actions: ProtocolAction[] = [
+			{
+				id: "sign_register_nonce_commitments",
+				groupId,
+				nonceCommitmentsHash: nonceTreeRoot,
+			},
+		];
 
 		if (this.#genesisGroupId === groupId) {
 			this.#logger?.(`Genesis group ready!`);
 			// Don't propose rollover for genesis groups
 			this.#keyGenState = { id: "waiting_for_rollover" };
-			return;
+			return actions;
 		}
 		const nextEpoch = this.#keyGenState.nextEpoch;
 		this.#keyGenState = { id: "request_rollover_data", groupId, nextEpoch };
+		return actions;
 	}
 
-	private async checkAvailableNonces() {
+	private checkAvailableNonces(): ProtocolAction[] {
 		if (
 			this.#activeEpoch === 0n &&
 			this.#keyGenState.id !== "waiting_for_rollover"
 		) {
 			// We are in the genesis setup
-			return;
+			return [];
 		}
 		const activeGroup = this.#epochGroups.get(this.#activeEpoch);
 		if (
@@ -679,13 +726,17 @@ export class ShieldnetStateMachine {
 				this.#logger?.(`Commit nonces for ${activeGroup}!`);
 				const nonceTreeRoot =
 					this.#signingClient.generateNonceTree(activeGroup);
-				// TODO: refactor to actions engine
-				await this.#protocol.publishNonceCommitmentsHash(
-					activeGroup,
-					nonceTreeRoot,
-				);
+
+				return [
+					{
+						id: "sign_register_nonce_commitments",
+						groupId: activeGroup,
+						nonceCommitmentsHash: nonceTreeRoot,
+					},
+				];
 			}
 		}
+		return [];
 	}
 
 	private checkEpochStaging(signatureId: SignatureId) {
