@@ -38,7 +38,7 @@ export class OnchainProtocol implements ShieldnetProtocol {
 		return this.#consensus;
 	}
 	coordinator(): Address {
-		return this.#consensus;
+		return this.#coordinator;
 	}
 	async triggerKeygenAndCommit(
 		participants: Hex,
