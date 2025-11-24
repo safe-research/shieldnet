@@ -47,6 +47,7 @@ export type KeyGenCoordinator = {
 export type SigningCoordinator = {
 	chainId(): bigint;
 	coordinator(): Address;
+
 	publishNonceCommitmentsHash(
 		groupId: GroupId,
 		nonceCommitmentsHash: Hex,
@@ -66,6 +67,7 @@ export type SigningCoordinator = {
 		groupCommitementShare: FrostPoint, // add(d, mul(bindingFactor, e)
 		signatureShare: bigint,
 		lagrange: bigint,
+		callbackContext?: Hex,
 	): Promise<Hex>;
 };
 

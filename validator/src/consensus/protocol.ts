@@ -132,7 +132,6 @@ export class OnchainProtocol implements ShieldnetProtocol {
 		peerShares: bigint[],
 		callbackContext?: Hex,
 	): Promise<Hex> {
-		// TODO: use callback
 		if (callbackContext !== undefined) {
 			return this.publishKeygenSecretSharesWithCallback(
 				groupId,
@@ -193,6 +192,44 @@ export class OnchainProtocol implements ShieldnetProtocol {
 		return this.#signingClient.writeContract(request);
 	}
 
+	async publishSignatureShareWithCallback(
+		signatureId: SignatureId,
+		signingParticipantsHash: Hex,
+		signingParticipantsProof: Hex[],
+		groupCommitement: FrostPoint,
+		groupCommitementShare: FrostPoint,
+		signatureShare: bigint,
+		lagrange: bigint,
+		callbackContext: Hex,
+	): Promise<Hex> {
+		// TODO: use callback
+		const { request } = await this.#publicClient.simulateContract({
+			address: this.#coordinator,
+			abi: COORDINATOR_FUNCTIONS,
+			functionName: "signShareWithCallback",
+			args: [
+				signatureId,
+				{
+					r: groupCommitement,
+					root: signingParticipantsHash,
+				},
+				{
+					r: groupCommitementShare,
+					z: signatureShare,
+					l: lagrange,
+				},
+				signingParticipantsProof,
+				{
+					target: this.#consensus,
+					context: callbackContext,
+				},
+			],
+			account: this.#signingClient.account,
+			gas: 400_000n, // TODO: this seems to be wrongly estimated
+		});
+		return this.#signingClient.writeContract(request);
+	}
+
 	async publishSignatureShare(
 		signatureId: SignatureId,
 		signingParticipantsHash: Hex,
@@ -201,8 +238,20 @@ export class OnchainProtocol implements ShieldnetProtocol {
 		groupCommitementShare: FrostPoint,
 		signatureShare: bigint,
 		lagrange: bigint,
+		callbackContext?: Hex,
 	): Promise<Hex> {
-		// TODO: use callback
+		if (callbackContext !== undefined) {
+			return this.publishSignatureShareWithCallback(
+				signatureId,
+				signingParticipantsHash,
+				signingParticipantsProof,
+				groupCommitement,
+				groupCommitementShare,
+				signatureShare,
+				lagrange,
+				callbackContext,
+			);
+		}
 		const { request } = await this.#publicClient.simulateContract({
 			address: this.#coordinator,
 			abi: COORDINATOR_FUNCTIONS,

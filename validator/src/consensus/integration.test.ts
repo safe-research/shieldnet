@@ -190,8 +190,8 @@ describe("integration", () => {
 				"function proposeTransaction((uint256 chainId, address account, address to, uint256 value, uint8 operation, bytes data, uint256 nonce) transaction) external",
 				"function groupKey(bytes32 id) external view returns ((uint256 x, uint256 y) key)",
 				"function sign(bytes32 gid, bytes32 message) external returns (bytes32 sid)",
-				"function groupSignature(bytes32 sid, bytes32 root) external view returns ((uint256 x, uint256 y) r, uint256 z)",
 				"function getAttestation(uint64 epoch, (uint256 chainId, address account, address to, uint256 value, uint8 operation, bytes data, uint256 nonce) transaction) external view returns (bytes32 message, ((uint256 x, uint256 y) r, uint256 z) signature)",
+				"function getAttestationByMessage(bytes32 message) external view returns (((uint256 x, uint256 y) r, uint256 z) signature)",
 			]);
 			const transaction = {
 				chainId: 1n,
@@ -330,6 +330,22 @@ describe("integration", () => {
 				verifySignature(
 					toPoint(signature.r),
 					signature.z,
+					toPoint(groupKey),
+					proposal.args.message,
+				),
+			).toBeTruthy();
+
+			// Check that the attestation is correctly tracked
+			const attestation = await readClient.readContract({
+				address: consensusAddress,
+				abi: abi,
+				functionName: "getAttestationByMessage",
+				args: [proposal.args.message],
+			});
+			expect(
+				verifySignature(
+					toPoint(attestation.r),
+					attestation.z,
 					toPoint(groupKey),
 					proposal.args.message,
 				),

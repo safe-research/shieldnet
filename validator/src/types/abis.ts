@@ -31,6 +31,7 @@ export const COORDINATOR_FUNCTIONS = parseAbi([
 	"function preprocess(bytes32 id, bytes32 commitment) external returns (uint32 chunk)",
 	"function signRevealNonces(bytes32 sid, ((uint256 x, uint256 y) d, (uint256 x, uint256 y) e) nonces, bytes32[] proof) external",
 	"function signShare(bytes32 sid, ((uint256 x, uint256 y) r, bytes32 root) selection, ((uint256 x, uint256 y) r, uint256 z, uint256 l) share, bytes32[] proof) external",
+	"function signShareWithCallback(bytes32 sid, ((uint256 x, uint256 y) r, bytes32 root) selection, ((uint256 x, uint256 y) r, uint256 z, uint256 l) share, bytes32[] proof, (address target, bytes context) callback) external",
 ]);
 
 export const CONSENSUS_FUNCTIONS = parseAbi([

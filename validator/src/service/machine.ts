@@ -1,4 +1,11 @@
-import { type Address, encodePacked, type Hex, zeroAddress } from "viem";
+import {
+	type Address,
+	encodeFunctionData,
+	encodePacked,
+	type Hex,
+	zeroAddress,
+	zeroHash,
+} from "viem";
 import type { KeyGenClient } from "../consensus/keyGen/client.js";
 import {
 	epochProposedEventSchema,
@@ -19,6 +26,7 @@ import type { EpochRolloverPacket } from "../consensus/verify/rollover/schemas.j
 import type { SafeTransactionPacket } from "../consensus/verify/safeTx/schemas.js";
 import { toPoint } from "../frost/math.js";
 import type { GroupId, ParticipantId, SignatureId } from "../frost/types.js";
+import { CONSENSUS_FUNCTIONS } from "../types/abis.js";
 import { Queue } from "./queue.js";
 
 const BLOCKS_PER_EPOCH = (24n * 60n * 60n) / 5n; // ~ blocks for 1 day
@@ -97,6 +105,10 @@ export class ShieldnetStateMachine {
 	#epochGroups = new Map<bigint, GroupId>();
 	#groupSequence = new Map<GroupId, bigint>();
 	#groupPendingNonces = new Set<GroupId>();
+	#transactionProposalInfo = new Map<
+		Hex,
+		{ epoch: bigint; transactionHash: Hex }
+	>();
 
 	#transitionQueue = new Queue<StateTransition>();
 	#currentTransition?: StateTransition;
@@ -324,6 +336,21 @@ export class ShieldnetStateMachine {
 				// Check that state for signature id is "collect_nonce_commitments"
 				const status = this.#signingState.get(event.sid);
 				if (status?.id !== "collect_nonce_commitments") return;
+				const message = this.#signingClient.message(event.sid);
+				const callbackContext =
+					this.#keyGenState.id === "sign_rollover_msg" &&
+					this.#keyGenState.msg === message
+						? encodeFunctionData({
+								abi: CONSENSUS_FUNCTIONS,
+								functionName: "stageEpoch",
+								args: [
+									this.#keyGenState.nextEpoch,
+									this.#keyGenState.nextEpoch * this.#blocksPerEpoch,
+									this.#keyGenState.groupId,
+									zeroHash,
+								],
+							})
+						: this.buildTransactionAttestationCallback(message);
 				const submissionId = await this.#signingClient.handleNonceCommitments(
 					event.sid,
 					event.identifier,
@@ -331,6 +358,7 @@ export class ShieldnetStateMachine {
 						hidingNonceCommitment: toPoint(event.nonces.d),
 						bindingNonceCommitment: toPoint(event.nonces.e),
 					},
+					callbackContext,
 				);
 				// If all participants have committed update state for request id to "collect_signing_shares"
 				if (submissionId !== undefined) {
@@ -357,10 +385,9 @@ export class ShieldnetStateMachine {
 				const status = this.#signingState.get(event.sid);
 				if (status?.id !== "collect_signing_shares") return;
 
-				const lastSigner = status.lastSigner;
 				this.#signingState.set(event.sid, { id: "signed" });
 				// If msg is rollover message check epoch update
-				await this.checkEpochStaging(event.sid, lastSigner);
+				this.checkEpochStaging(event.sid);
 				return;
 			}
 			case "EpochProposed": {
@@ -457,6 +484,10 @@ export class ShieldnetStateMachine {
 					},
 				};
 				const message = await this.#verificationEngine.verify(packet);
+				this.#transactionProposalInfo.set(message, {
+					epoch: event.epoch,
+					transactionHash: event.transactionHash,
+				});
 				this.#logger?.(`Verified message ${message}`);
 				// The signing will be triggered in a separate event
 				return;
@@ -464,6 +495,19 @@ export class ShieldnetStateMachine {
 			default: {
 			}
 		}
+	}
+
+	private buildTransactionAttestationCallback(message: Hex): Hex | undefined {
+		const info = this.#transactionProposalInfo.get(message);
+		if (info === undefined) {
+			this.#logger?.(`Warn: Unknown proposal info for ${message}`);
+			return undefined;
+		}
+		return encodeFunctionData({
+			abi: CONSENSUS_FUNCTIONS,
+			functionName: "attestTransaction",
+			args: [info.epoch, info.transactionHash, zeroHash],
+		});
 	}
 
 	private async checkGenesis() {
@@ -589,10 +633,7 @@ export class ShieldnetStateMachine {
 		}
 	}
 
-	private async checkEpochStaging(
-		signatureId: SignatureId,
-		lastSigner: ParticipantId | undefined,
-	) {
+	private checkEpochStaging(signatureId: SignatureId) {
 		if (
 			this.#keyGenState.id === "sign_rollover_msg" &&
 			this.#keyGenState.msg === this.#signingClient.message(signatureId)
@@ -600,18 +641,7 @@ export class ShieldnetStateMachine {
 			const state = this.#signingState.get(signatureId);
 			if (state?.id !== "signed") return;
 			this.#stagedEpoch = this.#keyGenState.nextEpoch;
-			const nextEpoch = this.#keyGenState.nextEpoch;
-			const nextGroupId = this.#keyGenState.groupId;
 			this.#keyGenState = { id: "waiting_for_rollover" };
-			this.#logger?.(`Stage rollover to ${nextEpoch}!`);
-			if (lastSigner === this.#signingClient.participantId(signatureId)) {
-				await this.#protocol.stageEpoch(
-					nextEpoch,
-					nextEpoch * this.#blocksPerEpoch,
-					nextGroupId,
-					signatureId,
-				);
-			}
 		}
 	}
 }

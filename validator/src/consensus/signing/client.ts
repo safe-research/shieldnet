@@ -104,6 +104,7 @@ export class SigningClient {
 		signatureId: SignatureId,
 		peerId: ParticipantId,
 		nonceCommitments: PublicNonceCommitments,
+		callbackContext?: Hex,
 	): Promise<Hex | undefined> {
 		const groupId = this.#storage.signingGroup(signatureId);
 		const signerId = this.#storage.participantId(groupId);
@@ -116,12 +117,15 @@ export class SigningClient {
 		);
 
 		if (this.#storage.checkIfNoncesComplete(signatureId)) {
-			return await this.submitSignature(signatureId);
+			return await this.submitSignature(signatureId, callbackContext);
 		}
 		return undefined;
 	}
 
-	private async submitSignature(signatureId: SignatureId): Promise<Hex> {
+	private async submitSignature(
+		signatureId: SignatureId,
+		callbackContext?: Hex,
+	): Promise<Hex> {
 		const groupId = this.#storage.signingGroup(signatureId);
 		const signers = this.#storage.signers(signatureId);
 		const signerId = this.#storage.participantId(groupId);
@@ -214,6 +218,7 @@ export class SigningClient {
 			signerPart.r,
 			signatureShare,
 			signerPart.l,
+			callbackContext,
 		);
 		this.#callbacks.onRequestSigned?.(signatureId, signerId, message);
 		return submissionId;

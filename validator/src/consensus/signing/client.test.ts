@@ -184,6 +184,7 @@ describe("signing", () => {
 					groupCommitementShare: FrostPoint, // add(d, mul(bindingFactor, e)
 					signatureShare: bigint,
 					_lagrange: bigint,
+					callbackContext?: Hex,
 				): Promise<Hex> => {
 					signatureShareEvents.push({
 						signatureId,
@@ -191,6 +192,7 @@ describe("signing", () => {
 						z: signatureShare,
 						r: groupCommitementShare,
 					});
+					expect(callbackContext).toBe("0xdad5afe1");
 					return Promise.resolve("0x");
 				},
 				chainId: (): bigint => 0n,
@@ -260,6 +262,7 @@ describe("signing", () => {
 					e.signatureId,
 					e.signerId,
 					e.nonces,
+					"0xdad5afe1",
 				);
 			}
 		}
