@@ -326,16 +326,22 @@ export class ShieldnetStateMachine {
 					this.#logger?.(`Message ${event.message} not verified!`);
 					return;
 				}
-				await this.#signingClient.handleSignatureRequest(
-					event.gid,
-					event.sid,
-					event.message,
-					event.sequence,
-				);
+				const { nonceCommitments, nonceProof } =
+					this.#signingClient.createNonceCommitments(
+						event.gid,
+						event.sid,
+						event.message,
+						event.sequence,
+					);
 				// Update state for signature id to "collect_nonce_commitments"
 				this.#signingState.set(event.sid, {
 					id: "collect_nonce_commitments",
 				});
+				await this.#protocol.publishNonceCommitments(
+					event.sid,
+					nonceCommitments,
+					nonceProof,
+				);
 				return;
 			}
 			case "SignRevealedNonces": {
@@ -346,32 +352,50 @@ export class ShieldnetStateMachine {
 				const status = this.#signingState.get(event.sid);
 				if (status?.id !== "collect_nonce_commitments") return;
 				const message = this.#signingClient.message(event.sid);
-				const callbackContext =
-					this.#keyGenState.id === "sign_rollover_msg" &&
-					this.#keyGenState.msg === message
-						? encodeFunctionData({
-								abi: CONSENSUS_FUNCTIONS,
-								functionName: "stageEpoch",
-								args: [
-									this.#keyGenState.nextEpoch,
-									this.#keyGenState.nextEpoch * this.#blocksPerEpoch,
-									this.#keyGenState.groupId,
-									zeroHash,
-								],
-							})
-						: this.buildTransactionAttestationCallback(message);
-				const submissionId = await this.#signingClient.handleNonceCommitments(
+				const readyToSubmit = this.#signingClient.handleNonceCommitments(
 					event.sid,
 					event.identifier,
 					{
 						hidingNonceCommitment: toPoint(event.nonces.d),
 						bindingNonceCommitment: toPoint(event.nonces.e),
 					},
-					callbackContext,
 				);
 				// If all participants have committed update state for request id to "collect_signing_shares"
-				if (submissionId !== undefined) {
+				if (readyToSubmit) {
 					this.#signingState.set(event.sid, { id: "collect_signing_shares" });
+					const {
+						signersRoot,
+						signersProof,
+						groupCommitment,
+						commitmentShare,
+						signatureShare,
+						lagrangeCoefficient,
+					} = this.#signingClient.createSignatureShare(event.sid);
+
+					const callbackContext =
+						this.#keyGenState.id === "sign_rollover_msg" &&
+						this.#keyGenState.msg === message
+							? encodeFunctionData({
+									abi: CONSENSUS_FUNCTIONS,
+									functionName: "stageEpoch",
+									args: [
+										this.#keyGenState.nextEpoch,
+										this.#keyGenState.nextEpoch * this.#blocksPerEpoch,
+										this.#keyGenState.groupId,
+										zeroHash,
+									],
+								})
+							: this.buildTransactionAttestationCallback(message);
+					await this.#protocol.publishSignatureShare(
+						event.sid,
+						signersRoot,
+						signersProof,
+						groupCommitment,
+						commitmentShare,
+						signatureShare,
+						lagrangeCoefficient,
+						callbackContext,
+					);
 				}
 				return;
 			}
@@ -604,7 +628,9 @@ export class ShieldnetStateMachine {
 
 		// If a group is setup start preprocess (aka nonce commitment)
 		this.#groupPendingNonces.add(groupId);
-		await this.#signingClient.commitNonces(groupId);
+		const nonceTreeRoot = this.#signingClient.generateNonceTree(groupId);
+		// TODO: refactor to actions engine
+		await this.#protocol.publishNonceCommitmentsHash(groupId, nonceTreeRoot);
 
 		if (this.#genesisGroupId === groupId) {
 			this.#logger?.(`Genesis group ready!`);
@@ -651,7 +677,13 @@ export class ShieldnetStateMachine {
 			) {
 				this.#groupPendingNonces.add(activeGroup);
 				this.#logger?.(`Commit nonces for ${activeGroup}!`);
-				await this.#signingClient.commitNonces(activeGroup);
+				const nonceTreeRoot =
+					this.#signingClient.generateNonceTree(activeGroup);
+				// TODO: refactor to actions engine
+				await this.#protocol.publishNonceCommitmentsHash(
+					activeGroup,
+					nonceTreeRoot,
+				);
 			}
 		}
 	}
