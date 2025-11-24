@@ -7,6 +7,7 @@ import {
 	zeroHash,
 } from "viem";
 import type { KeyGenClient } from "../consensus/keyGen/client.js";
+import type { ShieldnetProtocol } from "../consensus/protocol/types.js";
 import {
 	epochProposedEventSchema,
 	keyGenCommittedEventSchema,
@@ -20,7 +21,7 @@ import {
 } from "../consensus/schemas.js";
 import type { SigningClient } from "../consensus/signing/client.js";
 import { decodeSequence } from "../consensus/signing/nonces.js";
-import type { Participant, ShieldnetProtocol } from "../consensus/types.js";
+import type { Participant } from "../consensus/storage/types.js";
 import type { VerificationEngine } from "../consensus/verify/engine.js";
 import type { EpochRolloverPacket } from "../consensus/verify/rollover/schemas.js";
 import type { SafeTransactionPacket } from "../consensus/verify/safeTx/schemas.js";
@@ -226,14 +227,7 @@ export class ShieldnetStateMachine {
 				// Verify that the group corresponds to the next epoch
 				if (this.#keyGenState.groupId !== event.gid) return;
 				const nextEpoch = this.#keyGenState.nextEpoch;
-				const callbackContext =
-					this.#genesisGroupId === event.gid
-						? undefined
-						: encodePacked(
-								["uint256", "uint256"],
-								[nextEpoch, nextEpoch * this.#blocksPerEpoch],
-							);
-				await this.#keyGenClient.handleKeygenCommitment(
+				this.#keyGenClient.handleKeygenCommitment(
 					event.gid,
 					event.identifier,
 					event.commitment.c.map((c) => toPoint(c)),
@@ -241,10 +235,25 @@ export class ShieldnetStateMachine {
 						r: toPoint(event.commitment.r),
 						mu: event.commitment.mu,
 					},
-					callbackContext,
 				);
 				// If all participants have committed update state to "collecting_shares"
 				if (event.committed) {
+					const { verificationShare, shares } =
+						this.#keyGenClient.createSecretShares(event.gid);
+					// TODO: refactor to actions engine
+					const callbackContext =
+						this.#genesisGroupId === event.gid
+							? undefined
+							: encodePacked(
+									["uint256", "uint256"],
+									[nextEpoch, nextEpoch * this.#blocksPerEpoch],
+								);
+					await this.#protocol.publishKeygenSecretShares(
+						event.gid,
+						verificationShare,
+						shares,
+						callbackContext,
+					);
 					this.#keyGenState = {
 						id: "collecting_shares",
 						groupId: event.gid,
@@ -556,12 +565,26 @@ export class ShieldnetStateMachine {
 		const count = BigInt(this.#participants.length);
 		// TODO discuss
 		const threshold = (2n * count) / 3n;
-		const groupId = await this.#keyGenClient.triggerKeygenAndCommit(
+		const { groupId, participantId, commitments, pok, poap } =
+			this.#keyGenClient.setupGroup(
+				participantsRoot,
+				count,
+				threshold,
+				context,
+			);
+
+		// TODO: refactor to actions engine
+		await this.#protocol.triggerKeygenAndCommit(
 			participantsRoot,
 			count,
 			threshold,
 			context,
+			participantId,
+			commitments,
+			pok,
+			poap,
 		);
+
 		this.#logger?.(`Triggered key gen for epoch ${epoch} with ${groupId}`);
 		this.#epochGroups.set(epoch, groupId);
 		this.#keyGenState = {

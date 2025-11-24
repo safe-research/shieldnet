@@ -14,8 +14,8 @@ import type {
 	ParticipantId,
 	SignatureId,
 } from "../../frost/types.js";
-import { InMemoryStorage } from "../storage.js";
-import type { SigningCoordinator } from "../types.js";
+import type { SigningCoordinator } from "../protocol/types.js";
+import { InMemoryStorage } from "../storage/inmemory.js";
 import { SigningClient } from "./client.js";
 import type { NonceCommitments, PublicNonceCommitments } from "./nonces.js";
 import { verifySignature } from "./verify.js";

@@ -5,7 +5,7 @@ import type {
 	GroupInfoStorage,
 	SignatureRequestStorage,
 	SigningCoordinator,
-} from "../types.js";
+} from "../protocol/types.js";
 import { groupChallenge, lagrangeCoefficient } from "./group.js";
 import {
 	bindingFactors,

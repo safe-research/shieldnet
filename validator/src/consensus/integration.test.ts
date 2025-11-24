@@ -19,11 +19,11 @@ import type { GroupId } from "../frost/types.js";
 import { ShieldnetStateMachine as SchildNetzMachine } from "../service/machine.js";
 import { CONSENSUS_EVENTS, COORDINATOR_EVENTS } from "../types/abis.js";
 import { KeyGenClient } from "./keyGen/client.js";
-import { OnchainProtocol } from "./protocol.js";
+import { OnchainProtocol } from "./protocol/onchain.js";
 import { SigningClient } from "./signing/client.js";
 import { verifySignature } from "./signing/verify.js";
-import { InMemoryStorage } from "./storage.js";
-import type { Participant } from "./types.js";
+import { InMemoryStorage } from "./storage/inmemory.js";
+import type { Participant } from "./storage/types.js";
 import {
 	type PacketHandler,
 	type Typed,
@@ -127,11 +127,7 @@ describe("integration", () => {
 						);
 					},
 				});
-				const kc = new KeyGenClient(storage, protocol, {
-					onGroupSetup: (groupId, participantId) => {
-						log(`Participant ${participantId} is setup for group ${groupId}`);
-					},
-				});
+				const kc = new KeyGenClient(storage);
 				const verificationHandlers = new Map<string, PacketHandler<Typed>>();
 				verificationHandlers.set(
 					"safe_transaction_packet",

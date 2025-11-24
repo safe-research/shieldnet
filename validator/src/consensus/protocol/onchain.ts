@@ -5,9 +5,12 @@ import type {
 	ProofOfAttestationParticipation,
 	ProofOfKnowledge,
 	SignatureId,
-} from "../frost/types.js";
-import { CONSENSUS_FUNCTIONS, COORDINATOR_FUNCTIONS } from "../types/abis.js";
-import type { PublicNonceCommitments } from "./signing/nonces.js";
+} from "../../frost/types.js";
+import {
+	CONSENSUS_FUNCTIONS,
+	COORDINATOR_FUNCTIONS,
+} from "../../types/abis.js";
+import type { PublicNonceCommitments } from "../signing/nonces.js";
 import type { ShieldnetProtocol } from "./types.js";
 
 export class OnchainProtocol implements ShieldnetProtocol {
