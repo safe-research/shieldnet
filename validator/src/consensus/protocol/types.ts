@@ -9,16 +9,6 @@ import type {
 } from "../../frost/types.js";
 import type { PublicNonceCommitments } from "../signing/nonces.js";
 
-export type SigningCoordinator = {
-	publishNonceCommitments(
-		signatureId: SignatureId,
-		nonceCommitments: PublicNonceCommitments,
-		nonceProof: Hex[],
-	): Promise<Hex>;
-
-	publishSignatureShare(): Promise<Hex>;
-};
-
 export type ShieldnetProtocol = {
 	chainId(): bigint;
 	consensus(): Address;

@@ -23,20 +23,11 @@ import {
 import { createSignatureShare, lagrangeChallenge } from "./shares.js";
 import { verifySignatureShare } from "./verify.js";
 
-export type SigningCallbacks = {
-	onDebug?: (log: string) => void;
-};
-
 export class SigningClient {
 	#storage: GroupInfoStorage & SignatureRequestStorage;
-	#callbacks: SigningCallbacks;
 
-	constructor(
-		storage: GroupInfoStorage & SignatureRequestStorage,
-		callbacks: SigningCallbacks = {},
-	) {
+	constructor(storage: GroupInfoStorage & SignatureRequestStorage) {
 		this.#storage = storage;
-		this.#callbacks = callbacks;
 	}
 
 	generateNonceTree(groupId: GroupId): Hex {
@@ -155,8 +146,9 @@ export class SigningClient {
 		const challenge = groupChallenge(groupCommitment, groupPublicKey, message);
 		const signerParts = signers.map((signerId, index) => {
 			const nonceCommitments = signerNonceCommitments.get(signerId);
-			if (nonceCommitments === undefined)
+			if (nonceCommitments === undefined) {
 				throw Error(`Missing nonce commitments for ${signerId}`);
+			}
 			const r = groupCommitmentShares[index];
 			const coeff = lagrangeCoefficient(signers, signerId);
 			const cl = lagrangeChallenge(coeff, challenge);

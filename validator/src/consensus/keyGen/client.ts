@@ -20,6 +20,7 @@ import {
 	createProofOfKnowledge,
 	verifyCommitments,
 } from "../../frost/vss.js";
+import type { Logger } from "../../utils/logging.js";
 import { generateParticipantProof } from "../merkle.js";
 import type {
 	GroupInfoStorage,
@@ -40,11 +41,6 @@ export type KeygenInfo = {
 	signingShare?: bigint;
 };
 
-export type KeyGenCallbacks = {
-	onGroupSetup?: (groupId: GroupId, participantId: ParticipantId) => void;
-	onDebug?: (log: string) => void;
-};
-
 /**
  * The following order must always strictly kept:
  * 1. register participants root
@@ -56,14 +52,11 @@ export type KeyGenCallbacks = {
  */
 export class KeyGenClient {
 	#storage: GroupInfoStorage & KeyGenInfoStorage;
-	#callbacks: KeyGenCallbacks;
+	#logger?: Logger;
 
-	constructor(
-		storage: GroupInfoStorage & KeyGenInfoStorage,
-		callbacks: KeyGenCallbacks = {},
-	) {
+	constructor(storage: GroupInfoStorage & KeyGenInfoStorage, logger?: Logger) {
 		this.#storage = storage;
-		this.#callbacks = callbacks;
+		this.#logger = logger;
 	}
 
 	participantId(groupId: GroupId): bigint {
@@ -137,7 +130,7 @@ export class KeyGenClient {
 	): boolean {
 		const participantId = this.#storage.participantId(groupId);
 		if (senderId === participantId) {
-			this.#callbacks.onDebug?.("Do not verify own commitments");
+			this.#logger?.debug("Do not verify own commitments");
 			return false;
 		}
 		verifyCommitments(senderId, peerCommitments, pok);
@@ -204,7 +197,7 @@ export class KeyGenClient {
 		}
 		const participantId = this.#storage.participantId(groupId);
 		if (senderId === participantId) {
-			this.#callbacks.onDebug?.("Do not handle own share");
+			this.#logger?.debug("Do not handle own share");
 			return false;
 		}
 		const commitment = this.#storage.commitments(groupId, senderId);
@@ -231,8 +224,6 @@ export class KeyGenClient {
 			verifyKey(verificationShare, signingShare);
 			this.#storage.registerSigningShare(groupId, signingShare);
 			this.#storage.clearKeyGen(groupId);
-			const participantId = this.#storage.participantId(groupId);
-			this.#callbacks.onGroupSetup?.(groupId, participantId);
 			return true;
 		}
 		return false;
