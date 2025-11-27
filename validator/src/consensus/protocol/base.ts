@@ -5,6 +5,7 @@ import type {
 	PublishSecretShares,
 	PublishSignatureShare,
 	RegisterNonceCommitments,
+	RequestSignature,
 	RevealNonceCommitments,
 	ShieldnetProtocol,
 	StartKeyGen,
@@ -73,6 +74,8 @@ export abstract class BaseProtocol implements ShieldnetProtocol {
 				return await this.startKeyGen(action);
 			case "key_gen_publish_secret_shares":
 				return await this.publishKeygenSecretShares(action);
+			case "sign_request":
+				return await this.requestSignature(action);
 			case "sign_register_nonce_commitments":
 				return await this.registerNonceCommitments(action);
 			case "sign_reveal_nonce_commitments":
@@ -86,6 +89,8 @@ export abstract class BaseProtocol implements ShieldnetProtocol {
 	protected abstract publishKeygenSecretShares(
 		args: PublishSecretShares,
 	): Promise<Hex>;
+
+	protected abstract requestSignature(args: RequestSignature): Promise<Hex>;
 
 	protected abstract registerNonceCommitments(
 		args: RegisterNonceCommitments,

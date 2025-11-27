@@ -3,6 +3,7 @@ import {
 	encodeFunctionData,
 	encodePacked,
 	type Hex,
+	maxUint64,
 	zeroAddress,
 	zeroHash,
 } from "viem";
@@ -12,7 +13,7 @@ import type {
 	ShieldnetProtocol,
 } from "../consensus/protocol/types.js";
 import {
-	epochProposedEventSchema,
+	epochStagedEventSchema,
 	keyGenCommittedEventSchema,
 	keyGenSecretSharedEventSchema,
 	nonceCommitmentsEventSchema,
@@ -20,6 +21,7 @@ import {
 	signatureShareEventSchema,
 	signedEventSchema,
 	signRequestEventSchema,
+	transactionAttestedEventSchema,
 	transactionProposedEventSchema,
 } from "../consensus/schemas.js";
 import type { SigningClient } from "../consensus/signing/client.js";
@@ -34,6 +36,7 @@ import { CONSENSUS_FUNCTIONS } from "../types/abis.js";
 import { Queue } from "../utils/queue.js";
 
 const BLOCKS_PER_EPOCH = (24n * 60n * 60n) / 5n; // ~ blocks for 1 day
+const DEFAULT_TIMEOUT = (10n * 60n) / 5n; // ~ blocks for 10 minutes
 const NONCE_THRESHOLD = 100n;
 
 type KeyGenState =
@@ -44,35 +47,45 @@ type KeyGenState =
 			id: "collecting_commitments";
 			groupId: GroupId;
 			nextEpoch: bigint;
+			deadline: bigint;
 	  }
 	| {
 			id: "collecting_shares";
 			groupId: GroupId;
 			nextEpoch: bigint;
+			deadline: bigint;
 			lastParticipant?: ParticipantId;
 	  }
 	| {
-			id: "request_rollover_data";
+			id: "sign_rollover";
 			groupId: GroupId;
 			nextEpoch: bigint;
-	  }
-	| {
-			id: "sign_rollover_msg";
-			groupId: GroupId;
-			nextEpoch: bigint;
-			msg: Hex;
+			message: Hex;
+			responsible: ParticipantId;
 	  };
 
 type SigningState =
 	| {
+			id: "waiting_for_request";
+			responsible: ParticipantId | undefined;
+			signers: ParticipantId[];
+			deadline: bigint;
+	  }
+	| {
 			id: "collect_nonce_commitments";
+			lastSigner: ParticipantId | undefined;
+			deadline: bigint;
 	  }
 	| {
 			id: "collect_signing_shares";
-			lastSigner?: ParticipantId;
+			sharesFrom: ParticipantId[];
+			lastSigner: ParticipantId | undefined;
+			deadline: bigint;
 	  }
 	| {
-			id: "signed";
+			id: "waiting_for_attestation";
+			responsible: ParticipantId | undefined;
+			deadline: bigint;
 	  };
 
 export type StateTransition =
@@ -89,7 +102,7 @@ export type StateTransition =
 	  };
 
 export class ShieldnetStateMachine {
-	#participants: Participant[];
+	#defaultParticipants: Participant[];
 	#protocol: ShieldnetProtocol;
 	#verificationEngine: VerificationEngine;
 	#keyGenClient: KeyGenClient;
@@ -97,7 +110,10 @@ export class ShieldnetStateMachine {
 	#activeEpoch;
 	#genesisGroupId?: GroupId;
 	#logger?: (msg: unknown) => void;
+
 	#blocksPerEpoch: bigint;
+	#keyGenTimeout: bigint;
+	#signingTimeout: bigint;
 
 	#lastProcessedBlock = 0n;
 	#lastProcessedIndex = 0;
@@ -105,6 +121,7 @@ export class ShieldnetStateMachine {
 
 	#keyGenState: KeyGenState = { id: "waiting_for_rollover" };
 	#signingState = new Map<SignatureId, SigningState>();
+	#messageSignatureRequests = new Map<Hex, SignatureId>();
 
 	#epochGroups = new Map<bigint, GroupId>();
 	#groupSequence = new Map<GroupId, bigint>();
@@ -126,6 +143,8 @@ export class ShieldnetStateMachine {
 		initialEpoch,
 		logger,
 		blocksPerEpoch,
+		keyGenTimeout,
+		signingTimeout,
 	}: {
 		participants: Participant[];
 		protocol: ShieldnetProtocol;
@@ -135,8 +154,10 @@ export class ShieldnetStateMachine {
 		initialEpoch?: bigint;
 		logger?: (msg: unknown) => void;
 		blocksPerEpoch?: bigint;
+		keyGenTimeout?: bigint;
+		signingTimeout?: bigint;
 	}) {
-		this.#participants = participants;
+		this.#defaultParticipants = participants;
 		this.#protocol = protocol;
 		this.#keyGenClient = keyGenClient;
 		this.#signingClient = signingClient;
@@ -144,6 +165,8 @@ export class ShieldnetStateMachine {
 		this.#activeEpoch = initialEpoch ?? 0n;
 		this.#logger = logger;
 		this.#blocksPerEpoch = blocksPerEpoch ?? BLOCKS_PER_EPOCH;
+		this.#keyGenTimeout = keyGenTimeout ?? DEFAULT_TIMEOUT;
+		this.#signingTimeout = signingTimeout ?? DEFAULT_TIMEOUT;
 	}
 
 	transition(transition: StateTransition) {
@@ -196,12 +219,13 @@ export class ShieldnetStateMachine {
 		this.#lastProcessedBlock = block;
 		const actions: ProtocolAction[] = [];
 
+		actions.push(...this.checkKeyGenAbort(block));
+		actions.push(...this.checkKeyGenTimeouts(block));
+		actions.push(...this.checkSigningTimeouts(block));
+
 		actions.push(...this.checkGenesis());
 		actions.push(...this.checkEpochRollover(block));
 		actions.push(...this.checkAvailableNonces());
-
-		// TODO: Check keyGen timeouts
-		// TODO: Check signing timeouts
 
 		return actions;
 	}
@@ -223,13 +247,14 @@ export class ShieldnetStateMachine {
 		const actions: ProtocolAction[] = [];
 		this.#lastProcessedIndex = index;
 		actions.push(...this.progressToBlock(block));
-		actions.push(...(await this.handleEvent(eventName, eventArgs)));
+		actions.push(...(await this.handleEvent(block, eventName, eventArgs)));
 		// Check after every event if we could do a epoch rollover
 		actions.push(...this.checkEpochRollover(block));
 		return actions;
 	}
 
 	private async handleEvent(
+		block: bigint,
 		eventName: string,
 		eventArgs: unknown,
 	): Promise<ProtocolAction[]> {
@@ -263,6 +288,7 @@ export class ShieldnetStateMachine {
 						id: "collecting_shares",
 						groupId: event.gid,
 						nextEpoch,
+						deadline: block + this.#keyGenTimeout,
 					};
 
 					const callbackContext =
@@ -294,13 +320,13 @@ export class ShieldnetStateMachine {
 				if (this.#keyGenState.groupId !== event.gid) return [];
 				this.#keyGenState.lastParticipant = event.identifier;
 				// Track identity that has submitted last share
-				this.#keyGenClient.handleKeygenSecrets(
+				await this.#keyGenClient.handleKeygenSecrets(
 					event.gid,
 					event.identifier,
 					event.share.f,
 				);
 				if (event.completed) {
-					return this.onGroupSetup(event.gid);
+					return await this.onGroupSetup(block, event.gid);
 				}
 				return [];
 			}
@@ -339,16 +365,23 @@ export class ShieldnetStateMachine {
 					return [];
 				}
 				// Check that signing was initiated via consensus contract
-				// TODO: switch to filter by group id
-				if (event.initiator !== this.#protocol.consensus()) {
-					this.#logger?.(`Unexpected initiator ${event.initiator}!`);
-					return [];
-				}
+				// TODO: filter by group id
 				// Check that message is verified
 				if (!this.#verificationEngine.isVerified(event.message)) {
 					this.#logger?.(`Message ${event.message} not verified!`);
 					return [];
 				}
+				// Check if there is already a request for this message
+				const signatureRequest = this.#messageSignatureRequests.get(
+					event.message,
+				);
+				// Only allow one concurrent signing process per message
+				if (signatureRequest !== undefined) {
+					this.#logger?.(`Message ${event.message} is already being signed!`);
+					return [];
+				}
+				this.#messageSignatureRequests.set(event.message, event.sid);
+
 				const { nonceCommitments, nonceProof } =
 					this.#signingClient.createNonceCommitments(
 						event.gid,
@@ -359,6 +392,8 @@ export class ShieldnetStateMachine {
 				// Update state for signature id to "collect_nonce_commitments"
 				this.#signingState.set(event.sid, {
 					id: "collect_nonce_commitments",
+					deadline: block + this.#signingTimeout,
+					lastSigner: undefined,
 				});
 
 				return [
@@ -377,6 +412,10 @@ export class ShieldnetStateMachine {
 				// Check that state for signature id is "collect_nonce_commitments"
 				const status = this.#signingState.get(event.sid);
 				if (status?.id !== "collect_nonce_commitments") return [];
+				this.#signingState.set(event.sid, {
+					...status,
+					lastSigner: event.identifier,
+				});
 				const message = this.#signingClient.message(event.sid);
 				const readyToSubmit = this.#signingClient.handleNonceCommitments(
 					event.sid,
@@ -388,7 +427,13 @@ export class ShieldnetStateMachine {
 				);
 				// If all participants have committed update state for request id to "collect_signing_shares"
 				if (readyToSubmit) {
-					this.#signingState.set(event.sid, { id: "collect_signing_shares" });
+					this.#signingState.set(event.sid, {
+						id: "collect_signing_shares",
+						sharesFrom: [],
+						deadline: block + this.#signingTimeout,
+						lastSigner: event.identifier,
+					});
+
 					const {
 						signersRoot,
 						signersProof,
@@ -399,8 +444,8 @@ export class ShieldnetStateMachine {
 					} = this.#signingClient.createSignatureShare(event.sid);
 
 					const callbackContext =
-						this.#keyGenState.id === "sign_rollover_msg" &&
-						this.#keyGenState.msg === message
+						this.#keyGenState.id === "sign_rollover" &&
+						this.#keyGenState.message === message
 							? encodeFunctionData({
 									abi: CONSENSUS_FUNCTIONS,
 									functionName: "stageEpoch",
@@ -412,7 +457,6 @@ export class ShieldnetStateMachine {
 									],
 								})
 							: this.buildTransactionAttestationCallback(message);
-
 					return [
 						{
 							id: "sign_publish_signature_share",
@@ -437,93 +481,55 @@ export class ShieldnetStateMachine {
 				const status = this.#signingState.get(event.sid);
 				if (status?.id !== "collect_signing_shares") return [];
 				// Track identity that has submitted last share
+				status.sharesFrom.push(event.identifier);
 				status.lastSigner = event.identifier;
 				return [];
 			}
 			case "SignCompleted": {
-				// A participant has submitted a singature share for a signature id
+				// The message was completely signed
 				// Parse event from raw data
 				const event = signedEventSchema.parse(eventArgs);
 				// Check that state for signature id is "collect_signing_shares"
 				const status = this.#signingState.get(event.sid);
 				if (status?.id !== "collect_signing_shares") return [];
+				if (status.lastSigner === undefined) throw Error("Invalid state");
 
-				this.#signingState.set(event.sid, { id: "signed" });
+				this.#signingState.set(event.sid, {
+					id: "waiting_for_attestation",
+					deadline: block + this.#signingTimeout,
+					responsible: status.lastSigner,
+				});
 				// If msg is rollover message check epoch update
-				this.checkEpochStaging(event.sid);
+				if (
+					this.#keyGenState.id === "sign_rollover" &&
+					this.#keyGenState.message === this.#signingClient.message(event.sid)
+				) {
+				}
 				return [];
 			}
-			case "EpochProposed": {
-				// This provides the data for the signing of the epoch rollover
+			case "EpochStaged": {
+				// An epoch was staged
+				const event = epochStagedEventSchema.parse(eventArgs);
+				this.#stagedEpoch = event.proposedEpoch;
 				// Ignore if not in "request_rollover_data" state
-				if (this.#keyGenState.id !== "request_rollover_data") {
-					this.#logger?.(
-						`Not expecting new epochf during ${this.#keyGenState.id}!`,
+				if (this.#keyGenState.id !== "sign_rollover") {
+					throw Error(
+						`Not expecting epoch staging during ${this.#keyGenState.id}!`,
 					);
-					return [];
 				}
-				// Parse event from raw data
-				const event = epochProposedEventSchema.parse(eventArgs);
-				// TODO these checks should happen in the verified, but the current setup is not optimal for this
-				if (event.activeEpoch !== this.#activeEpoch) {
-					this.#logger?.(
-						`Proposal for unexpected active epoch ${event.activeEpoch}!`,
-					);
-					return [];
-				}
-				if (event.proposedEpoch !== this.#keyGenState.nextEpoch) {
-					this.#logger?.(
-						`Proposal for unexpected next epoch ${event.proposedEpoch}!`,
-					);
-					return [];
-				}
-				if (
-					event.rolloverBlock !==
-					event.proposedEpoch * this.#blocksPerEpoch
-				) {
-					this.#logger?.(
-						`Proposal for unexpected rollover block ${event.rolloverBlock}!`,
-					);
-					return [];
-				}
-				const groupKey = this.#keyGenClient.groupPublicKey(
-					this.#keyGenState.groupId,
+				// Get current signature id for message
+				const signatureRequest = this.#messageSignatureRequests.get(
+					this.#keyGenState.message,
 				);
-				if (groupKey === undefined) {
-					this.#logger?.("Missing group key!");
-					return [];
-				}
-				if (
-					groupKey.x !== event.groupKey.x ||
-					groupKey.y !== event.groupKey.y
-				) {
-					this.#logger?.("Proposal with unexpected group key!");
-					return [];
-				}
-				const packet: EpochRolloverPacket = {
-					type: "epoch_rollover_packet",
-					domain: {
-						chain: this.#protocol.chainId(),
-						consensus: this.#protocol.consensus(),
-					},
-					rollover: {
-						activeEpoch: event.activeEpoch,
-						proposedEpoch: event.proposedEpoch,
-						rolloverBlock: event.rolloverBlock,
-						groupKeyX: event.groupKey.x,
-						groupKeyY: event.groupKey.y,
-					},
-				};
-				const message = await this.#verificationEngine.verify(packet);
-				this.#logger?.(`Verified message ${message}`);
-				// Update state to "sign_rollover_msg"
-				this.#keyGenState = {
-					id: "sign_rollover_msg",
-					msg: message,
-					nextEpoch: event.proposedEpoch,
-					groupId: this.#keyGenState.groupId,
-				};
-				// The signing will be triggered in a separate event
+				if (signatureRequest === undefined) return [];
+				// Check that state for signature id is "collect_signing_shares"
+				const status = this.#signingState.get(signatureRequest);
+				if (status?.id !== "waiting_for_attestation") return [];
+
+				// Clean up internal state
+				this.#signingState.delete(signatureRequest);
+				this.#messageSignatureRequests.delete(this.#keyGenState.message);
+				this.#keyGenState = { id: "waiting_for_rollover" };
 				return [];
 			}
 			case "TransactionProposed": {
@@ -555,6 +561,25 @@ export class ShieldnetStateMachine {
 				// The signing will be triggered in a separate event
 				return [];
 			}
+			case "TransactionAttested": {
+				// The transaction attestation was submitted
+				// Parse event from raw data
+				const event = transactionAttestedEventSchema.parse(eventArgs);
+				// Get current signature id for message
+				const signatureRequest = this.#messageSignatureRequests.get(
+					event.message,
+				);
+				if (signatureRequest === undefined) return [];
+				// Check that state for signature id is "collect_signing_shares"
+				const status = this.#signingState.get(signatureRequest);
+				if (status?.id !== "waiting_for_attestation") return [];
+
+				// Clean up internal state
+				this.#signingState.delete(signatureRequest);
+				this.#messageSignatureRequests.delete(event.message);
+				this.#transactionProposalInfo.delete(event.message);
+				return [];
+			}
 			default: {
 				return [];
 			}
@@ -581,7 +606,13 @@ export class ShieldnetStateMachine {
 			this.#stagedEpoch === 0n
 		) {
 			this.#logger?.("Trigger Genesis Group Generation");
-			const { groupId, actions } = this.triggerKeyGen(0n, zeroAddress);
+			// We set no timeout for the genesis group generation
+			const { groupId, actions } = this.triggerKeyGen(
+				0n,
+				maxUint64,
+				this.#defaultParticipants,
+				zeroAddress,
+			);
 			this.#genesisGroupId = groupId;
 			this.#logger?.(`Genesis group id: ${this.#genesisGroupId}`);
 			return actions;
@@ -607,7 +638,11 @@ export class ShieldnetStateMachine {
 			// Trigger key gen for next epoch
 			const nextEpoch = currentEpoch + 1n;
 			this.#logger?.(`Trigger key gen for epoch ${nextEpoch}`);
-			const { actions } = this.triggerKeyGen(nextEpoch);
+			const { actions } = this.triggerKeyGen(
+				nextEpoch,
+				block + this.#keyGenTimeout,
+				this.#defaultParticipants,
+			);
 			return actions;
 		}
 		return [];
@@ -615,17 +650,21 @@ export class ShieldnetStateMachine {
 
 	private triggerKeyGen(
 		epoch: bigint,
+		deadline: bigint,
+		participants: Participant[],
 		consensus: Address = this.#protocol.consensus(),
 	): { groupId: GroupId; actions: ProtocolAction[] } {
+		if (participants.length < 2) {
+			throw Error("Not enough participatns!");
+		}
 		// 4 bytes version, 20 bytes address, 8 bytes epoch number
 		const context = encodePacked(
 			["uint32", "address", "uint64"],
 			[0, consensus, epoch],
 		);
-		const participantsRoot = this.#keyGenClient.registerParticipants(
-			this.#participants,
-		);
-		const count = BigInt(this.#participants.length);
+		const participantsRoot =
+			this.#keyGenClient.registerParticipants(participants);
+		const count = BigInt(participants.length);
 		const threshold = count / 2n + 1n;
 		const { groupId, participantId, commitments, pok, poap } =
 			this.#keyGenClient.setupGroup(
@@ -655,6 +694,7 @@ export class ShieldnetStateMachine {
 			id: "collecting_commitments",
 			nextEpoch: epoch,
 			groupId,
+			deadline: deadline,
 		};
 		return {
 			groupId,
@@ -662,12 +702,14 @@ export class ShieldnetStateMachine {
 		};
 	}
 
-	private onGroupSetup(groupId: GroupId): ProtocolAction[] {
-		if (
-			this.#keyGenState.id !== "collecting_shares" ||
-			this.#keyGenState.groupId !== groupId
-		)
+	private async onGroupSetup(
+		_block: bigint,
+		groupId: GroupId,
+	): Promise<ProtocolAction[]> {
+		const status = this.#keyGenState;
+		if (status.id !== "collecting_shares" || status.groupId !== groupId) {
 			return [];
+		}
 
 		// If a group is setup start preprocess (aka nonce commitment)
 		this.#groupPendingNonces.add(groupId);
@@ -686,9 +728,212 @@ export class ShieldnetStateMachine {
 			this.#keyGenState = { id: "waiting_for_rollover" };
 			return actions;
 		}
-		const nextEpoch = this.#keyGenState.nextEpoch;
-		this.#keyGenState = { id: "request_rollover_data", groupId, nextEpoch };
+		if (status.lastParticipant === undefined) {
+			throw Error("Invalid state");
+		}
+		const nextEpoch = status.nextEpoch;
+		const groupKey = this.#keyGenClient.groupPublicKey(groupId);
+		if (groupKey === undefined) {
+			throw Error("Invalid state");
+		}
+		// The deadline is either the timeout or when the epoch should start
+		const packet: EpochRolloverPacket = {
+			type: "epoch_rollover_packet",
+			domain: {
+				chain: this.#protocol.chainId(),
+				consensus: this.#protocol.consensus(),
+			},
+			rollover: {
+				activeEpoch: this.#activeEpoch,
+				proposedEpoch: nextEpoch,
+				rolloverBlock: nextEpoch * this.#blocksPerEpoch,
+				groupKeyX: groupKey.x,
+				groupKeyY: groupKey.y,
+			},
+		};
+		const message = await this.#verificationEngine.verify(packet);
+		this.#logger?.(`Verified message ${message}`);
+		this.#keyGenState = {
+			id: "sign_rollover",
+			groupId,
+			nextEpoch,
+			message,
+			responsible: status.lastParticipant,
+		};
 		return actions;
+	}
+
+	private checkKeyGenAbort(block: bigint): ProtocolAction[] {
+		if (
+			this.#keyGenState.id === "waiting_for_rollover" ||
+			this.#keyGenState.groupId === this.#genesisGroupId
+		) {
+			return [];
+		}
+		const currentEpoch = block / this.#blocksPerEpoch;
+		if (currentEpoch < this.#keyGenState.nextEpoch) {
+			// Still valid epoch
+			return [];
+		}
+		this.#logger?.(`Abort keygen for ${this.#keyGenState.nextEpoch}`);
+		this.#keyGenState = { id: "waiting_for_rollover" };
+		return [];
+	}
+
+	private checkKeyGenTimeouts(block: bigint): ProtocolAction[] {
+		// No timeout in waiting state
+		if (
+			this.#keyGenState.id !== "collecting_commitments" &&
+			this.#keyGenState.id !== "collecting_shares"
+		)
+			return [];
+		// Still within deadline
+		if (this.#keyGenState.deadline > block) return [];
+		const groupId = this.#keyGenState.groupId;
+		// Get participants that did not participate
+		const missingParticipants =
+			this.#keyGenState.id !== "collecting_commitments"
+				? this.#keyGenClient.missingCommitments(groupId)
+				: this.#keyGenClient.missingSecretShares(groupId);
+		// For next key gen only consider active participants
+		const participants = this.#defaultParticipants.filter(
+			(p) => missingParticipants.indexOf(p.id) < 0,
+		);
+		const { actions } = this.triggerKeyGen(
+			this.#keyGenState.nextEpoch,
+			block + this.#keyGenTimeout,
+			participants,
+		);
+		return actions;
+	}
+
+	private checkSigningTimeouts(block: bigint): ProtocolAction[] {
+		// No timeout in waiting state
+		const statesToProcess = Array.from(this.#signingState.entries());
+		for (const [signatureId, status] of statesToProcess) {
+			// Still within deadline
+			if (status.deadline > block) return [];
+			this.#messageSignatureRequests.delete(signatureId);
+			switch (status.id) {
+				case "waiting_for_attestation": {
+					const everyoneResponsible = status.responsible === undefined;
+					if (everyoneResponsible) {
+						// Everyone is responsible
+						// Signature request will be readded once it is submitted
+						// and no more state needs to be tracked
+						// if the deadline is hit again this would be a critical failure
+						this.#signingState.delete(signatureId);
+					} else {
+						// Make everyone responsible for next retry
+						this.#signingState.set(signatureId, {
+							...status,
+							responsible: undefined,
+							deadline: block + this.#signingTimeout,
+						});
+					}
+					const act =
+						everyoneResponsible ||
+						status.responsible ===
+							this.#signingClient.participantId(signatureId);
+					if (!act) {
+						return [];
+					}
+					const message = this.#signingClient.message(signatureId);
+					if (
+						this.#keyGenState.id === "sign_rollover" &&
+						message === this.#keyGenState.message
+					) {
+						return [
+							{
+								id: "consensus_stage_epoch",
+								proposedEpoch: this.#keyGenState.nextEpoch,
+								rolloverBlock:
+									this.#keyGenState.nextEpoch * this.#blocksPerEpoch,
+								groupId: this.#keyGenState.groupId,
+								signatureId,
+							},
+						];
+					}
+					const transactionInfo = this.#transactionProposalInfo.get(message);
+					if (transactionInfo !== undefined) {
+						return [
+							{
+								id: "consensus_attest_transaction",
+								...transactionInfo,
+								signatureId,
+							},
+						];
+					}
+					return [];
+				}
+				case "waiting_for_request": {
+					const everyoneResponsible = status.responsible === undefined;
+					if (everyoneResponsible) {
+						// Everyone is responsible
+						// Signature request will be readded once it is submitted
+						// and no more state needs to be tracked
+						// if the deadline is hit again this would be a critical failure
+						this.#signingState.delete(signatureId);
+					} else {
+						// Make everyone responsible for next retry
+						this.#signingState.set(signatureId, {
+							...status,
+							signers: status.signers.filter((id) => id !== status.responsible),
+							responsible: undefined,
+							deadline: block + this.#signingTimeout,
+						});
+					}
+					const act =
+						everyoneResponsible ||
+						status.responsible ===
+							this.#signingClient.participantId(signatureId);
+					if (!act) {
+						return [];
+					}
+					const message = this.#signingClient.message(signatureId);
+					const groupId = this.#signingClient.signingGroup(signatureId);
+					return [
+						{
+							id: "sign_request",
+							groupId,
+							message,
+						},
+					];
+				}
+				case "collect_nonce_commitments":
+				case "collect_signing_shares": {
+					// Still within deadline
+					if (status.deadline <= block) return [];
+					// Get participants that did not participate
+					const missingParticipants =
+						status.id === "collect_nonce_commitments"
+							? this.#signingClient.missingNonces(signatureId)
+							: this.#signingClient
+									.signers(signatureId)
+									.filter((s) => status.sharesFrom.indexOf(s) < 0);
+					// For next key gen only consider active participants
+					const signers = this.#defaultParticipants
+						.filter((p) => missingParticipants.indexOf(p.id) < 0)
+						.map((p) => p.id);
+					this.#signingState.set(signatureId, {
+						id: "waiting_for_request",
+						responsible: status.lastSigner,
+						signers,
+						deadline: block + this.#signingTimeout,
+					});
+					const groupId = this.#signingClient.signingGroup(signatureId);
+					const message = this.#signingClient.message(signatureId);
+					return [
+						{
+							id: "sign_request",
+							groupId,
+							message,
+						},
+					];
+				}
+			}
+		}
+		return [];
 	}
 
 	private checkAvailableNonces(): ProtocolAction[] {
@@ -739,17 +984,5 @@ export class ShieldnetStateMachine {
 			}
 		}
 		return [];
-	}
-
-	private checkEpochStaging(signatureId: SignatureId) {
-		if (
-			this.#keyGenState.id === "sign_rollover_msg" &&
-			this.#keyGenState.msg === this.#signingClient.message(signatureId)
-		) {
-			const state = this.#signingState.get(signatureId);
-			if (state?.id !== "signed") return;
-			this.#stagedEpoch = this.#keyGenState.nextEpoch;
-			this.#keyGenState = { id: "waiting_for_rollover" };
-		}
 	}
 }

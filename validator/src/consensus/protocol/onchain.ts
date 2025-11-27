@@ -6,6 +6,7 @@ import type {
 	PublishSecretShares,
 	PublishSignatureShare,
 	RegisterNonceCommitments,
+	RequestSignature,
 	RevealNonceCommitments,
 	StartKeyGen,
 } from "./types.js";
@@ -127,6 +128,20 @@ export class OnchainProtocol extends BaseProtocol {
 					f: shares,
 				},
 			],
+			account: this.#signingClient.account,
+		});
+		return this.#signingClient.writeContract(request);
+	}
+
+	protected async requestSignature({
+		groupId,
+		message,
+	}: RequestSignature): Promise<Hex> {
+		const { request } = await this.#publicClient.simulateContract({
+			address: this.#coordinator,
+			abi: COORDINATOR_FUNCTIONS,
+			functionName: "sign",
+			args: [groupId, message],
 			account: this.#signingClient.account,
 		});
 		return this.#signingClient.writeContract(request);
