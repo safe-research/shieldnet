@@ -1,13 +1,18 @@
 import type { Address, Hex, PublicClient, WalletClient } from "viem";
 import type { FrostPoint, GroupId, SignatureId } from "../../frost/types.js";
-import { COORDINATOR_FUNCTIONS } from "../../types/abis.js";
+import {
+	CONSENSUS_FUNCTIONS,
+	COORDINATOR_FUNCTIONS,
+} from "../../types/abis.js";
 import { BaseProtocol } from "./base.js";
 import type {
+	AttestTransaction,
 	PublishSecretShares,
 	PublishSignatureShare,
 	RegisterNonceCommitments,
 	RequestSignature,
 	RevealNonceCommitments,
+	StageEpoch,
 	StartKeyGen,
 } from "./types.js";
 
@@ -261,6 +266,35 @@ export class OnchainProtocol extends BaseProtocol {
 			],
 			account: this.#signingClient.account,
 			gas: 400_000n, // TODO: this seems to be wrongly estimated
+		});
+		return this.#signingClient.writeContract(request);
+	}
+	protected async attestTransaction({
+		epoch,
+		transactionHash,
+		signatureId,
+	}: AttestTransaction): Promise<Hex> {
+		const { request } = await this.#publicClient.simulateContract({
+			address: this.#consensus,
+			abi: CONSENSUS_FUNCTIONS,
+			functionName: "attestTransaction",
+			args: [epoch, transactionHash, signatureId],
+			account: this.#signingClient.account,
+		});
+		return this.#signingClient.writeContract(request);
+	}
+	protected async stageEpoch({
+		proposedEpoch,
+		rolloverBlock,
+		groupId,
+		signatureId,
+	}: StageEpoch): Promise<Hex> {
+		const { request } = await this.#publicClient.simulateContract({
+			address: this.#consensus,
+			abi: CONSENSUS_FUNCTIONS,
+			functionName: "stageEpoch",
+			args: [proposedEpoch, rolloverBlock, groupId, signatureId],
+			account: this.#signingClient.account,
 		});
 		return this.#signingClient.writeContract(request);
 	}
