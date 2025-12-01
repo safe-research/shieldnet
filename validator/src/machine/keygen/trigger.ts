@@ -21,11 +21,10 @@ export const triggerKeyGen = (
 		["uint32", "address", "uint64"],
 		[0, consensus, epoch],
 	);
-	const participantsRoot = keyGenClient.registerParticipants(participants);
 	const count = BigInt(participants.length);
 	const threshold = count / 2n + 1n;
-	const { groupId, participantId, commitments, pok, poap } =
-		keyGenClient.setupGroup(participantsRoot, count, threshold, context);
+	const { groupId, participantsRoot, participantId, commitments, pok, poap } =
+		keyGenClient.setupGroup(participants, count, threshold, context);
 
 	const actions: ProtocolAction[] = [
 		{
