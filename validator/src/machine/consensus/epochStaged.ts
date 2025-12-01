@@ -13,7 +13,7 @@ export const handleEpochStaged = async (
 			`Not expecting epoch staging during ${machineStates.rollover.id}!`,
 		);
 	}
-	// Check that state for signature id is "collect_signing_shares"
+	// Check that signing state is waiting for attestation
 	const status = machineStates.signing[machineStates.rollover.message];
 	if (status?.id !== "waiting_for_attestation") return {};
 

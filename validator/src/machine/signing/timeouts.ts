@@ -16,7 +16,6 @@ export const checkSigningTimeouts = (
 	machineStates: MachineStates,
 	block: bigint,
 ): StateDiff[] => {
-	// No timeout in waiting state
 	const statesToProcess = Object.entries(machineStates.signing) as [
 		Hex,
 		SigningState,

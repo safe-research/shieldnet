@@ -12,6 +12,7 @@ export const checkKeyGenTimeouts = (
 	logger?: (msg: unknown) => void,
 ): StateDiff => {
 	// No timeout in waiting state
+	// Timeouts in signing state will be handled in the signing flow
 	if (
 		machineStates.rollover.id !== "collecting_commitments" &&
 		machineStates.rollover.id !== "collecting_shares"

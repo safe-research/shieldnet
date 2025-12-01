@@ -8,7 +8,7 @@ export const handleTransactionAttested = async (
 	// The transaction attestation was submitted
 	// Parse event from raw data
 	const event = transactionAttestedEventSchema.parse(eventArgs);
-	// Check that state for signature id is "collect_signing_shares"
+	// Check that signing state is waiting for attestation
 	const status = machineStates.signing[event.message];
 	if (status?.id !== "waiting_for_attestation") return {};
 

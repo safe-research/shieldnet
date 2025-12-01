@@ -35,35 +35,35 @@ export const handleKeyGenCommitted = async (
 			mu: event.commitment.mu,
 		},
 	);
-	// If all participants have committed update state to "collecting_shares"
-	if (event.committed) {
-		const { verificationShare, shares } = keyGenClient.createSecretShares(
-			event.gid,
-		);
-		const callbackContext =
-			consensusState.genesisGroupId === event.gid
-				? undefined
-				: encodePacked(
-						["uint256", "uint256"],
-						[nextEpoch, nextEpoch * machineConfig.blocksPerEpoch],
-					);
-		return {
-			rollover: {
-				id: "collecting_shares",
-				groupId: event.gid,
-				nextEpoch,
-				deadline: block + machineConfig.keyGenTimeout,
-			},
-			actions: [
-				{
-					id: "key_gen_publish_secret_shares",
-					groupId: event.gid,
-					verificationShare,
-					shares,
-					callbackContext,
-				},
-			],
-		};
+	if (!event.committed) {
+		return {};
 	}
-	return {};
+	// If all participants have committed update state to "collecting_shares"
+	const { verificationShare, shares } = keyGenClient.createSecretShares(
+		event.gid,
+	);
+	const callbackContext =
+		consensusState.genesisGroupId === event.gid
+			? undefined
+			: encodePacked(
+					["uint256", "uint256"],
+					[nextEpoch, nextEpoch * machineConfig.blocksPerEpoch],
+				);
+	return {
+		rollover: {
+			id: "collecting_shares",
+			groupId: event.gid,
+			nextEpoch,
+			deadline: block + machineConfig.keyGenTimeout,
+		},
+		actions: [
+			{
+				id: "key_gen_publish_secret_shares",
+				groupId: event.gid,
+				verificationShare,
+				shares,
+				callbackContext,
+			},
+		],
+	};
 };
