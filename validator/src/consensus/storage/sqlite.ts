@@ -63,7 +63,7 @@ const dbSignatureCommitmentSchema = z.object({
 	hiding: dbPointSchema,
 	binding: dbPointSchema,
 });
-const dbEmpty = z.array(z.null()).length(1);
+const dbEmptyListSchema = z.array(z.null()).length(1);
 const dbList = <T>(result: unknown[], schema: ZodSchema<T>): T[] => {
 	// NOTE: For certain queries, we use a `LEFT JOIN` on the primary ID (for
 	// example group ID or signature ID) so that we return `[]` in case of
@@ -74,12 +74,12 @@ const dbList = <T>(result: unknown[], schema: ZodSchema<T>): T[] => {
 	if (result.length === 0) {
 		throw new Error("not found");
 	}
-	if (dbEmpty.safeParse(result).success) {
+	if (dbEmptyListSchema.safeParse(result).success) {
 		return [];
 	}
 	return result.map((row) => schema.parse(row));
 };
-const dbEmptyMap = z.array(z.record(z.string(), z.null())).length(1);
+const dbEmptyMapSchema = z.array(z.record(z.string(), z.null())).length(1);
 const dbMap = <T, K, V>(
 	result: unknown[],
 	schema: ZodSchema<T>,
@@ -89,7 +89,7 @@ const dbMap = <T, K, V>(
 	if (result.length === 0) {
 		throw new Error("not found");
 	}
-	if (dbEmptyMap.safeParse(result).success) {
+	if (dbEmptyMapSchema.safeParse(result).success) {
 		return new Map();
 	}
 	return new Map(result.map((row) => f(schema.parse(row))));
@@ -434,7 +434,8 @@ export class SqliteStorage
 		return dbList(
 			this.#db
 				.prepare(`
-					SELECT p.id FROM groups AS g
+					SELECT p.id
+					FROM groups AS g
 					LEFT JOIN group_participants AS p
 					ON p.group_id = g.id AND p.commitments IS NULL
 					WHERE g.id = ?
@@ -451,7 +452,8 @@ export class SqliteStorage
 			.prepare(`
 				SELECT CASE
 					WHEN EXISTS (SELECT id FROM groups WHERE id = ?) THEN EXISTS (
-						SELECT 1 FROM group_participants
+						SELECT 1
+						FROM group_participants
 						WHERE group_id = ? AND commitments IS NULL
 					)
 					ELSE NULL
@@ -470,7 +472,8 @@ export class SqliteStorage
 			this.#db
 				.prepare(`
 					WITH group_participant_secret_shares AS (
-						SELECT p.group_id, p.id, s.secret_share FROM group_participants AS p
+						SELECT p.group_id, p.id, s.secret_share
+						FROM group_participants AS p
 						LEFT JOIN group_secret_shares AS s
 						ON s.group_id = p.group_id AND s.address = ? AND s.from_participant = p.id
 					)
@@ -491,7 +494,8 @@ export class SqliteStorage
 			.prepare(`
 				SELECT CASE
 					WHEN EXISTS (SELECT id FROM groups WHERE id = ?) THEN EXISTS (
-						SELECT 1 FROM group_participants AS p
+						SELECT 1
+						FROM group_participants AS p
 				 		LEFT JOIN group_secret_shares AS s
 				 		ON s.group_id = p.group_id AND s.address = ? AND s.from_participant = p.id
 				 		WHERE p.group_id = ? AND s.secret_share IS NULL
@@ -539,7 +543,8 @@ export class SqliteStorage
 		return dbMap(
 			this.#db
 				.prepare(`
-					SELECT p.id, p.commitments FROM groups AS g
+					SELECT p.id, p.commitments
+					FROM groups AS g
 					LEFT JOIN group_participants AS p
 					ON p.group_id = g.id AND p.commitments IS NOT NULL
 					WHERE g.id = ?
@@ -557,10 +562,10 @@ export class SqliteStorage
 					SELECT s.from_participant AS id, s.secret_share AS secretShare
 					FROM groups AS g
 					LEFT JOIN group_secret_shares AS s
-					ON s.group_id = g.id AND s.secret_share IS NOT NULL
+					ON s.group_id = g.id AND s.address = ? AND s.secret_share IS NOT NULL
 					WHERE g.id = ?
 				`)
-				.all(groupId),
+				.all(this.#account, groupId),
 			dbSecretShareSchema,
 			({ id, secretShare }) => [id, secretShare],
 		);
@@ -732,7 +737,8 @@ export class SqliteStorage
 			.prepare(`
 				SELECT CASE
 					WHEN EXISTS (SELECT id FROM signatures WHERE id = ?) THEN EXISTS (
-						SELECT 1 FROM signature_commitments
+						SELECT 1
+						FROM signature_commitments
 						WHERE signature_id = ?
 						AND (hiding IS NULL OR binding IS NULL)
 					)
@@ -751,7 +757,8 @@ export class SqliteStorage
 		return dbList(
 			this.#db
 				.prepare(`
-					SELECT c.signer FROM signatures AS s
+					SELECT c.signer
+					FROM signatures AS s
 					LEFT JOIN signature_commitments AS c
 					ON c.signature_id = s.id AND (c.hiding IS NULL OR c.binding IS NULL)
 					WHERE s.id = ?
@@ -794,9 +801,10 @@ export class SqliteStorage
 		return dbMap(
 			this.#db
 				.prepare(`
-					SELECT c.signer, c.hiding, c.binding FROM signatures AS s
+					SELECT c.signer, c.hiding, c.binding
+					FROM signatures AS s
 					LEFT JOIN signature_commitments AS c
-					ON c.signature_id = s.id AND (c.hiding IS NOT NULL OR c.binding IS NOT NULL)
+					ON c.signature_id = s.id AND c.hiding IS NOT NULL AND c.binding IS NOT NULL
 					WHERE s.id = ?
 				`)
 				.all(signatureId),
