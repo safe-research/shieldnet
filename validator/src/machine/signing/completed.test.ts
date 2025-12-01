@@ -156,7 +156,7 @@ describe("signing completed", () => {
 		).rejects.toStrictEqual(Error("Invalid state"));
 	});
 
-	it("should return original state", async () => {
+	it("should correctly transition to waiting for attestation", async () => {
 		const diff = await handleSigningCompleted(
 			MACHINE_CONFIG,
 			CONSENSUS_STATE,
@@ -167,6 +167,7 @@ describe("signing completed", () => {
 
 		expect(diff.consensus).toBeUndefined();
 		expect(diff.rollover).toBeUndefined();
+		expect(diff.actions).toBeUndefined();
 		expect(diff.signing).toStrictEqual([
 			"0x5afe5afe",
 			{
