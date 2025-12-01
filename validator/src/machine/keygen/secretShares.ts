@@ -41,7 +41,6 @@ export const handleKeyGenSecretShared = async (
 		return {};
 	}
 	const groupId = event.gid;
-	machineStates.rollover.lastParticipant = event.identifier;
 	// Track identity that has submitted last share
 	// TODO: handle bad shares -> Submit fraud proof
 	await keyGenClient.handleKeygenSecrets(
@@ -51,7 +50,12 @@ export const handleKeyGenSecretShared = async (
 	);
 	if (!event.completed) {
 		logger?.(`Group ${event.gid} not completed yet`);
-		return {};
+		return {
+			rollover: {
+				...machineStates.rollover,
+				lastParticipant: event.identifier,
+			},
+		};
 	}
 
 	// If a group is setup start preprocess (aka nonce commitment)

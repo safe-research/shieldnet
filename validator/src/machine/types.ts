@@ -115,7 +115,10 @@ export type MutableMachineStates = {
 	signing: Record<SignatureId, SigningState>;
 };
 
-export type MachineStates = Readonly<MutableMachineStates>;
+export type MachineStates = Readonly<{
+	rollover: Readonly<RolloverState>;
+	signing: Record<SignatureId, Readonly<SigningState>>;
+}>;
 
 export type MachineConfig = {
 	defaultParticipants: Participant[];
