@@ -27,9 +27,8 @@ type SignatureRequest = {
 	signers: ParticipantId[];
 };
 
-export class InMemoryStorage implements KeyGenInfoStorage, GroupInfoStorage, SignatureRequestStorage {
+export class InMemoryClientStorage implements KeyGenInfoStorage, GroupInfoStorage, SignatureRequestStorage {
 	#account: Address;
-	#participantsInfo = new Map<Hex, readonly Participant[]>();
 	#keyGenInfo = new Map<GroupId, KeyGenInfo>();
 	#groupInfo = new Map<GroupId, GroupInfo>();
 	#nonceTrees = new Map<Hex, NonceTree>();

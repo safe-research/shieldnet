@@ -16,7 +16,6 @@ import { describe, expect, it } from "vitest";
 import { createClientStorage, createStateStorage, log } from "../__tests__/config.js";
 import { toPoint } from "../frost/math.js";
 import type { GroupId } from "../frost/types.js";
-import { InMemoryStateStorage } from "../machine/storage/inmemory.js";
 import { ShieldnetStateMachine as SchildNetzMachine } from "../service/machine.js";
 import { CONSENSUS_EVENTS, COORDINATOR_EVENTS } from "../types/abis.js";
 import { KeyGenClient } from "./keyGen/client.js";
