@@ -16,6 +16,7 @@ import { InMemoryStorage } from "../consensus/storage/inmemory.js";
 import { type PacketHandler, type Typed, VerificationEngine } from "../consensus/verify/engine.js";
 import { EpochRolloverHandler } from "../consensus/verify/rollover/handler.js";
 import { SafeTransactionHandler } from "../consensus/verify/safeTx/handler.js";
+import { InMemoryStateStorage } from "../machine/storage/inmemory.js";
 import { CONSENSUS_EVENTS, COORDINATOR_EVENTS } from "../types/abis.js";
 import { supportedChains } from "../types/chains.js";
 import type { ProtocolConfig } from "../types/interfaces.js";
@@ -60,11 +61,13 @@ export class ValidatorService {
 			config.coordinator,
 			this.#logger?.info,
 		);
+		const stateStorage = new InMemoryStateStorage();
 		this.#stateMachine = new ShieldnetStateMachine({
 			participants: config.participants,
 			blocksPerEpoch: config.blocksPerEpoch,
 			logger: this.#logger?.info,
 			protocol,
+			storage: stateStorage,
 			keyGenClient,
 			signingClient,
 			verificationEngine,
