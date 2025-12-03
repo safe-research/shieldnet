@@ -25,7 +25,7 @@ export class InMemoryStateStorage implements StateStorage {
 		};
 		this.#machineStates = {
 			rollover: machines?.rollover ?? { id: "waiting_for_rollover" },
-			signing: machines?.rollover ?? {},
+			signing: machines?.signing ?? {},
 		};
 	}
 

@@ -10,7 +10,7 @@ import { hexDataSchema } from "../types/schemas.js";
 // are all represented as strings (Hex) or standard identifiers in the database.
 
 const groupIdSchema = hexDataSchema.transform((v) => v as GroupId);
-const participantIdSchema = z
+const participantIdSchema = z.coerce
 	.bigint()
 	.nonnegative()
 	.transform((v) => v as ParticipantId);
@@ -63,7 +63,7 @@ const baseSigningStateSchema = z.object({
 
 const waitingForRequestSchema = z.object({
 	id: z.literal("waiting_for_request"),
-	responsible: z.union([participantIdSchema, z.undefined()]),
+	responsible: participantIdSchema.optional(),
 	signers: z.array(participantIdSchema),
 	deadline: coercedBigIntSchema,
 });
@@ -71,7 +71,7 @@ const waitingForRequestSchema = z.object({
 const collectNonceCommitmentsSchema = z.object({
 	id: z.literal("collect_nonce_commitments"),
 	signatureId: signatureIdSchema,
-	lastSigner: z.union([participantIdSchema, z.undefined()]),
+	lastSigner: participantIdSchema.optional(),
 	deadline: coercedBigIntSchema,
 });
 
@@ -79,14 +79,14 @@ const collectSigningSharesSchema = z.object({
 	id: z.literal("collect_signing_shares"),
 	signatureId: signatureIdSchema,
 	sharesFrom: z.array(participantIdSchema),
-	lastSigner: z.union([participantIdSchema, z.undefined()]),
+	lastSigner: participantIdSchema.optional(),
 	deadline: coercedBigIntSchema,
 });
 
 const waitingForAttestationSchema = z.object({
 	id: z.literal("waiting_for_attestation"),
 	signatureId: signatureIdSchema,
-	responsible: z.union([participantIdSchema, z.undefined()]),
+	responsible: participantIdSchema.optional(),
 	deadline: coercedBigIntSchema,
 });
 
