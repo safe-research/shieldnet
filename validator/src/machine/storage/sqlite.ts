@@ -57,28 +57,21 @@ function loadSigningStates(db: Database): Record<SignatureId, SigningState> {
 	return signingStates;
 }
 
-export function writeSigningStates(db: Database, states: Record<SignatureId, SigningState>): void {
-	// Clean up all prior existing signing states
-	const deleteAllQuery = "DELETE FROM signing_states;";
+function deleteSigningState(db: Database, id: SignatureId): void {
+	db.prepare(`
+		DELETE FROM signing_states
+		WHERE signatureId = ?;
+	`).run(id);
+}
 
-	// Statement to insert or replace a single row
-	const upsertStmt = db.prepare(`
-        INSERT INTO signing_states (signatureId, stateJson)
-        VALUES (?, ?)
-        ON CONFLICT(signatureId) DO UPDATE SET
-            stateJson = excluded.stateJson;
-    `);
-
-	// Run all operations inside a single transaction
-	const signatureIds = Object.keys(states) as SignatureId[];
-	db.transaction(() => {
-		db.exec(deleteAllQuery);
-		for (const signatureId of signatureIds) {
-			const state = states[signatureId];
-			const stateJson = JSON.stringify(state, jsonReplacer);
-			upsertStmt.run(signatureId, stateJson);
-		}
-	})();
+function writeSigningState(db: Database, id: SignatureId, state: SigningState): void {
+	const stateJson = JSON.stringify(state, jsonReplacer);
+	db.prepare(`
+		INSERT INTO signing_states (signatureId, stateJson)
+		VALUES (?, ?)
+		ON CONFLICT(signatureId) DO UPDATE SET
+			stateJson = excluded.stateJson;
+	`).run(id, stateJson);
 }
 
 function loadRolloverState(db: Database): RolloverState | undefined {
@@ -147,10 +140,20 @@ export class SqliteStateStorage extends InMemoryStateStorage {
 		// Use the actions from the inmemory storage as a return value
 		const actions = super.applyDiff(diff);
 		// Sync the db with the inmemory storage
-		writeConsensusState(this.#db, super.consensusState());
-		const machineStates = super.machineStates();
-		writeRolloverState(this.#db, machineStates.rollover);
-		writeSigningStates(this.#db, machineStates.signing);
+		this.#db.transaction(() => {
+			writeConsensusState(this.#db, super.consensusState());
+			if (diff.rollover) {
+				writeRolloverState(this.#db, diff.rollover);
+			}
+			if (diff.signing) {
+				const [signatureId, update] = diff.signing;
+				if (update === undefined) {
+					deleteSigningState(this.#db, signatureId);
+				} else {
+					writeSigningState(this.#db, signatureId, update);
+				}
+			}
+		})();
 		return actions;
 	}
 }
