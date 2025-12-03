@@ -69,7 +69,7 @@ const dbMap = <T, K, V>(result: unknown[], schema: ZodSchema<T>, f: (value: T) =
 	return new Map(result.map((row) => f(schema.parse(row))));
 };
 
-export class SqliteStorage implements GroupInfoStorage, KeyGenInfoStorage, SignatureRequestStorage {
+export class SqliteClientStorage implements GroupInfoStorage, KeyGenInfoStorage, SignatureRequestStorage {
 	#account: Address;
 	#db: Database;
 

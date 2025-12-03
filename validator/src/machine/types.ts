@@ -7,7 +7,7 @@ import type { GroupId, ParticipantId, SignatureId } from "../frost/types.js";
 
 export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
-export type RolloverState =
+export type RolloverState = Readonly<
 	| {
 			id: "waiting_for_rollover";
 	  }
@@ -30,7 +30,8 @@ export type RolloverState =
 			nextEpoch: bigint;
 			message: Hex;
 			responsible: ParticipantId;
-	  };
+	  }
+>;
 
 export type BaseSigningState = {
 	packet: SafeTransactionPacket | EpochRolloverPacket;
@@ -41,27 +42,27 @@ export type SigningState = Readonly<
 		(
 			| {
 					id: "waiting_for_request";
-					responsible: ParticipantId | undefined;
+					responsible?: ParticipantId;
 					signers: readonly ParticipantId[];
 					deadline: bigint;
 			  }
 			| {
 					id: "collect_nonce_commitments";
 					signatureId: SignatureId;
-					lastSigner: ParticipantId | undefined;
+					lastSigner?: ParticipantId;
 					deadline: bigint;
 			  }
 			| {
 					id: "collect_signing_shares";
 					signatureId: SignatureId;
 					sharesFrom: readonly ParticipantId[];
-					lastSigner: ParticipantId | undefined;
+					lastSigner?: ParticipantId;
 					deadline: bigint;
 			  }
 			| {
 					id: "waiting_for_attestation";
 					signatureId: SignatureId;
-					responsible: ParticipantId | undefined;
+					responsible?: ParticipantId;
 					deadline: bigint;
 			  }
 		)

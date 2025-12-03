@@ -12,10 +12,11 @@ import {
 import { KeyGenClient } from "../consensus/keyGen/client.js";
 import { OnchainProtocol } from "../consensus/protocol/onchain.js";
 import { SigningClient } from "../consensus/signing/client.js";
-import { InMemoryStorage } from "../consensus/storage/inmemory.js";
+import { InMemoryClientStorage } from "../consensus/storage/inmemory.js";
 import { type PacketHandler, type Typed, VerificationEngine } from "../consensus/verify/engine.js";
 import { EpochRolloverHandler } from "../consensus/verify/rollover/handler.js";
 import { SafeTransactionHandler } from "../consensus/verify/safeTx/handler.js";
+import { InMemoryStateStorage } from "../machine/storage/inmemory.js";
 import { CONSENSUS_EVENTS, COORDINATOR_EVENTS } from "../types/abis.js";
 import { supportedChains } from "../types/chains.js";
 import type { ProtocolConfig } from "../types/interfaces.js";
@@ -46,7 +47,7 @@ export class ValidatorService {
 		this.#config = config;
 		this.#publicClient = createPublicClient({ chain, transport });
 		const walletClient = createWalletClient({ chain, transport, account });
-		const storage = new InMemoryStorage(account.address);
+		const storage = new InMemoryClientStorage(account.address);
 		const signingClient = new SigningClient(storage);
 		const keyGenClient = new KeyGenClient(storage, this.#logger);
 		const verificationHandlers = new Map<string, PacketHandler<Typed>>();
@@ -60,11 +61,13 @@ export class ValidatorService {
 			config.coordinator,
 			this.#logger?.info,
 		);
+		const stateStorage = new InMemoryStateStorage();
 		this.#stateMachine = new ShieldnetStateMachine({
 			participants: config.participants,
 			blocksPerEpoch: config.blocksPerEpoch,
 			logger: this.#logger?.info,
 			protocol,
+			storage: stateStorage,
 			keyGenClient,
 			signingClient,
 			verificationEngine,
