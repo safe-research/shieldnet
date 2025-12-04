@@ -18,6 +18,7 @@ import { type PacketHandler, type Typed, VerificationEngine } from "../consensus
 import { EpochRolloverHandler } from "../consensus/verify/rollover/handler.js";
 import { SafeTransactionHandler } from "../consensus/verify/safeTx/handler.js";
 import { InMemoryStateStorage } from "../machine/storage/inmemory.js";
+import { logToTransition } from "../machine/transitions/onchain.js";
 import { CONSENSUS_EVENTS, COORDINATOR_EVENTS } from "../types/abis.js";
 import { supportedChains } from "../types/chains.js";
 import type { ProtocolConfig } from "../types/interfaces.js";
@@ -94,13 +95,12 @@ export class ValidatorService {
 						return left.logIndex - right.logIndex;
 					});
 					for (const log of logs) {
-						this.#stateMachine.transition({
-							type: "event",
-							block: log.blockNumber,
-							index: log.logIndex,
-							eventName: log.eventName,
-							eventArgs: log.args,
-						});
+						const transition = logToTransition(log.blockNumber, log.logIndex, log.eventName, log.args);
+						if (transition === undefined) {
+							this.#logger?.info(`Unknown log: ${log.eventName}`);
+							continue;
+						}
+						this.#stateMachine.transition(transition);
 					}
 				},
 				onError: this.#logger?.error,
@@ -112,7 +112,7 @@ export class ValidatorService {
 					// We delay the processing to avoid potential race conditions for now
 					setTimeout(() => {
 						this.#stateMachine.transition({
-							type: "block",
+							id: "block_new",
 							block,
 						});
 					}, 2000);

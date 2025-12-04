@@ -88,10 +88,19 @@ export const publishSecretSharesSchema = z.object({
 	groupId: groupIdSchema,
 	verificationShare: frostPointSchema,
 	shares: z.array(coercedBigIntSchema),
+});
+
+export const keyGenCofirmSchema = z.object({
+	id: z.literal("key_gen_confirm"),
+	groupId: groupIdSchema,
 	callbackContext: hexDataSchema.optional(),
 });
 
-export const keyGenActionSchema = z.discriminatedUnion("id", [startKeyGenSchema, publishSecretSharesSchema]);
+export const keyGenActionSchema = z.discriminatedUnion("id", [
+	startKeyGenSchema,
+	publishSecretSharesSchema,
+	keyGenCofirmSchema,
+]);
 
 // --- Consensus Actions ---
 

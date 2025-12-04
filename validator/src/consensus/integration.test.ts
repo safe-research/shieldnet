@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest";
 import { createClientStorage, createStateStorage, log } from "../__tests__/config.js";
 import { toPoint } from "../frost/math.js";
 import type { GroupId } from "../frost/types.js";
+import { logToTransition } from "../machine/transitions/onchain.js";
 import { ShieldnetStateMachine as SchildNetzMaschine } from "../service/machine.js";
 import { CONSENSUS_EVENTS, COORDINATOR_EVENTS } from "../types/abis.js";
 import { InMemoryQueue } from "../utils/queue.js";
@@ -131,15 +132,14 @@ describe("integration", () => {
 			publicClient.watchContractEvent({
 				address: [coordinatorAddress, consensusAddress],
 				abi: [...CONSENSUS_EVENTS, ...COORDINATOR_EVENTS],
-				onLogs: async (logs) => {
-					for (const log of logs) {
-						sm.transition({
-							type: "event",
-							block: log.blockNumber,
-							index: log.logIndex,
-							eventName: log.eventName,
-							eventArgs: log.args,
-						});
+				onLogs: async (events) => {
+					for (const event of events) {
+						const transtion = logToTransition(event.blockNumber, event.logIndex, event.eventName, event.args);
+						if (transtion === undefined) {
+							log(`Unknown event: ${event.eventName}`);
+							continue;
+						}
+						sm.transition(transtion);
 					}
 				},
 				onError: logger,
@@ -149,7 +149,7 @@ describe("integration", () => {
 					// We delay the processing to avoid potential race conditions for now
 					setTimeout(() => {
 						sm.transition({
-							type: "block",
+							id: "block_new",
 							block,
 						});
 					}, 2000);

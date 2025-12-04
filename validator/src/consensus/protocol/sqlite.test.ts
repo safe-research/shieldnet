@@ -74,14 +74,17 @@ const actions: ActionWithRetry[] = [
 		groupId: "0x5afe",
 		verificationShare: TEST_POINT,
 		shares: [1n, 2n, 3n, 5n, 8n, 13n],
-		callbackContext: "0x5afe00aa",
 		retryCount: 1,
 	},
 	{
-		id: "key_gen_publish_secret_shares",
+		id: "key_gen_confirm",
 		groupId: "0x5afe",
-		verificationShare: TEST_POINT,
-		shares: [1n, 2n, 3n, 5n, 8n, 13n],
+		retryCount: 1,
+	},
+	{
+		id: "key_gen_confirm",
+		groupId: "0x5afe",
+		callbackContext: "0x5afe00aa",
 		retryCount: 1,
 	},
 	{
