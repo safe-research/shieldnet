@@ -1,180 +1,111 @@
+open Crypto
+open Eth
+module GroupId = Id.Make ()
+module SignatureId = Id.Make ()
+module AddressSet = Set.Make (Address)
+module GroupMap = Map.Make (GroupId)
+module GroupSet = Set.Make (GroupId)
 module IntMap = Map.Make (Int)
+module ParticipantMap = Map.Make (FROST.Identifier)
+module ParticipantSet = Set.Make (FROST.Identifier)
 module StringMap = Map.Make (String)
 
-module Address = struct
-  type t = unit (* place holder *)
+module ParticipantMTree = MerkleTree.Make (struct
+  type t = FROST.Identifier.t * Address.t
 
-  let equal (_ : t) (_ : t) : bool = failwith "place holder"
-end
+  let encode (id, addr) =
+    Abi.encode [ `Uint256 (FROST.Identifier.to_int id); `Address addr ]
+end)
 
-module Secp256k1 = struct
-  type secret_key = unit (* place holder *)
-  type public_key = unit (* place holder *)
-  type scalar = unit (* place holder *)
-  type point = unit (* place holder *)
+module NoncesMTree = MerkleTree.Make (struct
+  type t = int * FROST.nonces
 
-  let infinity : point = () (* place holder *)
-  let random_scalar () : scalar = failwith "place holder"
-  let g (_ : scalar) : point = failwith "place holder"
-  let add (_ : point) (_ : point) : point = failwith "place holder"
-  let addr (_ : secret_key) : Address.t = failwith "place holder"
-  let equal (_ : public_key) (_ : public_key) : bool = failwith "place holder"
-end
+  let encode (offset, nonces) =
+    Abi.encode (`Uint256 offset :: FROST.encode_nonces nonces)
+end)
 
-module FROST = struct
-  type key_gen_commitment = {
-    c : Secp256k1.point list;
-    r : Secp256k1.point;
-    mu : Secp256k1.scalar;
-  }
+module VerificationMTree = MerkleTree.Make (struct
+  type t =
+    FROST.(
+      Identifier.t * share_commitment * lagrange_coefficient * group_commitment)
 
-  type key_gen_secret_shares = {
-    y : Secp256k1.point;
-    f : Secp256k1.scalar list;
-  }
+  let encode (id, ri, l, r) =
+    Abi.encode @@ FROST.encode_verification_share id ri l r
+end)
 
-  type nonces = { hiding : Secp256k1.scalar; binding : Secp256k1.scalar }
-
-  type nonces_commitments = {
-    hiding : Secp256k1.point;
-    binding : Secp256k1.point;
-  }
-
-  let key_gen_commit (_ : Secp256k1.scalar list) : key_gen_commitment =
-    failwith "place holder"
-
-  let key_gen_verify_proof (_ : key_gen_commitment) : bool =
-    failwith "place holder"
-
-  let key_gen_group_public_key (_ : Secp256k1.point list IntMap.t) :
-      Secp256k1.point =
-    failwith "place holder"
-
-  let key_gen_secret_shares (_ : int) (_ : Secp256k1.scalar list)
-      (_ : Secp256k1.point list IntMap.t) :
-      Secp256k1.scalar * key_gen_secret_shares =
-    failwith "place holder"
-
-  let key_gen_get_secret_share (_ : int) (_ : int)
-      (_ : Secp256k1.point list IntMap.t) (_ : key_gen_secret_shares) :
-      Secp256k1.scalar option =
-    failwith "place holder"
-
-  let key_gen_participant_secret (_ : int) (_ : Secp256k1.scalar IntMap.t) :
-      Secp256k1.secret_key =
-    failwith "place holder"
-
-  let preprocess_generate_nonce (_ : Secp256k1.secret_key) : nonces =
-    failwith "place holder"
-
-  let signature_commitments (_ : int) (_ : nonces_commitments IntMap.t) :
-      Secp256k1.point * Secp256k1.point =
-    failwith "place holder"
-
-  let signature_share (_ : Secp256k1.secret_key) (_ : int) (_ : string)
-      (_ : nonces_commitments IntMap.t) : Secp256k1.scalar * string =
-    failwith "place holder"
-end
-
-module Abi = struct
-  let encode (_ : 'a list) (_ : 'b) : string = failwith "place holder"
-  let encode_packed (_ : 'a list) (_ : 'b) : string = failwith "place holder"
-
-  let encode_with_selector (_ : 'a) (_ : 'b list) (_ : 'c) : string =
-    failwith "place holder"
-
-  let hash_typed_data (_ : 'a) : string = failwith "place holder"
-end
-
-module MerkleTree = struct
-  let root (_ : 'a) : string = failwith "place holder"
-  let proof (_ : 'a) (_ : 'b) : string list = failwith "place holder"
-end
-
-module ParticipantSet = struct
-  type t = unit (* place holder *)
-
-  let init (_ : Address.t list) : t = failwith "place holder"
-  let remove (_ : t) (_ : 'a) : t = failwith "place holder"
-  let remove_missing (_ : t) (_ : 'a) : t = failwith "place holder"
-  let cardinal (_ : t) : int = failwith "place holder"
-  let identifier (_ : t) (_ : Address.t) : int = failwith "place holder"
-  let addr (_ : t) (_ : int) : Address.t = failwith "place holder"
-end
-
-type group_id = string
-
-module FROSTCoordinator = struct
-  let group_id (_ : ParticipantSet.t) (_ : int) (_ : int) (_ : string) :
-      group_id =
-    failwith "place holder"
-end
+(** A marker type to indicate state that is local to a specific validator and
+    only known by them. *)
+type 'a local = Local of 'a
 
 type group = {
-  id : group_id;  (** The set of participants in the group. *)
+  id : GroupId.t;
   participants : ParticipantSet.t;
-      (** The identifier of the validator in the group. *)
-  key : Secp256k1.public_key;  (** The participant share ID. *)
-  share : Secp256k1.secret_key;
+  key : FROST.verification_key;
+  me : FROST.Identifier.t local;
+  share : FROST.signing_share local;
 }
 
-type epoch = { id : int; group : group }
+type epoch = { epoch : int; group : group }
 
 type rollover =
   | Collecting_key_gen_commitments of {
       epoch : int;
-      id : group_id;
-      coefficients : Secp256k1.scalar list;
-      commitments : Secp256k1.point list IntMap.t;
-      participants : ParticipantSet.t;
+      group : GroupId.t;
+      participants : AddressSet.t;
+      coefficients : FROST.KeyGen.coefficients local;
+      commitments : FROST.KeyGen.commitments ParticipantMap.t;
       deadline : int;
     }
   | Collecting_key_gen_secret_shares of {
       epoch : int;
-      id : group_id;
-      key : Secp256k1.point;
-      commitments : Secp256k1.point list IntMap.t;
-      shares : Secp256k1.scalar IntMap.t;
-      last_participant : Address.t;
-      participants : ParticipantSet.t;
+      group : GroupId.t;
+      participants : AddressSet.t;
+      key : FROST.verification_key;
+      coefficients : FROST.KeyGen.coefficients local;
+      commitments : FROST.KeyGen.commitments ParticipantMap.t;
+      shares : FROST.KeyGen.secret_share ParticipantMap.t local;
+      last_participant : FROST.Identifier.t;
       deadline : int;
     }
   | Signing_epoch_rollover of { epoch : epoch; message : string }
-  | Staged_epoch of epoch
+  | Staged_epoch of { epoch : epoch }
+  | Skipped of { epoch : int }
 
 type preprocess_group = {
-  nonces : FROST.nonces IntMap.t;
-  pending : FROST.nonces list StringMap.t;
+  nonces : (FROST.nonces * MerkleTree.proof) IntMap.t;
+  pending : (int * FROST.nonces) list option;
 }
 
-type signature_id = string
-
-type sign_status =
-  | Waiting_for_sign_request of { responsible : Address.t }
+type sign_state =
+  | Waiting_for_sign_request of { responsible : FROST.Identifier.t option }
   | Collecting_sign_nonces of {
-      id : signature_id;
-      nonces : FROST.nonces_commitments IntMap.t;
+      id : SignatureId.t;
+      nonces : FROST.nonces_commitments ParticipantMap.t;
     }
   | Collecting_sign_shares of {
-      id : signature_id;
+      id : SignatureId.t;
       root : string;
-      group_commitment : Secp256k1.point;
-      shares : Secp256k1.scalar IntMap.t;
+      group_commitment : FROST.group_commitment;
+      shares : FROST.signature_share ParticipantMap.t;
     }
   | Waiting_for_consensus_attestation of {
-      id : signature_id;
-      responsible : Address.t;
+      id : SignatureId.t;
+      responsible : FROST.Identifier.t option;
     }
 
 type packet =
-  | Epoch_rollover of { epoch : int; rollover : int; group_id : group_id }
+  | Epoch_rollover of {
+      epoch : int;
+      rollover : int;
+      group_key : FROST.verification_key;
+    }
   | Transaction_proposal of { epoch : int; hash : string }
 
-type signing_ceremony = {
-  status : sign_status;
+type signature = {
+  state : sign_state;
   epoch : epoch;
   packet : packet;
-  last_participant : Address.t;
+  last_participant : FROST.Identifier.t option;
   selection : ParticipantSet.t;
   deadline : int;
 }
@@ -183,82 +114,147 @@ type state = {
   block : int;
   active_epoch : epoch;
   rollover : rollover;
-  preprocess : preprocess_group StringMap.t;
-  signing_ceremonies : signing_ceremony StringMap.t;
+  preprocess : preprocess_group GroupMap.t local;
+  signatures : signature StringMap.t;
 }
-(** The validator state. *)
+
+type transaction = {
+  chain_id : int;
+  account : Address.t;
+  to_ : Address.t;
+  value : int;
+  operation : [ `Call | `Delegatecall ];
+  data : string;
+  nonce : int;
+}
 
 (** Create a validator parameterized over some configuration. *)
 module MakeValidator (Configuration : sig
-  val account : Secp256k1.secret_key
+  val account : Address.t
   val blocks_per_epoch : int
-  val all_participants : Address.t list
+  val all_participants : AddressSet.t
   val consensus : Address.t
   val nonces_chunk_size : int
   val min_remaining_nonces : int
   val key_gen_block_timeout : int
-  val signing_ceremony_block_timeout : int
+  val signing_block_timeout : int
+  val validate_transaction : transaction -> bool
 end) =
 struct
   let () =
     if Configuration.(min_remaining_nonces > nonces_chunk_size) then
       failwith "invalid configuration"
 
-  let assert_assumption c m = if c then () else failwith m
-  let account_address = Secp256k1.addr Configuration.account
+  let participant_identifier participants address =
+    let left, present, _ = AddressSet.split address participants in
+    if present then
+      Some (FROST.Identifier.of_int (1 + AddressSet.cardinal left))
+    else None
 
-  let group_parameters participants =
-    let count = ParticipantSet.cardinal participants in
-    assert_assumption (count >= 2)
-      "we always have at least 2 functioning validators";
-    let threshold = (count / 2) + 1 in
-    (count, threshold)
+  let participant_address participants identifier =
+    let i = FROST.Identifier.to_int identifier - 1 in
+    List.nth (AddressSet.to_list participants) i
+
+  let participants_tree participants =
+    AddressSet.to_list participants
+    |> List.mapi (fun i a -> (FROST.Identifier.of_int (i + 1), a))
+
+  let participant_identifiers participants =
+    participants_tree participants |> List.map (fun (id, _) -> id)
+
+  let participant_set participants =
+    ParticipantSet.of_list @@ participant_identifiers participants
+
+  let remove_missing_participants participants items =
+    let missing =
+      participants_tree participants
+      |> ParticipantMap.of_list
+      |> ParticipantMap.fold
+           (fun id _ missing -> ParticipantMap.remove id missing)
+           items
+    in
+    ParticipantMap.fold
+      (fun _ address remaining -> AddressSet.remove address remaining)
+      missing participants
+
+  let participanting_selection items =
+    ParticipantMap.fold
+      (fun id _ set -> ParticipantSet.add id set)
+      items ParticipantSet.empty
+
+  let group_threshold count =
+    let ( /^ ) q d = (q + d - 1) / d in
+    (* For our consensus to never get stuck due to dishonest participants, we
+       require more than 2/3rds of the total participant set to participate. Any
+       less and dishonest participants can be a majority in any group if you
+       consider intermittent failures from honest participants. *)
+    let min_count =
+      ((2 * AddressSet.cardinal Configuration.all_participants) + 1) /^ 3
+    in
+    if count >= min_count then Some ((count / 2) + 1) else None
+
+  let compute_group_id participants count threshold context =
+    let participants_root =
+      ParticipantMTree.root @@ participants_tree participants
+    in
+    Abi.encode
+      [
+        `Bytes32 participants_root;
+        `Uint64 count;
+        `Uint64 threshold;
+        `Bytes32 context;
+      ]
+    |> Keccak256.hash |> GroupId.of_string
 
   let key_gen_context epoch =
     let version = 0 in
     Abi.encode_packed
-      [ `Uint32; `Address; `Uint64 ]
-      (version, Configuration.consensus, epoch)
+      [ `Uint32 version; `Address Configuration.consensus; `Uint64 epoch ]
 
   let key_gen_and_commit state participants =
     let epoch = 1 + (state.block / Configuration.blocks_per_epoch) in
-    let count, threshold = group_parameters participants in
-    let context = key_gen_context epoch in
-    let coefficients =
-      List.init threshold (fun _ -> Secp256k1.random_scalar ())
+    let identifier =
+      participant_identifier participants Configuration.account
     in
-    let state' =
-      {
-        state with
-        rollover =
-          Collecting_key_gen_commitments
-            {
-              epoch;
-              id =
-                FROSTCoordinator.group_id participants count threshold context;
-              commitments = IntMap.empty;
-              coefficients;
-              participants;
-              deadline = state.block + Configuration.key_gen_block_timeout;
-            };
-      }
-    in
-    let identifier = ParticipantSet.identifier participants account_address in
-    let proof = MerkleTree.proof participants account_address in
-    let commitments = FROST.key_gen_commit coefficients in
-    let actions =
-      [
-        `Coordinator_key_gen_and_commit
-          ( MerkleTree.root participants,
-            count,
-            threshold,
-            context,
-            identifier,
-            proof,
-            commitments );
-      ]
-    in
-    (state', actions)
+    let count = AddressSet.cardinal participants in
+    match (identifier, group_threshold count) with
+    | Some identifier, Some threshold ->
+        let context = key_gen_context epoch in
+        let coefficients = FROST.KeyGen.random_coefficients threshold in
+        let state' =
+          {
+            state with
+            rollover =
+              Collecting_key_gen_commitments
+                {
+                  epoch;
+                  group = compute_group_id participants count threshold context;
+                  participants;
+                  commitments = ParticipantMap.empty;
+                  coefficients = Local coefficients;
+                  deadline = state.block + Configuration.key_gen_block_timeout;
+                };
+          }
+        in
+        let participants' = participants_tree participants in
+        let actions =
+          [
+            `Coordinator_key_gen_and_commit
+              ( ParticipantMTree.root participants',
+                count,
+                threshold,
+                context,
+                identifier,
+                ParticipantMTree.proof
+                  (identifier, Configuration.account)
+                  participants',
+                FROST.KeyGen.commit coefficients );
+          ]
+        in
+        (state', actions)
+    | _ ->
+        let state' = { state with rollover = Skipped { epoch } } in
+        (state', [])
 
   let rollover_block epoch = epoch * Configuration.blocks_per_epoch
 
@@ -268,19 +264,18 @@ struct
          if they were previously misbahaving. In the future, the participant
          selection can be stricter and inspect onchain state of the staking
          contract. *)
-      let all_participants =
-        Configuration.all_participants |> ParticipantSet.init
-      in
-      key_gen_and_commit st all_participants
+      key_gen_and_commit st Configuration.all_participants
     in
     match state.rollover with
-    (* The previous KeyGen ceremony took too long, try again. *)
+    (* The previous KeyGen ceremony took too long or was skipped, try again. *)
     | Collecting_key_gen_commitments { epoch; _ }
     | Collecting_key_gen_secret_shares { epoch; _ }
-    | Signing_epoch_rollover { epoch = { id = epoch; _ }; _ }
+    | Signing_epoch_rollover { epoch = { epoch; _ }; _ }
+    | Skipped { epoch }
       when rollover_block epoch = state.block ->
         key_gen_and_commit_with_all state
-    | Staged_epoch staged when rollover_block staged.id = state.block ->
+    | Staged_epoch { epoch = staged }
+      when rollover_block staged.epoch = state.block ->
         let state' = { state with active_epoch = staged } in
         key_gen_and_commit_with_all state'
     | _ -> (state, [])
@@ -290,39 +285,70 @@ struct
     | Collecting_key_gen_commitments { participants; deadline; commitments; _ }
       when deadline = state.block ->
         let participants' =
-          ParticipantSet.remove_missing participants commitments
+          remove_missing_participants participants commitments
         in
         key_gen_and_commit state participants'
-    | Collecting_key_gen_secret_shares { participants; deadline; shares; _ }
+    | Collecting_key_gen_secret_shares
+        { participants; deadline; shares = Local shares; _ }
       when deadline = state.block ->
-        let participants' = ParticipantSet.remove_missing participants shares in
+        let participants' = remove_missing_participants participants shares in
         key_gen_and_commit state participants'
     | _ -> (state, [])
 
   let key_gen_commitment state group_id identifier commitment =
     match state.rollover with
     | Collecting_key_gen_commitments
-        { epoch; id; coefficients; commitments; participants; deadline }
-      when id == group_id ->
-        if FROST.key_gen_verify_proof commitment then
-          let commitments' = IntMap.add identifier commitment.c commitments in
+        {
+          epoch;
+          group;
+          coefficients = Local coefficients;
+          commitments;
+          participants;
+          deadline;
+        }
+      when GroupId.equal group group_id ->
+        if FROST.KeyGen.verify_proof commitment then
+          let commitments' =
+            ParticipantMap.add identifier commitment commitments
+          in
           if
-            ParticipantSet.cardinal participants == IntMap.cardinal commitments'
+            AddressSet.cardinal participants
+            == ParticipantMap.cardinal commitments'
           then
-            let me = ParticipantSet.identifier participants account_address in
-            let self, shares =
-              FROST.key_gen_secret_shares me coefficients commitments'
+            let me =
+              participant_identifier participants Configuration.account
+              |> Option.get
             in
-            let key = FROST.key_gen_group_public_key commitments' in
+            let shares =
+              FROST.KeyGen.secret_shares coefficients
+                (participant_identifiers participants)
+              |> ParticipantMap.of_list
+            in
+            let shares = ParticipantMap.(singleton me (find me shares)) in
+            let encrypted_shares =
+              ParticipantMap.(remove me shares)
+              |> ParticipantMap.to_list
+              |> List.map (fun (id, share) ->
+                  let participant_commitments =
+                    ParticipantMap.find id commitments'
+                  in
+                  FROST.KeyGen.encrypt_secret_share coefficients
+                    participant_commitments share)
+            in
+            let key =
+              FROST.KeyGen.group_public_key
+                (ParticipantMap.to_list commitments')
+            in
             let rollover' =
               Collecting_key_gen_secret_shares
                 {
                   epoch;
-                  id;
+                  group;
                   key;
+                  coefficients = Local coefficients;
                   commitments;
-                  shares = IntMap.(add me self empty);
-                  last_participant = ParticipantSet.addr participants identifier;
+                  shares = Local shares;
+                  last_participant = identifier;
                   participants;
                   deadline = state.block + Configuration.key_gen_block_timeout;
                 }
@@ -330,19 +356,19 @@ struct
             ( { state with rollover = rollover' },
               [
                 `Coordinator_key_gen_secret_share_with_callback
-                  ( id,
-                    shares,
+                  ( group,
+                    encrypted_shares,
                     ( Configuration.consensus,
-                      Abi.encode [ `Uint64; `Uint64 ]
-                        (epoch, rollover_block epoch) ) );
+                      Abi.encode
+                        [ `Uint64 epoch; `Uint64 (rollover_block epoch) ] ) );
               ] )
           else
             let rollover' =
               Collecting_key_gen_commitments
                 {
                   epoch;
-                  id;
-                  coefficients;
+                  group;
+                  coefficients = Local coefficients;
                   commitments = commitments';
                   participants;
                   deadline;
@@ -350,7 +376,8 @@ struct
             in
             ({ state with rollover = rollover' }, [])
         else
-          let participants' = ParticipantSet.remove participants identifier in
+          let address = participant_address participants identifier in
+          let participants' = AddressSet.remove address participants in
           key_gen_and_commit state participants'
     | _ -> (state, [])
 
@@ -359,267 +386,272 @@ struct
     | Collecting_key_gen_secret_shares
         {
           epoch;
-          id;
+          group;
           key;
+          coefficients = Local coefficients;
           commitments;
-          shares;
+          shares = Local shares;
           last_participant;
           participants;
           deadline;
         }
-      when id == group_id -> begin
-        let me = ParticipantSet.identifier participants account_address in
-        match
-          FROST.key_gen_get_secret_share me identifier commitments secret_shares
-        with
-        | Some my_share ->
-            let shares' = IntMap.add identifier my_share shares in
-            if ParticipantSet.cardinal participants == IntMap.cardinal shares'
-            then
-              let share = FROST.key_gen_participant_secret me shares' in
-              let epoch =
-                {
-                  id = epoch;
-                  group = { id = group_id; participants; key; share };
-                }
-              in
-              let packet =
-                Epoch_rollover
+      when group == group_id -> begin
+        let me =
+          participant_identifier participants Configuration.account
+          |> Option.get
+        in
+        let participant_commitments =
+          ParticipantMap.find identifier commitments
+        in
+        let secret_share =
+          let i =
+            FROST.Identifier.to_int me
+            - if FROST.Identifier.compare me identifier < 0 then 1 else 2
+          in
+          let encrypted = List.nth secret_shares i in
+          FROST.KeyGen.decrypt_secret_share coefficients participant_commitments
+            encrypted
+        in
+        if FROST.KeyGen.verify_secret_share participant_commitments secret_share
+        then
+          let shares' = ParticipantMap.add identifier secret_share shares in
+          if AddressSet.cardinal participants == ParticipantMap.cardinal shares'
+          then
+            let share =
+              FROST.KeyGen.signing_share (ParticipantMap.to_list shares')
+            in
+            let epoch =
+              {
+                epoch;
+                group =
                   {
-                    epoch = epoch.id;
-                    rollover = rollover_block epoch.id;
-                    group_id;
-                  }
-              in
-              let message = Abi.hash_typed_data packet in
-              let rollover' = Signing_epoch_rollover { epoch; message } in
-              let signing_ceremonies' =
-                StringMap.add message
-                  {
-                    status =
-                      Waiting_for_sign_request
-                        {
-                          responsible =
-                            ParticipantSet.addr participants identifier;
-                        };
-                    epoch = state.active_epoch;
-                    packet;
-                    last_participant =
-                      ParticipantSet.addr participants identifier;
-                    selection = state.active_epoch.group.participants;
-                    deadline =
-                      state.block + Configuration.signing_ceremony_block_timeout;
-                  }
-                  state.signing_ceremonies
-              in
-
-              let state' =
-                {
-                  state with
-                  rollover = rollover';
-                  signing_ceremonies = signing_ceremonies';
-                }
-              in
-
-              (state', [])
-            else
-              let rollover' =
-                Collecting_key_gen_secret_shares
-                  {
-                    epoch;
-                    id;
+                    id = group;
+                    participants = participant_set participants;
                     key;
-                    commitments;
-                    shares = shares';
-                    last_participant;
-                    participants;
-                    deadline;
-                  }
-              in
-              ({ state with rollover = rollover' }, [])
-        | None ->
-            let participants' = ParticipantSet.remove participants identifier in
-            key_gen_and_commit state participants'
+                    me = Local me;
+                    share = Local share;
+                  };
+              }
+            in
+            let packet =
+              Epoch_rollover
+                {
+                  epoch = epoch.epoch;
+                  rollover = rollover_block epoch.epoch;
+                  group_key = key;
+                }
+            in
+            let message = Abi.hash_typed_data packet in
+            let rollover' = Signing_epoch_rollover { epoch; message } in
+            let signatures' =
+              StringMap.add message
+                {
+                  state =
+                    Waiting_for_sign_request { responsible = Some identifier };
+                  epoch = state.active_epoch;
+                  packet;
+                  last_participant = Some last_participant;
+                  selection = state.active_epoch.group.participants;
+                  deadline = state.block + Configuration.signing_block_timeout;
+                }
+                state.signatures
+            in
+
+            let state' =
+              { state with rollover = rollover'; signatures = signatures' }
+            in
+
+            (state', [])
+          else
+            let rollover' =
+              Collecting_key_gen_secret_shares
+                {
+                  epoch;
+                  group;
+                  key;
+                  coefficients = Local coefficients;
+                  commitments;
+                  shares = Local shares';
+                  last_participant;
+                  participants;
+                  deadline;
+                }
+            in
+            ({ state with rollover = rollover' }, [])
+        else
+          let address = participant_address participants identifier in
+          let participants' = AddressSet.remove address participants in
+          key_gen_and_commit state participants'
       end
     | _ -> (state, [])
 
   let preprocess state group_id chunk nonces_commitments =
+    let (Local preprocess) = state.preprocess in
     let state' =
-      match StringMap.find_opt group_id state.preprocess with
-      | Some preprocess_group -> begin
-          match
-            StringMap.find_opt nonces_commitments preprocess_group.pending
-          with
-          | Some nonces ->
-              let pending' =
-                StringMap.remove nonces_commitments preprocess_group.pending
-              in
-              let nonces', _ =
-                List.fold_left
-                  (fun (nonces', sequence) n ->
-                    (IntMap.add sequence n nonces', sequence + 1))
-                  ( preprocess_group.nonces,
-                    chunk * Configuration.nonces_chunk_size )
-                  nonces
-              in
-              let preprocess_group' =
-                { pending = pending'; nonces = nonces' }
-              in
-              let preprocess' =
-                StringMap.add group_id preprocess_group' state.preprocess
-              in
-              { state with preprocess = preprocess' }
-          | None -> state
-        end
-      | None -> state
+      match GroupMap.find_opt group_id preprocess with
+      | Some { nonces; pending = Some pending }
+        when nonces_commitments = NoncesMTree.root pending ->
+          let starting_sequence = chunk * Configuration.nonces_chunk_size in
+          let nonces' =
+            List.fold_left
+              (fun nonces' (offset, n) ->
+                let sequence = starting_sequence + offset in
+                let proof = NoncesMTree.proof (offset, n) pending in
+                IntMap.add sequence (n, proof) nonces')
+              nonces pending
+          in
+          let preprocess' =
+            GroupMap.add group_id
+              { nonces = nonces'; pending = None }
+              preprocess
+          in
+          { state with preprocess = Local preprocess' }
+      | _ -> state
     in
     (state', [])
 
+  let signing_ceremony_nonce state group sequence =
+    let (Local preprocess) = state.preprocess in
+    match GroupMap.find_opt group.id preprocess with
+    | Some { nonces; pending } ->
+        let _, entry, nonces' = IntMap.split sequence nonces in
+        let pending', actions =
+          if
+            IntMap.cardinal nonces' < Configuration.min_remaining_nonces
+            && Option.is_none pending
+          then
+            let (Local share) = group.share in
+            let nonces_chunk =
+              List.init Configuration.nonces_chunk_size (fun offset ->
+                  (offset, FROST.generate_nonces share))
+            in
+            let nonces_commitment = NoncesMTree.root nonces_chunk in
+            let pending' = Some nonces_chunk in
+            (pending', [ `Coordinator_preprocess (group.id, nonces_commitment) ])
+          else (pending, [])
+        in
+        let preprocess' =
+          GroupMap.add group.id
+            { nonces = nonces'; pending = pending' }
+            preprocess
+        in
+        let state' = { state with preprocess = Local preprocess' } in
+        (entry, state', actions)
+    | None -> (None, state, [])
+
   let signing_ceremony_request state group_id message signature_id sequence =
-    match StringMap.find_opt message state.signing_ceremonies with
-    | Some signing_ceremony when signing_ceremony.epoch.group.id == group_id ->
-      begin
-        match signing_ceremony.status with
+    match StringMap.find_opt message state.signatures with
+    | Some signature when signature.epoch.group.id == group_id -> begin
+        match signature.state with
         | Waiting_for_sign_request _ -> begin
-            let signing_ceremony' =
+            let signature' =
               {
-                signing_ceremony with
-                status =
+                signature with
+                state =
                   Collecting_sign_nonces
-                    { id = signature_id; nonces = IntMap.empty };
-                deadline =
-                  state.block + Configuration.signing_ceremony_block_timeout;
+                    { id = signature_id; nonces = ParticipantMap.empty };
+                deadline = state.block + Configuration.signing_block_timeout;
               }
             in
-            let signing_ceremonies' =
-              StringMap.add message signing_ceremony' state.signing_ceremonies
+            let signatures' =
+              StringMap.add message signature' state.signatures
             in
-            let state' =
-              { state with signing_ceremonies = signing_ceremonies' }
+            let state' = { state with signatures = signatures' } in
+            let nonces, state', actions =
+              signing_ceremony_nonce state' signature.epoch.group sequence
             in
-            let preprocess_group =
-              StringMap.find_opt group_id state.preprocess
-            in
-            match
-              Option.bind preprocess_group (fun { nonces; _ } ->
-                  let _, n, rest = IntMap.split sequence nonces in
-                  Option.map (fun n -> (n, rest)) n)
-            with
-            | Some (n, preprocess_group_nonces') ->
-                let preprocess_group = Option.get preprocess_group in
-
-                let pending', actions_preprocess =
-                  if
-                    IntMap.cardinal preprocess_group_nonces'
-                    < Configuration.min_remaining_nonces
-                    && StringMap.is_empty preprocess_group.pending
-                  then
-                    let nonces_chunk =
-                      List.init Configuration.nonces_chunk_size (fun _ ->
-                          FROST.preprocess_generate_nonce
-                            signing_ceremony.epoch.group.share)
-                    in
-                    let nonces_commitment = MerkleTree.root nonces_chunk in
-                    let pending' =
-                      StringMap.add nonces_commitment nonces_chunk
-                        preprocess_group.pending
-                    in
-                    ( pending',
-                      [ `Coordinator_preprocess (group_id, nonces_commitment) ]
-                    )
-                  else (preprocess_group.pending, [])
-                in
-
-                let preprocess_group' =
-                  { nonces = preprocess_group_nonces'; pending = pending' }
-                in
-                let preprocess' =
-                  StringMap.add group_id preprocess_group' state'.preprocess
-                in
-                let state' = { state' with preprocess = preprocess' } in
-                let proof = MerkleTree.proof preprocess_group_nonces' in
-
+            match nonces with
+            | Some (nonces, proof) ->
                 ( state',
-                  `Coordinator_sign_reveal_nonces (n, proof)
-                  :: actions_preprocess )
-            | None -> (state', [])
+                  `Coordinator_sign_reveal_nonces (nonces, proof) :: actions )
+            | None -> (state', actions)
           end
         | _ -> (state, [])
       end
     | _ -> (state, [])
 
-  let sign_share_with_callback signing_ceremony message signature_id nonces =
-    let me =
-      ParticipantSet.identifier signing_ceremony.selection account_address
+  let sign_share_with_callback signature message signature_id nonces =
+    let { key; me = Local me; share = Local share; _ } =
+      signature.epoch.group
     in
-    let group_commitment, share_commitment =
-      FROST.signature_commitments me nonces
+    let signature_share, group_commitment, verification_shares =
+      FROST.signature_share me share message key (ParticipantMap.to_list nonces)
     in
-    let share, root =
-      FROST.signature_share signing_ceremony.epoch.group.share me message nonces
+    let _, share_commitment, lagrange_coefficient =
+      List.find
+        (fun (id, _, _) -> FROST.Identifier.equal me id)
+        verification_shares
     in
-    let status' =
+    let verification_tree =
+      List.map
+        (fun (id, ri, l) -> (id, ri, l, group_commitment))
+        verification_shares
+    in
+    let root = VerificationMTree.root verification_tree in
+    let state' =
       Collecting_sign_shares
-        { id = signature_id; root; group_commitment; shares = IntMap.empty }
+        {
+          id = signature_id;
+          root;
+          group_commitment;
+          shares = ParticipantMap.empty;
+        }
     in
-    let proof = MerkleTree.proof root share_commitment in
+    let proof =
+      VerificationMTree.proof
+        (me, share_commitment, lagrange_coefficient, group_commitment)
+    in
     let callback_context =
-      match signing_ceremony.packet with
+      match signature.packet with
       | Epoch_rollover { epoch; rollover; _ } ->
-          Abi.encode_with_selector `Consensus_propose_epoch [ `Uint64; `Uint64 ]
-            (epoch, rollover)
+          Abi.encode_call "proposeEpoch" [ `Uint64 epoch; `Uint64 rollover ]
       | Transaction_proposal { epoch; hash } ->
-          Abi.encode_with_selector `Consensus_attest_transaction
-            [ `Uint64; `Bytes32 ] (epoch, hash)
+          Abi.encode_call "attestTransaction" [ `Uint64 epoch; `Bytes32 hash ]
     in
-    ( status',
+    ( state',
       `Coordinator_sign_share_with_callback
         ( signature_id,
           (share_commitment, root),
-          share,
+          signature_share,
           proof,
           (Configuration.consensus, callback_context) ) )
 
   let signing_ceremony_reveal_nonce state signature_id identifier
       nonces_commitments =
     match
-      List.find_map (fun (message, signing_ceremony) ->
-          match signing_ceremony.status with
+      List.find_map (fun (message, signature) ->
+          match signature.state with
           | Collecting_sign_nonces { id; nonces } when id == signature_id ->
-              Some (message, signing_ceremony, nonces)
+              Some (message, signature, nonces)
           | _ -> None)
-      @@ StringMap.to_list state.signing_ceremonies
+      @@ StringMap.to_list state.signatures
     with
-    | Some (message, signing_ceremony, nonces) ->
-        let nonces' = IntMap.add identifier nonces_commitments nonces in
-        let status', actions =
+    | Some (message, signature, nonces) ->
+        let nonces' = ParticipantMap.add identifier nonces_commitments nonces in
+        let state', actions =
           if
-            IntMap.cardinal nonces'
-            = ParticipantSet.cardinal signing_ceremony.selection
+            ParticipantMap.cardinal nonces'
+            = ParticipantSet.cardinal signature.selection
           then
-            let status', action =
-              sign_share_with_callback signing_ceremony message signature_id
-                nonces'
+            let state', action =
+              sign_share_with_callback signature message signature_id nonces'
             in
-            (status', [ action ])
+            (state', [ action ])
           else
-            let status' =
+            let state' =
               Collecting_sign_nonces { id = signature_id; nonces = nonces' }
             in
-            (status', [])
+            (state', [])
         in
-        let signing_ceremony' =
+        let signature' =
           {
-            signing_ceremony with
-            status = status';
-            deadline =
-              state.block + Configuration.signing_ceremony_block_timeout;
+            signature with
+            state = state';
+            deadline = state.block + Configuration.signing_block_timeout;
           }
         in
-        let signing_ceremonies' =
-          StringMap.add message signing_ceremony' state.signing_ceremonies
-        in
-        let state' = { state with signing_ceremonies = signing_ceremonies' } in
+        let signatures' = StringMap.add message signature' state.signatures in
+        let state' = { state with signatures = signatures' } in
         (state', actions)
     | None -> (state, [])
 
@@ -627,30 +659,26 @@ struct
       binding_root =
     let state' =
       match
-        List.find_map (fun (message, signing_ceremony) ->
-            match signing_ceremony.status with
+        List.find_map (fun (message, signature) ->
+            match signature.state with
             | Collecting_sign_shares { id; root; group_commitment; shares }
               when id == signature_id && root == binding_root ->
-                Some (message, signing_ceremony, group_commitment, shares)
+                Some (message, signature, group_commitment, shares)
             | _ -> None)
-        @@ StringMap.to_list state.signing_ceremonies
+        @@ StringMap.to_list state.signatures
       with
-      | Some (message, signing_ceremony, group_commitment, shares) ->
-          let shares' = IntMap.add identifier signature_share shares in
-          let status' =
+      | Some (message, signature, group_commitment, shares) ->
+          let shares' = ParticipantMap.add identifier signature_share shares in
+          let state' =
             if
-              IntMap.cardinal shares'
-              = ParticipantSet.cardinal signing_ceremony.selection
+              ParticipantMap.cardinal shares'
+              = ParticipantSet.cardinal signature.selection
             then
-              let status' =
+              let state' =
                 Waiting_for_consensus_attestation
-                  {
-                    id = signature_id;
-                    responsible =
-                      ParticipantSet.addr signing_ceremony.selection identifier;
-                  }
+                  { id = signature_id; responsible = Some identifier }
               in
-              status'
+              state'
             else
               Collecting_sign_shares
                 {
@@ -660,209 +688,237 @@ struct
                   shares = shares';
                 }
           in
-          let signing_ceremony' =
+          let signature' =
             {
-              signing_ceremony with
-              status = status';
-              deadline =
-                state.block + Configuration.signing_ceremony_block_timeout;
+              signature with
+              state = state';
+              deadline = state.block + Configuration.signing_block_timeout;
             }
           in
-          let signing_ceremonies' =
-            StringMap.add message signing_ceremony' state.signing_ceremonies
-          in
-          let state' =
-            { state with signing_ceremonies = signing_ceremonies' }
-          in
+          let signatures' = StringMap.add message signature' state.signatures in
+          let state' = { state with signatures = signatures' } in
           state'
       | None -> state
     in
     (state', [])
 
-  let signing_ceremonies_wait state =
-    let signing_ceremonies', actions =
+  let signatures_wait state =
+    let signatures', actions =
       StringMap.fold
-        (fun message signing_ceremony (signing_ceremonies, actions) ->
-          let signing_ceremony', actions =
-            if signing_ceremony.deadline = state.block then (
+        (fun message signature (signatures, actions) ->
+          let signature', actions =
+            if signature.deadline = state.block then begin
               let selection' =
-                match signing_ceremony.status with
+                match signature.state with
                 | Collecting_sign_nonces { nonces; _ } ->
-                    ParticipantSet.remove_missing signing_ceremony.selection
-                      nonces
+                    participanting_selection nonces
                 | Collecting_sign_shares { shares; _ } ->
-                    ParticipantSet.remove_missing signing_ceremony.selection
-                      shares
+                    participanting_selection shares
                 | Waiting_for_sign_request { responsible }
-                | Waiting_for_consensus_attestation { responsible; _ } ->
-                    ParticipantSet.remove signing_ceremony.selection responsible
+                | Waiting_for_consensus_attestation { responsible; _ } -> (
+                    match responsible with
+                    | Some responsible ->
+                        ParticipantSet.remove responsible signature.selection
+                    | None -> ParticipantSet.empty)
               in
-              let _, threshold =
-                group_parameters signing_ceremony.epoch.group.participants
+              let threshold =
+                group_threshold
+                @@ ParticipantSet.cardinal signature.epoch.group.participants
+                |> Option.get
               in
-              assert_assumption
-                (ParticipantSet.cardinal selection' >= threshold)
-                "we always have an honest majority of participants.";
-
-              let status', action =
-                match signing_ceremony.status with
-                | Waiting_for_consensus_attestation { id = signature_id; _ } ->
-                    (* As an optimization, we just re-attest if we already have
+              let insufficient_signers =
+                ParticipantSet.cardinal selection' < threshold
+              in
+              if insufficient_signers then
+                (* If we don't have enough signers for a ceremony, we need to
+                   drop the signature request. *)
+                (None, [])
+              else
+                let state', action, actor =
+                  match signature.state with
+                  | Waiting_for_consensus_attestation { id = signature_id; _ }
+                    ->
+                      (* As an optimization, we just re-attest if we already have
                        a valid signature but the responsible participant did not
                        do it in time. The punishment for doing this is foregoing
                        rewards for that attestation. *)
-                    let status' =
-                      Waiting_for_consensus_attestation
-                        {
-                          id = signature_id;
-                          responsible = signing_ceremony.last_participant;
-                        }
-                    in
-                    (* The actual attestation action depends on the packet we are
+                      let state' =
+                        Waiting_for_consensus_attestation
+                          {
+                            id = signature_id;
+                            responsible = signature.last_participant;
+                          }
+                      in
+                      (* The actual attestation action depends on the packet we are
                        attesting to. *)
-                    let action =
-                      match signing_ceremony.packet with
-                      | Epoch_rollover { epoch; rollover; group_id } ->
-                          `Consensus_stage_epoch
-                            (epoch, rollover, group_id, signature_id)
-                      | Transaction_proposal { epoch; hash } ->
-                          `Consensus_attest_transaction
-                            (epoch, hash, signature_id)
-                    in
-                    (status', action)
-                | Collecting_sign_nonces { id; nonces; _ } ->
-                    (* Continue the signing process with only the participants
+                      let action =
+                        match signature.packet with
+                        | Epoch_rollover { epoch; rollover; group_key } ->
+                            `Consensus_stage_epoch
+                              (epoch, rollover, group_key, signature_id)
+                        | Transaction_proposal { epoch; hash } ->
+                            `Consensus_attest_transaction
+                              (epoch, hash, signature_id)
+                      in
+                      (state', action, signature.last_participant)
+                  | Collecting_sign_nonces { id; nonces; _ } ->
+                      (* Continue the signing process with only the participants
                        which provided nonces. Note that this is sound given the
                        asserted assumption above - i.e. we always have a
                        threshold of well-behaving signers. *)
-                    sign_share_with_callback signing_ceremony message id nonces
-                | _ ->
-                    ( Waiting_for_sign_request
-                        { responsible = signing_ceremony.last_participant },
-                      `Coordinator_sign
-                        (signing_ceremony.epoch.group.id, message) )
-              in
-              let signing_ceremony' =
-                {
-                  signing_ceremony with
-                  status = status';
-                  last_participant = account_address;
-                  selection = selection';
-                  deadline =
-                    state.block + Configuration.signing_ceremony_block_timeout;
-                }
-              in
-              let actions' =
-                if
-                  Address.equal signing_ceremony.last_participant
-                    account_address
-                then action :: actions
-                else actions
-              in
-              (signing_ceremony', actions'))
-            else (signing_ceremony, actions)
+                      let state', action =
+                        sign_share_with_callback signature message id nonces
+                      in
+                      (state', action, None)
+                  | _ ->
+                      ( Waiting_for_sign_request
+                          { responsible = signature.last_participant },
+                        `Coordinator_sign (signature.epoch.group.id, message),
+                        signature.last_participant )
+                in
+                let signature' =
+                  {
+                    signature with
+                    state = state';
+                    last_participant = None;
+                    selection = selection';
+                    deadline = state.block + Configuration.signing_block_timeout;
+                  }
+                in
+                let (Local me) = signature.epoch.group.me in
+                let actions' =
+                  match actor with
+                  | None -> action :: actions
+                  | Some address when FROST.Identifier.equal address me ->
+                      action :: actions
+                  | _ -> actions
+                in
+                (Some signature', actions')
+            end
+            else (Some signature, actions)
           in
-          let signing_ceremonies' =
-            StringMap.add message signing_ceremony' signing_ceremonies
+          let signatures' =
+            match signature' with
+            | Some signature' -> StringMap.add message signature' signatures
+            | None -> StringMap.remove message signatures
           in
-          (signing_ceremonies', actions))
-        state.signing_ceremonies (StringMap.empty, [])
+          (signatures', actions))
+        state.signatures (StringMap.empty, [])
     in
-    let state' = { state with signing_ceremonies = signing_ceremonies' } in
+    let state' = { state with signatures = signatures' } in
     (state', actions)
 
   let epoch_staged state proposed_epoch =
     match state.rollover with
-    | Signing_epoch_rollover { epoch; message } when epoch.id == proposed_epoch
-      ->
-        let rollover' = Staged_epoch epoch in
+    | Signing_epoch_rollover { epoch; message }
+      when epoch.epoch == proposed_epoch ->
+        let rollover' = Staged_epoch { epoch } in
+        let (Local share) = epoch.group.share in
         let nonces_chunk =
-          List.init Configuration.nonces_chunk_size (fun _ ->
-              FROST.preprocess_generate_nonce epoch.group.share)
+          List.init Configuration.nonces_chunk_size (fun offset ->
+              (offset, FROST.generate_nonces share))
         in
-        let nonces_commitment = MerkleTree.root nonces_chunk in
+        let nonces_commitment = NoncesMTree.root nonces_chunk in
+        let (Local preprocess) = state.preprocess in
         let preprocess' =
-          StringMap.add epoch.group.id
-            {
-              nonces = IntMap.empty;
-              pending =
-                StringMap.add nonces_commitment nonces_chunk StringMap.empty;
-            }
-            state.preprocess
+          GroupMap.add epoch.group.id
+            { nonces = IntMap.empty; pending = Some nonces_chunk }
+            preprocess
         in
-        let signing_ceremonies' =
-          StringMap.remove message state.signing_ceremonies
-        in
+        let signatures' = StringMap.remove message state.signatures in
         let state' =
           {
             state with
             rollover = rollover';
-            preprocess = preprocess';
-            signing_ceremonies = signing_ceremonies';
+            preprocess = Local preprocess';
+            signatures = signatures';
           }
         in
         (state', [ `Coordinator_preprocess (epoch.group.id, nonces_commitment) ])
     | _ -> (state, [])
 
-  let validate_transaction _ =
-    (* TBD. *)
-    true
-
   let transaction_proposed state message transaction_hash epoch transaction =
-    if epoch == state.active_epoch.id && validate_transaction transaction then
-      let signing_ceremonies' =
+    if
+      epoch == state.active_epoch.epoch
+      && Configuration.validate_transaction transaction
+    then
+      let signatures' =
         StringMap.add message
           {
-            status = Waiting_for_sign_request { responsible = account_address };
+            state = Waiting_for_sign_request { responsible = None };
             epoch = state.active_epoch;
             packet = Transaction_proposal { epoch; hash = transaction_hash };
-            last_participant = account_address;
+            last_participant = None;
             selection = state.active_epoch.group.participants;
-            deadline =
-              state.block + Configuration.signing_ceremony_block_timeout;
+            deadline = state.block + Configuration.signing_block_timeout;
           }
-          state.signing_ceremonies
+          state.signatures
       in
-      let state' = { state with signing_ceremonies = signing_ceremonies' } in
+      let state' = { state with signatures = signatures' } in
       (state', [])
     else (state, [])
 
   let transaction_attested state message =
-    let signing_ceremonies' =
-      StringMap.remove message state.signing_ceremonies
+    let signatures' = StringMap.remove message state.signatures in
+    ({ state with signatures = signatures' }, [])
+
+  let garbage_collect state =
+    let groups = GroupSet.singleton state.active_epoch.group.id in
+    let groups =
+      match state.rollover with
+      | Staged_epoch { epoch } -> GroupSet.add epoch.group.id groups
+      | _ -> groups
     in
-    ({ state with signing_ceremonies = signing_ceremonies' }, [])
+    let groups =
+      StringMap.fold
+        (fun _ signature groups -> GroupSet.add signature.epoch.group.id groups)
+        state.signatures groups
+    in
+    let (Local preprocess) = state.preprocess in
+    let preprocess' =
+      GroupSet.fold
+        (fun group preprocess' ->
+          match GroupMap.find_opt group preprocess with
+          | Some p -> GroupMap.add group p preprocess'
+          | None -> preprocess')
+        groups GroupMap.empty
+    in
+    { state with preprocess = Local preprocess' }
 
   (** The state transition function for a validator. *)
-  let transition state = function
-    | `Chain_block block_number ->
-        let state' = { state with block = block_number } in
-        let state', actions_r = epoch_rollover state' in
-        let state', actions_kgw = key_gen_wait state' in
-        let state', actions_sw = signing_ceremonies_wait state' in
-        (state', actions_r @ actions_kgw @ actions_sw)
-    | `Coordinator_key_gen_committed (group_id, identifier, commitment, _) ->
-        key_gen_commitment state group_id identifier commitment
-    | `Coordinator_key_gen_secret_shared (group_id, identifier, secret_shares, _)
-      ->
-        key_gen_secret_shares state group_id identifier secret_shares
-    | `Coordinator_preprocess (group_id, _, chunk, nonces_commitment) ->
-        preprocess state group_id chunk nonces_commitment
-    | `Coordinator_sign (_, group_id, message, signature_id, sequence) ->
-        signing_ceremony_request state group_id message signature_id sequence
-    | `Coordinator_sign_revealed_nonces
-        (signature_id, identifier, nonces_commitments) ->
-        signing_ceremony_reveal_nonce state signature_id identifier
-          nonces_commitments
-    | `Coordinator_sign_shared
-        (signature_id, identifier, signature_share, binding_root) ->
-        signing_ceremony_share state signature_id identifier signature_share
-          binding_root
-    | `Consensus_epoch_staged (_, proposed_epoch, _, _) ->
-        epoch_staged state proposed_epoch
-    | `Consensus_transaction_proposed
-        (message, transaction_hash, epoch, transaction) ->
-        transaction_proposed state message transaction_hash epoch transaction
-    | `Consensus_transaction_attested message ->
-        transaction_attested state message
+  let transition state event =
+    let state', actions =
+      match event with
+      | `Chain_block block_number ->
+          let state' = { state with block = block_number } in
+          let state', actions_r = epoch_rollover state' in
+          let state', actions_kgw = key_gen_wait state' in
+          let state', actions_sw = signatures_wait state' in
+          (state', actions_r @ actions_kgw @ actions_sw)
+      | `Coordinator_key_gen_committed (group_id, identifier, commitment, _) ->
+          key_gen_commitment state group_id identifier commitment
+      | `Coordinator_key_gen_secret_shared
+          (group_id, identifier, secret_shares, _) ->
+          key_gen_secret_shares state group_id identifier secret_shares
+      | `Coordinator_preprocess (group_id, _, chunk, nonces_commitment) ->
+          preprocess state group_id chunk nonces_commitment
+      | `Coordinator_sign (_, group_id, message, signature_id, sequence) ->
+          signing_ceremony_request state group_id message signature_id sequence
+      | `Coordinator_sign_revealed_nonces
+          (signature_id, identifier, nonces_commitments) ->
+          signing_ceremony_reveal_nonce state signature_id identifier
+            nonces_commitments
+      | `Coordinator_sign_shared
+          (signature_id, identifier, signature_share, binding_root) ->
+          signing_ceremony_share state signature_id identifier signature_share
+            binding_root
+      | `Consensus_epoch_staged (_, proposed_epoch, _, _) ->
+          epoch_staged state proposed_epoch
+      | `Consensus_transaction_proposed
+          (message, transaction_hash, epoch, transaction) ->
+          transaction_proposed state message transaction_hash epoch transaction
+      | `Consensus_transaction_attested message ->
+          transaction_attested state message
+    in
+    (garbage_collect state', actions)
 end
