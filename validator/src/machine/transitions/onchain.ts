@@ -1,7 +1,9 @@
 import {
+	epochProposedEventSchema,
 	epochStagedEventSchema,
 	keyGenCommittedEventSchema,
 	keyGenConfirmedEventSchema,
+	keyGenEventSchema,
 	keyGenSecretSharedEventSchema,
 	nonceCommitmentsEventSchema,
 	nonceCommitmentsHashEventSchema,
@@ -114,6 +116,24 @@ export const logToTransition = (
 			const args = transactionAttestedEventSchema.parse(eventArgs);
 			return {
 				id: "event_transaction_attested",
+				block,
+				index,
+				...args,
+			};
+		}
+		case "KeyGen": {
+			const args = keyGenEventSchema.parse(eventArgs);
+			return {
+				id: "event_key_gen",
+				block,
+				index,
+				...args,
+			};
+		}
+		case "EpochProposed": {
+			const args = epochProposedEventSchema.parse(eventArgs);
+			return {
+				id: "event_epoch_proposed",
 				block,
 				index,
 				...args,
