@@ -313,7 +313,7 @@ struct
           in
           if
             AddressSet.cardinal participants
-            == ParticipantMap.cardinal commitments'
+            = ParticipantMap.cardinal commitments'
           then
             let me =
               participant_identifier participants Configuration.account
@@ -324,7 +324,7 @@ struct
                 (participant_identifiers participants)
               |> ParticipantMap.of_list
             in
-            let shares = ParticipantMap.(singleton me (find me shares)) in
+            let my_shares = ParticipantMap.(singleton me (find me shares)) in
             let encrypted_shares =
               ParticipantMap.(remove me shares)
               |> ParticipantMap.to_list
@@ -347,7 +347,7 @@ struct
                   key;
                   coefficients = Local coefficients;
                   commitments;
-                  shares = Local shares;
+                  shares = Local my_shares;
                   last_participant = identifier;
                   participants;
                   deadline = state.block + Configuration.key_gen_block_timeout;
@@ -395,7 +395,7 @@ struct
           participants;
           deadline;
         }
-      when group == group_id -> begin
+      when GroupId.equal group group_id -> begin
         let me =
           participant_identifier participants Configuration.account
           |> Option.get
@@ -415,7 +415,7 @@ struct
         if FROST.KeyGen.verify_secret_share participant_commitments secret_share
         then
           let shares' = ParticipantMap.add identifier secret_share shares in
-          if AddressSet.cardinal participants == ParticipantMap.cardinal shares'
+          if AddressSet.cardinal participants = ParticipantMap.cardinal shares'
           then
             let share =
               FROST.KeyGen.signing_share (ParticipantMap.to_list shares')
@@ -541,7 +541,8 @@ struct
 
   let signing_ceremony_request state group_id message signature_id sequence =
     match StringMap.find_opt message state.signatures with
-    | Some signature when signature.epoch.group.id == group_id -> begin
+    | Some signature when GroupId.equal signature.epoch.group.id group_id ->
+      begin
         match signature.state with
         | Waiting_for_sign_request _ -> begin
             let signature' =
@@ -621,7 +622,8 @@ struct
     match
       List.find_map (fun (message, signature) ->
           match signature.state with
-          | Collecting_sign_nonces { id; nonces } when id == signature_id ->
+          | Collecting_sign_nonces { id; nonces }
+            when SignatureId.equal id signature_id ->
               Some (message, signature, nonces)
           | _ -> None)
       @@ StringMap.to_list state.signatures
@@ -662,7 +664,8 @@ struct
         List.find_map (fun (message, signature) ->
             match signature.state with
             | Collecting_sign_shares { id; root; group_commitment; shares }
-              when id == signature_id && root == binding_root ->
+              when SignatureId.equal id signature_id
+                   && String.equal root binding_root ->
                 Some (message, signature, group_commitment, shares)
             | _ -> None)
         @@ StringMap.to_list state.signatures
@@ -811,7 +814,7 @@ struct
   let epoch_staged state proposed_epoch =
     match state.rollover with
     | Signing_epoch_rollover { epoch; message }
-      when epoch.epoch == proposed_epoch ->
+      when epoch.epoch = proposed_epoch ->
         let rollover' = Staged_epoch { epoch } in
         let (Local share) = epoch.group.share in
         let nonces_chunk =
@@ -839,7 +842,7 @@ struct
 
   let transaction_proposed state message transaction_hash epoch transaction =
     if
-      epoch == state.active_epoch.epoch
+      epoch = state.active_epoch.epoch
       && Configuration.validate_transaction transaction
     then
       let signatures' =
