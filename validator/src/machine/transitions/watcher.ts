@@ -55,7 +55,7 @@ export class OnchainTransitionWatcher {
 
 		if (!result) {
 			// No entries stored, lets start fresh
-			return 0n;
+			return -1n;
 		}
 		return result.lastIndexedBlock;
 	}
@@ -80,7 +80,7 @@ export class OnchainTransitionWatcher {
 				this.#onTransition(transition);
 			}
 		} catch (e: unknown) {
-			this.#logger?.error(e instanceof Error ? e : new Error("unknown error occured!"));
+			this.#logger?.error(e instanceof Error ? e : new Error(`unknown error occurred: ${String(e)}`));
 		}
 	}
 
@@ -90,7 +90,7 @@ export class OnchainTransitionWatcher {
 			this.#publicClient.watchContractEvent({
 				address: [this.#config.consensus, this.#config.coordinator],
 				abi: [...CONSENSUS_EVENTS, ...COORDINATOR_EVENTS],
-				fromBlock: lastIndexedBlock,
+				fromBlock: lastIndexedBlock + 1n,
 				onLogs: async (logs) => {
 					logs.sort((left, right) => {
 						if (left.blockNumber !== right.blockNumber) {

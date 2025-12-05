@@ -51,7 +51,7 @@ export abstract class BaseProtocol implements ShieldnetProtocol {
 			this.#actionQueue.pop();
 			this.#logger?.(`Max retry count exeeded for ${action.id}. Dropping action!`);
 			setTimeout(() => {
-				this.checkNextAction()
+				this.checkNextAction();
 			}, 1000);
 			return;
 		}
