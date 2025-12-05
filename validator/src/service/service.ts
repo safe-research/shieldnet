@@ -18,8 +18,7 @@ import { type PacketHandler, type Typed, VerificationEngine } from "../consensus
 import { EpochRolloverHandler } from "../consensus/verify/rollover/handler.js";
 import { SafeTransactionHandler } from "../consensus/verify/safeTx/handler.js";
 import { InMemoryStateStorage } from "../machine/storage/inmemory.js";
-import { logToTransition } from "../machine/transitions/onchain.js";
-import { CONSENSUS_EVENTS, COORDINATOR_EVENTS } from "../types/abis.js";
+import { OnchainTransitionWatcher } from "../machine/transitions/watcher.js";
 import { supportedChains } from "../types/chains.js";
 import type { ProtocolConfig } from "../types/interfaces.js";
 import type { Logger } from "../utils/logging.js";
@@ -30,8 +29,8 @@ export class ValidatorService {
 	#logger?: Logger;
 	#config: ProtocolConfig;
 	#publicClient: PublicClient;
+	#watcher: OnchainTransitionWatcher;
 	#stateMachine: ShieldnetStateMachine;
-	#cleanupCallbacks: (() => void)[] = [];
 
 	constructor({
 		account,
@@ -61,7 +60,7 @@ export class ValidatorService {
 		const protocol = new OnchainProtocol(
 			this.#publicClient,
 			walletClient,
-			config.conensus,
+			config.consensus,
 			config.coordinator,
 			actionStorage,
 			this.#logger?.info,
@@ -77,57 +76,23 @@ export class ValidatorService {
 			signingClient,
 			verificationEngine,
 		});
+		this.#watcher = new OnchainTransitionWatcher({
+			dbPath: ":memory:",
+			publicClient: this.#publicClient,
+			config,
+			logger,
+			onTransition: (t) => {
+				this.#stateMachine.transition(t);
+			},
+		});
 	}
 
 	async start() {
-		if (this.#cleanupCallbacks.length > 0) throw new Error("Already started!");
-		// TODO: from block should be last synced block (after state machine transition)
-		this.#cleanupCallbacks.push(
-			this.#publicClient.watchContractEvent({
-				address: [this.#config.conensus, this.#config.coordinator],
-				abi: [...CONSENSUS_EVENTS, ...COORDINATOR_EVENTS],
-				fromBlock: 0n,
-				onLogs: async (logs) => {
-					logs.sort((left, right) => {
-						if (left.blockNumber !== right.blockNumber) {
-							return left.blockNumber < right.blockNumber ? -1 : 1;
-						}
-						return left.logIndex - right.logIndex;
-					});
-					for (const log of logs) {
-						const transition = logToTransition(log.blockNumber, log.logIndex, log.eventName, log.args);
-						if (transition === undefined) {
-							this.#logger?.info(`Unknown log: ${log.eventName}`);
-							continue;
-						}
-						this.#stateMachine.transition(transition);
-					}
-				},
-				onError: this.#logger?.error,
-			}),
-		);
-		this.#cleanupCallbacks.push(
-			this.#publicClient.watchBlockNumber({
-				onBlockNumber: (block) => {
-					// We delay the processing to avoid potential race conditions for now
-					setTimeout(() => {
-						this.#stateMachine.transition({
-							id: "block_new",
-							block,
-						});
-					}, 2000);
-				},
-				onError: this.#logger?.error,
-			}),
-		);
+		await this.#watcher.start();
 	}
 
 	stop() {
-		const cleanupCallbacks = this.#cleanupCallbacks;
-		this.#cleanupCallbacks = [];
-		for (const callback of cleanupCallbacks) {
-			callback();
-		}
+		this.#watcher.stop();
 	}
 }
 

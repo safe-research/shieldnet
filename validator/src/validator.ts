@@ -30,7 +30,7 @@ const participants: Participant[] = validatorConfig.PARTICIPANTS.map((address, i
 
 const config: ProtocolConfig = {
 	chainId: validatorConfig.CHAIN_ID,
-	conensus: validatorConfig.CONSENSUS_ADDRESS,
+	consensus: validatorConfig.CONSENSUS_ADDRESS,
 	coordinator: validatorConfig.COORDINATOR_ADDRESS,
 	blocksPerEpoch: BLOCKS_PER_EPOCH,
 	participants,

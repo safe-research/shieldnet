@@ -4,7 +4,7 @@ import type { SupportedChain } from "./schemas.js";
 
 export interface ProtocolConfig {
 	chainId: SupportedChain;
-	conensus: Address;
+	consensus: Address;
 	coordinator: Address;
 	blocksPerEpoch: bigint;
 	participants: Participant[];
