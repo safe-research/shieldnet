@@ -34,7 +34,7 @@ module VerificationMTree = MerkleTree.Make (struct
 end)
 
 (** A marker type to indicate state that is local to a specific validator and
-    only known by them. *)
+    only known by them (as opposed to public global shared state). *)
 type 'a local = Local of 'a
 
 type group = {
@@ -76,7 +76,7 @@ type preprocess_group = {
   pending : (int * FROST.nonces) list option;
 }
 
-type sign_state =
+type sign_status =
   | Waiting_for_sign_request of { responsible : FROST.Identifier.t option }
   | Collecting_sign_nonces of {
       id : SignatureId.t;
@@ -96,13 +96,13 @@ type sign_state =
 type packet =
   | Epoch_rollover of {
       epoch : int;
-      rollover : int;
+      rollover_block : int;
       group_key : FROST.verification_key;
     }
   | Transaction_proposal of { epoch : int; hash : string }
 
 type signature = {
-  state : sign_state;
+  status : sign_status;
   epoch : epoch;
   packet : packet;
   last_participant : FROST.Identifier.t option;
@@ -146,6 +146,14 @@ struct
       failwith "invalid configuration"
 
   let participant_identifier participants address =
+    (* We explicitely define the participant identifier to be its index in the
+       sorted list of active participants starting at 1. Note that OCaml `Set`
+       type is an ordered set, so we don't need to resort here. We implement it
+       by spliting the set at the participant's address, so that the cardinal of
+       the `left` subset is the number of addresses that are smaller than the
+       participant `address`, which allows us to trivially compute the FROST
+       identifier for that participant address. Note that we return `None` in
+       case the `address` is not present in the `participants` set. *)
     let left, present, _ = AddressSet.split address participants in
     if present then
       Some (FROST.Identifier.of_int (1 + AddressSet.cardinal left))
@@ -156,6 +164,8 @@ struct
     List.nth (AddressSet.to_list participants) i
 
   let participants_tree participants =
+    (* Note that sets are ordered in OCaml, so no need to sort the address set
+       before computing each participant's identifier. *)
     AddressSet.to_list participants
     |> List.mapi (fun i a -> (FROST.Identifier.of_int (i + 1), a))
 
@@ -183,7 +193,17 @@ struct
       items ParticipantSet.empty
 
   let group_threshold count =
-    let ( /^ ) q d = (q + d - 1) / d in
+    (* For our consensus to be resilient to intermittent failures, we have a
+       define the following parameters:
+       - The minimum number of participants in a group must be strictly greater
+         than 2/3rds of the set of all validators.
+       - The threshold for a group is strictly greater than 1/2
+
+       This implies a Byzantine fault tolerance of 33%, and is chosen to be
+       this way to not make it possible to ever roll into a group without an
+       absolute majority of honest participants. *)
+    let ceil_div q d = (q + d - 1) / d in
+    let ( /^ ) = ceil_div in
     (* For our consensus to never get stuck due to dishonest participants, we
        require more than 2/3rds of the total participant set to participate. Any
        less and dishonest participants can be a majority in any group if you
@@ -191,7 +211,10 @@ struct
     let min_count =
       ((2 * AddressSet.cardinal Configuration.all_participants) + 1) /^ 3
     in
-    if count >= min_count then Some ((count / 2) + 1) else None
+    if count >= min_count then
+      (* The threshold is always the absolute majority of participants. *)
+      Some ((count / 2) + 1)
+    else None
 
   let compute_group_id participants count threshold context =
     let participants_root =
@@ -253,6 +276,10 @@ struct
         in
         (state', actions)
     | _ ->
+        (* In case the epoch rollover is continuing without me, or if the number
+           of participants becomes too small, then we skip the rollover until
+           the next epoch, in the hopes that we and/or other validators recover
+           enough to continue with consensus. *)
         let state' = { state with rollover = Skipped { epoch } } in
         (state', [])
 
@@ -437,7 +464,7 @@ struct
               Epoch_rollover
                 {
                   epoch = epoch.epoch;
-                  rollover = rollover_block epoch.epoch;
+                  rollover_block = rollover_block epoch.epoch;
                   group_key = key;
                 }
             in
@@ -446,7 +473,7 @@ struct
             let signatures' =
               StringMap.add message
                 {
-                  state =
+                  status =
                     Waiting_for_sign_request { responsible = Some identifier };
                   epoch = state.active_epoch;
                   packet;
@@ -543,12 +570,12 @@ struct
     match StringMap.find_opt message state.signatures with
     | Some signature when GroupId.equal signature.epoch.group.id group_id ->
       begin
-        match signature.state with
+        match signature.status with
         | Waiting_for_sign_request _ -> begin
             let signature' =
               {
                 signature with
-                state =
+                status =
                   Collecting_sign_nonces
                     { id = signature_id; nonces = ParticipantMap.empty };
                 deadline = state.block + Configuration.signing_block_timeout;
@@ -604,8 +631,9 @@ struct
     in
     let callback_context =
       match signature.packet with
-      | Epoch_rollover { epoch; rollover; _ } ->
-          Abi.encode_call "proposeEpoch" [ `Uint64 epoch; `Uint64 rollover ]
+      | Epoch_rollover { epoch; rollover_block; _ } ->
+          Abi.encode_call "proposeEpoch"
+            [ `Uint64 epoch; `Uint64 rollover_block ]
       | Transaction_proposal { epoch; hash } ->
           Abi.encode_call "attestTransaction" [ `Uint64 epoch; `Bytes32 hash ]
     in
@@ -621,7 +649,7 @@ struct
       nonces_commitments =
     match
       List.find_map (fun (message, signature) ->
-          match signature.state with
+          match signature.status with
           | Collecting_sign_nonces { id; nonces }
             when SignatureId.equal id signature_id ->
               Some (message, signature, nonces)
@@ -648,7 +676,7 @@ struct
         let signature' =
           {
             signature with
-            state = state';
+            status = state';
             deadline = state.block + Configuration.signing_block_timeout;
           }
         in
@@ -662,7 +690,7 @@ struct
     let state' =
       match
         List.find_map (fun (message, signature) ->
-            match signature.state with
+            match signature.status with
             | Collecting_sign_shares { id; root; group_commitment; shares }
               when SignatureId.equal id signature_id
                    && String.equal root binding_root ->
@@ -694,7 +722,7 @@ struct
           let signature' =
             {
               signature with
-              state = state';
+              status = state';
               deadline = state.block + Configuration.signing_block_timeout;
             }
           in
@@ -712,7 +740,7 @@ struct
           let signature', actions =
             if signature.deadline = state.block then begin
               let selection' =
-                match signature.state with
+                match signature.status with
                 | Collecting_sign_nonces { nonces; _ } ->
                     participanting_selection nonces
                 | Collecting_sign_shares { shares; _ } ->
@@ -738,7 +766,7 @@ struct
                 (None, [])
               else
                 let state', action, actor =
-                  match signature.state with
+                  match signature.status with
                   | Waiting_for_consensus_attestation { id = signature_id; _ }
                     ->
                       (* As an optimization, we just re-attest if we already have
@@ -756,9 +784,9 @@ struct
                        attesting to. *)
                       let action =
                         match signature.packet with
-                        | Epoch_rollover { epoch; rollover; group_key } ->
+                        | Epoch_rollover { epoch; rollover_block; group_key } ->
                             `Consensus_stage_epoch
-                              (epoch, rollover, group_key, signature_id)
+                              (epoch, rollover_block, group_key, signature_id)
                         | Transaction_proposal { epoch; hash } ->
                             `Consensus_attest_transaction
                               (epoch, hash, signature_id)
@@ -782,7 +810,7 @@ struct
                 let signature' =
                   {
                     signature with
-                    state = state';
+                    status = state';
                     last_participant = None;
                     selection = selection';
                     deadline = state.block + Configuration.signing_block_timeout;
@@ -848,7 +876,7 @@ struct
       let signatures' =
         StringMap.add message
           {
-            state = Waiting_for_sign_request { responsible = None };
+            status = Waiting_for_sign_request { responsible = None };
             epoch = state.active_epoch;
             packet = Transaction_proposal { epoch; hash = transaction_hash };
             last_participant = None;
