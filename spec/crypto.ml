@@ -50,7 +50,7 @@ module FROST = struct
     let verify_secret_share (_ : commitments) (_ : secret_share) : bool =
       Placeholder.fn ()
 
-    let group_public_key (_ : (Identifier.t * coefficients) list) :
+    let group_public_key (_ : (Identifier.t * commitments) list) :
         verification_key =
       Placeholder.fn ()
 
