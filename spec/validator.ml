@@ -47,17 +47,16 @@ type group = {
 
 type epoch = { epoch : int; group : group }
 
-type rollover_secret_shares = {
-  epoch : int;
-  group : GroupId.t;
+type rollover_group = {
+  id : GroupId.t;
   participants : AddressSet.t;
   key : FROST.verification_key;
   me : FROST.Identifier.t local;
+}
+
+type rollover_vss = {
   coefficients : FROST.KeyGen.coefficients local;
   commitments : FROST.KeyGen.commitments ParticipantMap.t;
-  shares : FROST.KeyGen.secret_share ParticipantMap.t local;
-  confirmations : ParticipantSet.t;
-  deadline : int;
 }
 
 type rollover =
@@ -65,17 +64,23 @@ type rollover =
       epoch : int;
       group : GroupId.t;
       participants : AddressSet.t;
-      coefficients : FROST.KeyGen.coefficients local;
-      commitments : FROST.KeyGen.commitments ParticipantMap.t;
+      vss : rollover_vss;
       deadline : int;
     }
-  | Collecting_key_gen_secret_shares of rollover_secret_shares
+  | Collecting_key_gen_secret_shares of {
+      epoch : int;
+      group : rollover_group;
+      vss : rollover_vss;
+      shares : FROST.KeyGen.secret_share option ParticipantMap.t local;
+      deadline : int;
+    }
   | Confirming_key_gen of {
-      epoch : epoch;
-      participants : AddressSet.t;
-      coefficients : FROST.KeyGen.coefficients local;
-      commitments : FROST.KeyGen.commitments ParticipantMap.t;
+      epoch : int;
+      group : rollover_group;
+      vss : rollover_vss;
+      shares : FROST.KeyGen.secret_share ParticipantMap.t local;
       confirmations : ParticipantSet.t;
+      complaints : int ParticipantMap.t;
       last_participant : FROST.Identifier.t;
       deadline : int;
     }
@@ -265,8 +270,11 @@ struct
                   epoch;
                   group = compute_group_id participants count threshold context;
                   participants;
-                  commitments = ParticipantMap.empty;
-                  coefficients = Local coefficients;
+                  vss =
+                    {
+                      commitments = ParticipantMap.empty;
+                      coefficients = Local coefficients;
+                    };
                   deadline = state.block + Configuration.key_gen_block_timeout;
                 };
           }
@@ -309,7 +317,7 @@ struct
     (* The previous KeyGen ceremony took too long or was skipped, try again. *)
     | Collecting_key_gen_commitments { epoch; _ }
     | Collecting_key_gen_secret_shares { epoch; _ }
-    | Confirming_key_gen { epoch = { epoch; _ }; _ }
+    | Confirming_key_gen { epoch; _ }
     | Signing_epoch_rollover { epoch = { epoch; _ }; _ }
     | Skipped { epoch }
       when rollover_block epoch = state.block ->
@@ -322,34 +330,29 @@ struct
 
   let key_gen_wait state =
     match state.rollover with
-    | Collecting_key_gen_commitments { participants; deadline; commitments; _ }
+    | Collecting_key_gen_commitments { participants; deadline; vss; _ }
       when deadline = state.block ->
         let participants' =
-          remove_missing_participants participants commitments
+          remove_missing_participants participants vss.commitments
         in
         key_gen_and_commit state participants'
     | Collecting_key_gen_secret_shares
-        { participants; deadline; shares = Local shares; _ }
+        { group; deadline; shares = Local shares; _ }
       when deadline = state.block ->
-        let participants' = remove_missing_participants participants shares in
+        let participants' =
+          remove_missing_participants group.participants shares
+        in
         key_gen_and_commit state participants'
     | _ -> (state, [])
 
   let key_gen_commitment state group_id identifier commitment =
     match state.rollover with
     | Collecting_key_gen_commitments
-        {
-          epoch;
-          group;
-          coefficients = Local coefficients;
-          commitments;
-          participants;
-          deadline;
-        }
+        { epoch; group; participants; vss; deadline }
       when GroupId.equal group group_id ->
         if FROST.KeyGen.verify_proof commitment then
           let commitments' =
-            ParticipantMap.add identifier commitment commitments
+            ParticipantMap.add identifier commitment vss.commitments
           in
           if
             AddressSet.cardinal participants
@@ -359,9 +362,10 @@ struct
               participant_identifier participants Configuration.account
               |> Option.get
             in
+            let (Local coefficients) = vss.coefficients in
             let shares =
               ParticipantMap.singleton me
-                (FROST.KeyGen.secret_share coefficients me)
+                (Some (FROST.KeyGen.secret_share coefficients me))
             in
             let encrypted_shares =
               participant_set participants
@@ -382,14 +386,9 @@ struct
               Collecting_key_gen_secret_shares
                 {
                   epoch;
-                  group;
-                  participants;
-                  key;
-                  me = Local me;
-                  coefficients = Local coefficients;
-                  commitments;
+                  group = { id = group; participants; key; me = Local me };
+                  vss;
                   shares = Local shares;
-                  confirmations = ParticipantSet.empty;
                   deadline = state.block + Configuration.key_gen_block_timeout;
                 }
             in
@@ -408,8 +407,7 @@ struct
                 {
                   epoch;
                   group;
-                  coefficients = Local coefficients;
-                  commitments = commitments';
+                  vss = { vss with commitments = commitments' };
                   participants;
                   deadline;
                 }
@@ -471,24 +469,74 @@ struct
 
   let key_gen_secret_shares state group_id identifier secret_shares =
     match state.rollover with
-    | Collecting_key_gen_secret_shares st when GroupId.equal st.group group_id
-      -> begin
-        let { me = Local me; coefficients = Local coefficients; _ } = st in
-        let participant_commitments =
-          ParticipantMap.find identifier st.commitments
-        in
+    | Collecting_key_gen_secret_shares
+        { epoch; group; vss; shares = Local shares; deadline }
+      when GroupId.equal group.id group_id -> begin
+        let (Local me) = group.me in
+        let (Local coefficients) = vss.coefficients in
         let secret_share =
           let i =
             FROST.Identifier.to_int me
             - if FROST.Identifier.compare me identifier < 0 then 1 else 2
           in
           let encrypted = List.nth secret_shares i in
-          FROST.KeyGen.decrypt_secret_share coefficients participant_commitments
-            encrypted
+          let participant_commitments =
+            ParticipantMap.find identifier vss.commitments
+          in
+          FROST.KeyGen.decrypt_secret_share coefficients
+              participant_commitments encrypted
         in
-        if FROST.KeyGen.verify_secret_share participant_commitments secret_share
-        then register_secret_share state st identifier secret_share
-        else (state, [ `Consensus_key_gen_complain (group_id, identifier) ])
+
+          if FROST.KeyGen.verify_secret_share participant_commitments value then
+        let shares' = ParticipantMap.add identifier secret_share shares in
+        if
+          AddressSet.cardinal group.participants
+          = ParticipantMap.cardinal shares'
+        then
+          let valid_shares =
+            ParticipantMap.filter_map (fun _ -> Fun.id) shares'
+          in
+          let invalid_shares =
+            ParticipantMap.fold
+              (fun id secret_share invalid ->
+                if Option.is_none secret_share then id :: invalid else invalid)
+              shares' []
+          in
+          let rollover' =
+            Confirming_key_gen
+              {
+                epoch;
+                group;
+                vss;
+                shares = Local valid_shares;
+                confirmations = ParticipantSet.empty;
+                complaints = ParticipantMap.empty;
+                last_participant = identifier;
+                deadline = state.block + Configuration.key_gen_block_timeout;
+              }
+          in
+          let state' = { state with rollover = rollover' } in
+          let actions = if List.is_empty invalid_shares then
+                          [
+              `Coordinator_key_gen_confirm_with_callback
+                ( group.id,
+                  ( Configuration.consensus,
+                    Abi.encode
+                      [
+                        `Uint64 epoch;
+                        `Uint64 (rollover_block epoch);
+                ]));]
+                        else
+                          List.map (`invalid_shares
+                          in
+          ( state',
+             actions)
+        else
+          let rollover' =
+            Collecting_key_gen_secret_shares { st with shares = Local shares' }
+          in
+          let state' = { state with rollover = rollover' } in
+          (state', [])
       end
     | _ -> (state, [])
 
