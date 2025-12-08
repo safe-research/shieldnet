@@ -16,13 +16,13 @@ import { describe, expect, it } from "vitest";
 import { createClientStorage, createStateStorage, log } from "../__tests__/config.js";
 import { toPoint } from "../frost/math.js";
 import type { GroupId } from "../frost/types.js";
-import { logToTransition } from "../machine/transitions/onchain.js";
+import { OnchainTransitionWatcher } from "../machine/transitions/watcher.js";
 import { ShieldnetStateMachine as SchildNetzMaschine } from "../service/machine.js";
 import { CONSENSUS_EVENTS, COORDINATOR_EVENTS } from "../types/abis.js";
 import { InMemoryQueue } from "../utils/queue.js";
 import { KeyGenClient } from "./keyGen/client.js";
 import { OnchainProtocol } from "./protocol/onchain.js";
-import type { ActionWithRetry } from "./protocol/types.js";
+import type { ActionWithTimeout } from "./protocol/types.js";
 import { SigningClient } from "./signing/client.js";
 import { verifySignature } from "./signing/verify.js";
 import type { Participant } from "./storage/types.js";
@@ -109,7 +109,7 @@ describe("integration", () => {
 				transport: http(),
 				account: a,
 			});
-			const actionStorage = new InMemoryQueue<ActionWithRetry>();
+			const actionStorage = new InMemoryQueue<ActionWithTimeout>();
 			const protocol = new OnchainProtocol(
 				publicClient,
 				signingClient,
@@ -129,38 +129,35 @@ describe("integration", () => {
 				logger,
 				blocksPerEpoch: BLOCKS_PER_EPOCH,
 			});
-			publicClient.watchContractEvent({
-				address: [coordinatorAddress, consensusAddress],
-				abi: [...CONSENSUS_EVENTS, ...COORDINATOR_EVENTS],
-				onLogs: async (events) => {
-					for (const event of events) {
-						const transtion = logToTransition(event.blockNumber, event.logIndex, event.eventName, event.args);
-						if (transtion === undefined) {
-							log(`Unknown event: ${event.eventName}`);
-							continue;
-						}
-						sm.transition(transtion);
-					}
+			const watcher = new OnchainTransitionWatcher({
+				dbPath: ":memory:",
+				publicClient,
+				config: {
+					consensus: consensusAddress,
+					coordinator: coordinatorAddress,
 				},
-				onError: logger,
-			});
-			publicClient.watchBlockNumber({
-				onBlockNumber: (block) => {
-					// We delay the processing to avoid potential race conditions for now
-					setTimeout(() => {
-						sm.transition({
-							id: "block_new",
-							block,
-						});
-					}, 2000);
+				logger:
+					logger !== undefined
+						? {
+								error: logger,
+								debug: logger,
+								info: logger,
+							}
+						: undefined,
+				onTransition: (t) => {
+					sm.transition(t);
 				},
 			});
 			return {
 				kc,
 				sc,
 				sm,
+				watcher,
 			};
 		});
+		for (const { watcher } of clients) {
+			await watcher.start();
+		}
 		// Setup done ... SchildNetz läuft ... lets send some signature requests
 		const abi = parseAbi([
 			"function proposeTransaction((uint256 chainId, address account, address to, uint256 value, uint8 operation, bytes data, uint256 nonce) transaction) external",
