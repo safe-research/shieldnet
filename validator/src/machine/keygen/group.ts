@@ -13,8 +13,8 @@ export type GroupParameters = {
 export const calcGroupParameters = (participantCount: number, consensus: Address, epoch: bigint): GroupParameters => {
 	const count = BigInt(participantCount);
 	const threshold = count / 2n + 1n;
+	// 4 bytes version, 20 bytes address, 8 bytes epoch number
 	const context = encodePacked(["uint32", "address", "uint64"], [0, consensus, epoch]);
-
 	// TODO: Handle cases where the group size is too small.
 	return { count, threshold, context };
 };

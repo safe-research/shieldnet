@@ -17,7 +17,6 @@ export const triggerKeyGen = (
 	if (participants.length < 2) {
 		throw new Error("Not enough participatns!");
 	}
-	// 4 bytes version, 20 bytes address, 8 bytes epoch number
 	const { count, threshold, context } = calcGroupParameters(participants.length, consensus, epoch);
 	const { groupId, participantsRoot, participantId, commitments, pok, poap } = keyGenClient.setupGroup(
 		participants,
