@@ -32,26 +32,25 @@ export const handleKeyGenConfirmed = async (
 	const groupId = event.gid;
 
 	// Track this confirmation
-	const confirmedParticipants = [...machineStates.rollover.confirmedParticipants, event.identifier];
+	const sharesFrom = [...machineStates.rollover.sharesFrom, event.identifier];
 	const participants = signingClient.participants(groupId);
-	const allConfirmed = confirmedParticipants.length === participants.length;
+	const allConfirmed = participants.every((p) => sharesFrom.includes(p));
 
-	logger?.(
-		`Group ${groupId} confirmation from ${event.identifier} (${confirmedParticipants.length}/${participants.length})`,
-	);
+	logger?.(`Group ${groupId} confirmation from ${event.identifier} (${sharesFrom.length}/${participants.length})`);
+
+	// Still waiting for confirmations
+	if (!allConfirmed) {
+		return {
+			rollover: {
+				...machineStates.rollover,
+				sharesFrom,
+				lastParticipant: event.identifier,
+			},
+		};
+	}
 
 	// Genesis group: after all confirmations, we're done with keygen
 	if (consensusState.genesisGroupId === groupId) {
-		if (!allConfirmed) {
-			// Still waiting for confirmations
-			return {
-				rollover: {
-					...machineStates.rollover,
-					confirmedParticipants,
-					lastParticipant: event.identifier,
-				},
-			};
-		}
 		// All confirmed for genesis group - start preprocessing and return to waiting state
 		logger?.("Genesis group all confirmations received, starting preprocessing");
 		const consensus: ConsensusDiff = {
@@ -66,17 +65,6 @@ export const handleKeyGenConfirmed = async (
 			},
 		];
 		return { consensus, rollover: { id: "waiting_for_rollover" }, actions };
-	}
-
-	// Non-genesis group: if not all participants have confirmed yet, stay in collecting_confirmations
-	if (!allConfirmed) {
-		return {
-			rollover: {
-				...machineStates.rollover,
-				confirmedParticipants,
-				lastParticipant: event.identifier,
-			},
-		};
 	}
 
 	// All participants have confirmed - compute the epoch rollover message locally
