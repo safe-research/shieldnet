@@ -57,7 +57,7 @@ const EVENT: TransactionAttestedEvent = {
 };
 
 // --- Tests ---
-describe("transaction proposed", () => {
+describe("transaction attested", () => {
 	it("should not handle attestation event if in unexpected state", async () => {
 		const machineStates: MachineStates = {
 			...MACHINE_STATES,
