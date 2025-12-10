@@ -56,7 +56,7 @@ describe("key gen abort", () => {
 		expect(diff).toStrictEqual({});
 	});
 
-	it("should abort if rollover when current epoch is not stateg epoch", async () => {
+	it("should abort key gen when current epoch is not staged rollover epoch", async () => {
 		const diff = checkKeyGenAbort(MACHINE_CONFIG, CONSENSUS_STATE, MACHINE_STATES, 10n);
 		expect(diff.actions).toBeUndefined();
 		expect(diff.rollover).toStrictEqual({ id: "waiting_for_rollover" });
