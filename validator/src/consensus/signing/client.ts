@@ -167,8 +167,12 @@ export class SigningClient {
 		};
 	}
 
-	signers(groupId: GroupId): ParticipantId[] {
-		return this.#storage.signers(groupId);
+	signers(signatureId: SignatureId): ParticipantId[] {
+		return this.#storage.signers(signatureId);
+	}
+
+	participants(groupId: GroupId): ParticipantId[] {
+		return this.#storage.participants(groupId).map((p) => p.id);
 	}
 
 	missingNonces(groupId: GroupId): ParticipantId[] {

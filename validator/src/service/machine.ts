@@ -223,6 +223,9 @@ export class ShieldnetStateMachine {
 			}
 			case "event_key_gen_confirmed": {
 				return await handleKeyGenConfirmed(
+					this.#machineConfig,
+					this.#protocol,
+					this.#verificationEngine,
 					this.#keyGenClient,
 					this.#signingClient,
 					consensusState,
@@ -263,7 +266,6 @@ export class ShieldnetStateMachine {
 			}
 			case "event_epoch_proposed": {
 				return await handleEpochProposed(
-					this.#machineConfig,
 					this.#protocol,
 					this.#verificationEngine,
 					machineStates,
@@ -272,7 +274,7 @@ export class ShieldnetStateMachine {
 				);
 			}
 			case "event_epoch_staged": {
-				return await handleEpochStaged(machineStates, transition);
+				return await handleEpochStaged(this.#signingClient, machineStates, transition);
 			}
 			case "event_transaction_proposed": {
 				return await handleTransactionProposed(

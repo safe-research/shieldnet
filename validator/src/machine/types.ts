@@ -30,6 +30,7 @@ export type RolloverState = Readonly<
 			nextEpoch: bigint;
 			deadline: bigint;
 			lastParticipant?: ParticipantId;
+			confirmedParticipants: readonly ParticipantId[];
 	  }
 	| {
 			id: "sign_rollover";
