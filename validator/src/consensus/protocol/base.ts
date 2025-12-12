@@ -1,4 +1,5 @@
 import type { Address, Hex } from "viem";
+import type { Logger } from "../../utils/logging.js";
 import { InMemoryQueue, type Queue } from "../../utils/queue.js";
 import type {
 	ActionWithTimeout,
@@ -21,19 +22,19 @@ const ERROR_RETRY_DELAY = 1000;
 export abstract class BaseProtocol implements ShieldnetProtocol {
 	#actionQueue: Queue<ActionWithTimeout> = new InMemoryQueue<ActionWithTimeout>();
 	#currentAction?: ActionWithTimeout;
-	#logger?: (msg: unknown) => void;
+	#logger: Logger;
 
 	abstract chainId(): bigint;
 	abstract consensus(): Address;
 	abstract coordinator(): Address;
 
-	constructor(queue: Queue<ActionWithTimeout>, logger?: (msg: unknown) => void) {
+	constructor(queue: Queue<ActionWithTimeout>, logger: Logger) {
 		this.#actionQueue = queue;
 		this.#logger = logger;
 	}
 
 	process(action: ProtocolAction, timeout: number = ACTION_TIMEOUT): void {
-		this.#logger?.(`Enqueue ${action.id}`);
+		this.#logger.debug(`Enqueue ${action.id}`);
 		this.#actionQueue.push({
 			...action,
 			validUntil: Date.now() + timeout,
@@ -50,7 +51,7 @@ export abstract class BaseProtocol implements ShieldnetProtocol {
 		// Check if action is still valid
 		if (action.validUntil < Date.now()) {
 			this.#actionQueue.pop();
-			this.#logger?.(`Timeout exeeded for ${action.id}. Dropping action!`);
+			this.#logger.debug(`Timeout exeeded for ${action.id}. Dropping action!`);
 			this.checkNextAction();
 			return;
 		}
@@ -63,7 +64,7 @@ export abstract class BaseProtocol implements ShieldnetProtocol {
 				this.checkNextAction();
 			})
 			.catch(() => {
-				this.#logger?.("Action failed, will retry after a delay!");
+				this.#logger.debug("Action failed, will retry after a delay!");
 				this.#currentAction = undefined;
 				setTimeout(() => {
 					this.checkNextAction();

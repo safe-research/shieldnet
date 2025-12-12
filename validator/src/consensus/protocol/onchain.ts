@@ -1,6 +1,7 @@
 import type { Address, Hex, PublicClient, WalletClient } from "viem";
 import type { FrostPoint, GroupId, SignatureId } from "../../frost/types.js";
 import { CONSENSUS_FUNCTIONS, COORDINATOR_FUNCTIONS } from "../../types/abis.js";
+import type { Logger } from "../../utils/logging.js";
 import type { Queue } from "../../utils/queue.js";
 import { BaseProtocol } from "./base.js";
 import type {
@@ -28,7 +29,7 @@ export class OnchainProtocol extends BaseProtocol {
 		consensus: Address,
 		coordinator: Address,
 		queue: Queue<ActionWithTimeout>,
-		logger?: (msg: unknown) => void,
+		logger: Logger,
 	) {
 		super(queue, logger);
 		this.#publicClient = publicClient;

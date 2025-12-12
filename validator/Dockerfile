@@ -36,5 +36,7 @@ RUN npm ci --workspace=validator --omit=dev --ignore-scripts
 COPY --from=builder /usr/src/app/validator/dist ./validator/dist
 
 USER node
+ENV NODE_ENV production
+
 # Specify the command to run the compiled worker.
 CMD [ "node", "validator/dist/validator.js" ]

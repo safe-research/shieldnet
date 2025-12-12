@@ -24,6 +24,7 @@ import { TransitionState } from "../machine/state/local.js";
 import type { StateStorage } from "../machine/storage/types.js";
 import type { EventTransition, StateTransition } from "../machine/transitions/types.js";
 import type { ConsensusState, MachineConfig, MachineStates, StateDiff } from "../machine/types.js";
+import type { Logger } from "../utils/logging.js";
 import { InMemoryQueue, type Queue } from "../utils/queue.js";
 
 const BLOCKS_PER_EPOCH = (24n * 60n * 60n) / 5n; // ~ blocks for 1 day
@@ -36,7 +37,7 @@ export class ShieldnetStateMachine {
 	#keyGenClient: KeyGenClient;
 	#signingClient: SigningClient;
 	#storage: StateStorage;
-	#logger?: (msg: unknown) => void;
+	#logger: Logger;
 	// Config Parameters
 	#machineConfig: MachineConfig;
 	// Event queue state
@@ -64,7 +65,7 @@ export class ShieldnetStateMachine {
 		keyGenClient: KeyGenClient;
 		signingClient: SigningClient;
 		verificationEngine: VerificationEngine;
-		logger?: (msg: unknown) => void;
+		logger: Logger;
 		blocksPerEpoch?: bigint;
 		keyGenTimeout?: bigint;
 		signingTimeout?: bigint;
@@ -86,7 +87,7 @@ export class ShieldnetStateMachine {
 	}
 
 	transition(transition: StateTransition) {
-		this.#logger?.(`Enqueue ${transition.id} at ${transition.block}`);
+		this.#logger.debug(`Enqueue ${transition.id} at ${transition.block}`);
 		this.#transitionQueue.push(transition);
 		this.checkNextTransition();
 	}
@@ -108,7 +109,7 @@ export class ShieldnetStateMachine {
 					this.#protocol.process(action);
 				}
 			})
-			.catch(this.#logger)
+			.catch((err) => this.#logger.warn(err))
 			.finally(() => {
 				this.#transitionQueue.pop();
 				this.#currentTransition = undefined;
@@ -134,9 +135,16 @@ export class ShieldnetStateMachine {
 			return [];
 		}
 		this.#lastProcessedBlock = block;
-		state.apply(checkKeyGenAbort(this.#machineConfig, state.consensus, state.machines, block, this.#logger));
+		state.apply(checkKeyGenAbort(this.#machineConfig, state.consensus, state.machines, block, this.#logger.info));
 		state.apply(
-			checkKeyGenTimeouts(this.#machineConfig, this.#protocol, this.#keyGenClient, state.machines, block, this.#logger),
+			checkKeyGenTimeouts(
+				this.#machineConfig,
+				this.#protocol,
+				this.#keyGenClient,
+				state.machines,
+				block,
+				this.#logger.info,
+			),
 		);
 
 		for (const diff of checkSigningTimeouts(
@@ -157,7 +165,7 @@ export class ShieldnetStateMachine {
 				state.consensus,
 				state.machines,
 				block,
-				this.#logger,
+				this.#logger.info,
 			),
 		);
 
@@ -184,7 +192,7 @@ export class ShieldnetStateMachine {
 				state.consensus,
 				state.machines,
 				block,
-				this.#logger,
+				this.#logger.info,
 			),
 		);
 		return state.diffs;
@@ -196,7 +204,7 @@ export class ShieldnetStateMachine {
 		consensusState: ConsensusState,
 		machineStates: MachineStates,
 	): Promise<StateDiff> {
-		this.#logger?.(`Handle event ${transition.id}`);
+		this.#logger.debug(`Handle event ${transition.id}`);
 		switch (transition.id) {
 			case "event_key_gen": {
 				return await handleGenesisKeyGen(
@@ -205,7 +213,7 @@ export class ShieldnetStateMachine {
 					consensusState,
 					machineStates,
 					transition,
-					this.#logger,
+					this.#logger.info,
 				);
 			}
 			case "event_key_gen_committed": {
@@ -217,7 +225,7 @@ export class ShieldnetStateMachine {
 					this.#keyGenClient,
 					machineStates,
 					transition,
-					this.#logger,
+					this.#logger.info,
 				);
 			}
 			case "event_key_gen_confirmed": {
@@ -230,12 +238,12 @@ export class ShieldnetStateMachine {
 					consensusState,
 					machineStates,
 					transition,
-					this.#logger,
+					this.#logger.info,
 				);
 			}
 			// aka Preprocess
 			case "event_nonce_commitments_hash": {
-				return await handlePreprocess(this.#signingClient, consensusState, transition, this.#logger);
+				return await handlePreprocess(this.#signingClient, consensusState, transition, this.#logger.info);
 			}
 			case "event_sign_request": {
 				return await handleSign(
@@ -245,7 +253,7 @@ export class ShieldnetStateMachine {
 					consensusState,
 					machineStates,
 					transition,
-					this.#logger,
+					this.#logger.info,
 				);
 			}
 			case "event_nonce_commitments": {
@@ -277,7 +285,7 @@ export class ShieldnetStateMachine {
 					this.#verificationEngine,
 					consensusState,
 					transition,
-					this.#logger,
+					this.#logger.info,
 				);
 			}
 			case "event_transaction_attested": {

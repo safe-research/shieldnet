@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createValidatorService } from "./service/service.js";
 import type { ProtocolConfig } from "./types/interfaces.js";
 import { validatorConfigSchema } from "./types/schemas.js";
+import { createLogger } from "./utils/logging.js";
 
 dotenv.config({ quiet: true });
 
@@ -20,6 +21,11 @@ if (!result.success) {
 const validatorConfig = result.data;
 const rpcUrl = validatorConfig.RPC_URL;
 
+const logger = createLogger({
+	level: validatorConfig.LOG_LEVEL,
+	pretty: process.stdout.isTTY,
+});
+
 const config: ProtocolConfig = {
 	chainId: validatorConfig.CHAIN_ID,
 	consensus: validatorConfig.CONSENSUS_ADDRESS,
@@ -30,20 +36,20 @@ const config: ProtocolConfig = {
 };
 
 const account = privateKeyToAccount(validatorConfig.PRIVATE_KEY);
-console.log(`Using validator account ${account.address}`);
+logger.info(`Using validator account ${account.address}`);
 
-const service = createValidatorService(account, rpcUrl, config);
+const service = createValidatorService(account, rpcUrl, config, logger);
 
 // Handle graceful shutdown
 process.on("SIGINT", () => {
-	console.log("Shutting down service...");
+	logger.info("Shutting down service...");
 	service.stop();
 	process.exit(0);
 });
 
 service.start().catch((error: unknown) => {
-	console.error("Service failed to start:");
-	console.error(error);
+	logger.error("Service failed to start:");
+	logger.error(error);
 	process.exit(1);
 });
 

@@ -26,7 +26,7 @@ import { InMemoryQueue } from "../utils/queue.js";
 import { ShieldnetStateMachine } from "./machine.js";
 
 export class ValidatorService {
-	#logger?: Logger;
+	#logger: Logger;
 	#config: ProtocolConfig;
 	#publicClient: PublicClient;
 	#watcher: OnchainTransitionWatcher;
@@ -43,7 +43,7 @@ export class ValidatorService {
 		transport: Transport;
 		config: ProtocolConfig;
 		chain: Chain;
-		logger?: Logger;
+		logger: Logger;
 	}) {
 		this.#logger = logger;
 		this.#config = config;
@@ -63,13 +63,13 @@ export class ValidatorService {
 			config.consensus,
 			config.coordinator,
 			actionStorage,
-			this.#logger?.info,
+			this.#logger,
 		);
 		const stateStorage = new InMemoryStateStorage();
 		this.#stateMachine = new ShieldnetStateMachine({
 			participants: config.participants,
 			blocksPerEpoch: config.blocksPerEpoch,
-			logger: this.#logger?.info,
+			logger: this.#logger,
 			genesisSalt: config.genesisSalt,
 			protocol,
 			storage: stateStorage,
@@ -97,16 +97,16 @@ export class ValidatorService {
 	}
 }
 
-export const createValidatorService = (account: Account, rpcUrl: string, config: ProtocolConfig): ValidatorService => {
+export const createValidatorService = (
+	account: Account,
+	rpcUrl: string,
+	config: ProtocolConfig,
+	logger: Logger,
+): ValidatorService => {
 	const transport = rpcUrl.startsWith("wss") ? webSocket(rpcUrl) : http(rpcUrl);
 	const chain = extractChain({
 		chains: supportedChains,
 		id: config.chainId,
 	});
-	const logger: Logger = {
-		error: console.error,
-		debug: console.debug,
-		info: console.info,
-	};
 	return new ValidatorService({ account, transport, config, chain, logger });
 };

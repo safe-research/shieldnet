@@ -14,7 +14,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { anvil } from "viem/chains";
 import { describe, expect, it } from "vitest";
-import { createClientStorage, createStateStorage, log } from "../__tests__/config.js";
+import { createClientStorage, createStateStorage, silentLogger, testLogger } from "../__tests__/config.js";
 import { toPoint } from "../frost/math.js";
 import type { GroupId } from "../frost/types.js";
 import { OnchainTransitionWatcher } from "../machine/transitions/watcher.js";
@@ -86,7 +86,7 @@ describe("integration", () => {
 				"function groupKey(bytes32 id) external view returns ((uint256 x, uint256 y) key)",
 			]),
 		} as const;
-		log(`Use coordinator at ${coordinator.address}`);
+		testLogger.debug(`Use coordinator at ${coordinator.address}`);
 		const consensus = {
 			address: deploymentInfo.returns["1"].value as Address,
 			abi: parseAbi([
@@ -95,7 +95,7 @@ describe("integration", () => {
 				"function getAttestationByMessage(bytes32 message) external view returns (((uint256 x, uint256 y) r, uint256 z) signature)",
 			]),
 		} as const;
-		log(`Use consensus at ${consensus.address}`);
+		testLogger.debug(`Use consensus at ${consensus.address}`);
 
 		// Private keys from Anvil testnet
 		const accounts = [
@@ -114,7 +114,7 @@ describe("integration", () => {
 			verificationHandlers.set("safe_transaction_packet", new SafeTransactionHandler());
 			verificationHandlers.set("epoch_rollover_packet", new EpochRolloverHandler());
 			const verificationEngine = new VerificationEngine(verificationHandlers);
-			const logger = i === 0 ? log : undefined;
+			const logger = i === 0 ? testLogger : silentLogger;
 			const publicClient = createPublicClient({
 				chain: anvil,
 				transport: http(),
@@ -153,14 +153,7 @@ describe("integration", () => {
 					consensus: consensus.address,
 					coordinator: coordinator.address,
 				},
-				logger:
-					logger !== undefined
-						? {
-								error: logger,
-								debug: logger,
-								info: logger,
-							}
-						: undefined,
+				logger,
 				onTransition: (t) => {
 					sm.transition(t);
 				},
