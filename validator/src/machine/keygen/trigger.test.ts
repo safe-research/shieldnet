@@ -32,7 +32,7 @@ describe("trigger key gen", () => {
 	it("should throw if not enough participants are provided", () => {
 		const keyGenClient = {} as unknown as KeyGenClient;
 		expect(() => triggerKeyGen(keyGenClient, 1n, 20n, PARTICIPANTS.slice(0, 1), zeroHash)).toThrowError(
-			new Error("Not enough participatns!"),
+			new Error("Not enough participants!"),
 		);
 	});
 
