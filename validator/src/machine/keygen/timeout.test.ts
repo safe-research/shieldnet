@@ -79,8 +79,7 @@ describe("key gen timeouts", () => {
 				nextEpoch: 10n,
 				deadline: 22n,
 			} as RolloverState,
-			keyGenInvocations: [1, 0],
-			expectedActiveEpoch: 0n,
+			keyGenInvocations: [1, 0]
 		},
 		{
 			description: "collecting shares",
@@ -90,8 +89,7 @@ describe("key gen timeouts", () => {
 				nextEpoch: 10n,
 				deadline: 22n,
 			} as RolloverState,
-			keyGenInvocations: [0, 1],
-			expectedActiveEpoch: 0n,
+			keyGenInvocations: [0, 1]
 		},
 		{
 			description: "collecting confirmations",
@@ -102,8 +100,7 @@ describe("key gen timeouts", () => {
 				deadline: 22n,
 				sharesFrom: [1n, 3n],
 			} as RolloverState,
-			keyGenInvocations: [0, 0],
-			expectedActiveEpoch: 0n,
+			keyGenInvocations: [0, 0]
 		},
 	])("when in $description", ({ rollover, keyGenInvocations }) => {
 		it("should not timeout when deadline has not passed", () => {
