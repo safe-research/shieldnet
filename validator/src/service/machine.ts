@@ -110,7 +110,7 @@ export class ShieldnetStateMachine {
 				}
 			})
 			.catch((err) => {
-				this.#logger.warn("Error performing state transition:", err);
+				this.#logger.warn(`Error performing state transition '${transition.id}':`, err);
 			})
 			.finally(() => {
 				this.#transitionQueue.pop();
