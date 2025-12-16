@@ -1,8 +1,7 @@
 import dotenv from "dotenv";
 import { createWalletClient, extractChain, http, parseAbi } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { calculateParticipantsRoot } from "../consensus/merkle.js";
-import { calcGroupParameters } from "../machine/keygen/group.js";
+import { calcGenesisGroup } from "../machine/keygen/group.js";
 import { supportedChains } from "../types/chains.js";
 import { validatorConfigSchema } from "../types/schemas.js";
 
@@ -20,9 +19,10 @@ const main = async (): Promise<void> => {
 		})
 		.parse(process.env);
 
-	const participants = config.PARTICIPANTS;
-	const participantsRoot = calculateParticipantsRoot(participants);
-	const { count, threshold } = calcGroupParameters(participants.length);
+	const { participantsRoot, count, threshold, context } = calcGenesisGroup({
+		defaultParticipants: config.PARTICIPANTS,
+		genesisSalt: config.GENESIS_SALT,
+	});
 
 	const chain = extractChain({
 		chains: supportedChains,
@@ -38,15 +38,13 @@ const main = async (): Promise<void> => {
 		address: config.COORDINATOR_ADDRESS,
 		abi: parseAbi([
 			"function keyGen(bytes32 participants, uint64 count, uint64 threshold, bytes32 context) external returns (bytes32 gid)",
-			"function sign(bytes32 gid, bytes32 message) external returns (bytes32 sid)",
-			"function groupKey(bytes32 id) external view returns ((uint256 x, uint256 y) key)",
 		]),
 	} as const;
 	// Manually trigger genesis KeyGen
 	const response = await initiatorClient.writeContract({
 		...coordinator,
 		functionName: "keyGen",
-		args: [participantsRoot, count, threshold, config.GENESIS_SALT],
+		args: [participantsRoot, count, threshold, context],
 	});
 	console.log({ response });
 };

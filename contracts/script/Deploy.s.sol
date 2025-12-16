@@ -29,8 +29,8 @@ contract DeployScript is Script {
             vm.computeCreate2Address(coordinatorSalt, keccak256(coordinatorInitCode), DETERMINISTIC_FACTORY);
 
         if (expectedCoordinatorAddr.code.length > 0) {
-            console.log("FROSTCoordinator already exists at:", expectedCoordinatorAddr);
             coordinator = FROSTCoordinator(expectedCoordinatorAddr);
+            console.log("FROSTCoordinator already exists at:", expectedCoordinatorAddr);
         } else {
             coordinator = new FROSTCoordinator{salt: coordinatorSalt}();
             console.log("FROSTCoordinator deployed to:", address(coordinator));
@@ -48,14 +48,14 @@ contract DeployScript is Script {
         // Calculate init code: Creation Code + ABI Encoded Constructor Arguments
         bytes memory consensusArgs = abi.encode(address(coordinator), groupIdWrapped);
         bytes memory consensusInitCode = abi.encodePacked(type(Consensus).creationCode, consensusArgs);
-        bytes32 consensusSalt = bytes32(0);
+        bytes32 consensusSalt = vm.envOr("CONSENSUS_SALT", bytes32(0));
 
         address expectedConsensusAddr =
             vm.computeCreate2Address(consensusSalt, keccak256(consensusInitCode), DETERMINISTIC_FACTORY);
 
         if (expectedConsensusAddr.code.length > 0) {
-            console.log("Consensus already exists at:", expectedConsensusAddr);
             consensus = Consensus(expectedConsensusAddr);
+            console.log("Consensus already exists at:", expectedConsensusAddr);
         } else {
             consensus = new Consensus{salt: consensusSalt}(address(coordinator), groupIdWrapped);
             console.log("Consensus deployed to:", address(consensus));
