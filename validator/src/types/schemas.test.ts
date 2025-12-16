@@ -64,7 +64,7 @@ describe("checkedAddressSchema", () => {
 });
 
 describe("validatorConfigSchema", () => {
-	it("should successfully parse a valid config object", () => {
+	it("should successfully parse a valid config object without blocks per epoch", () => {
 		const pk = generatePrivateKey();
 		const validConfig = {
 			RPC_URL: MOCK_VALID_URL,
@@ -88,6 +88,35 @@ describe("validatorConfigSchema", () => {
 				{ id: 2n, address: "0x6Adb3baB5730852eB53987EA89D8e8f16393C200" },
 			],
 			GENESIS_SALT: MOCK_GENESIS_SALT,
+			BLOCKS_PER_EPOCH: 17280n,
+		});
+	});
+	it("should successfully parse a valid config object with blocks per epoch", () => {
+		const pk = generatePrivateKey();
+		const validConfig = {
+			RPC_URL: MOCK_VALID_URL,
+			CONSENSUS_ADDRESS: MOCK_CHECKSUMMED_ADDRESS,
+			COORDINATOR_ADDRESS: MOCK_CHECKSUMMED_ADDRESS,
+			CHAIN_ID: 100,
+			PRIVATE_KEY: pk,
+			PARTICIPANTS: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266,0x6Adb3baB5730852eB53987EA89D8e8f16393C200",
+			GENESIS_SALT: MOCK_GENESIS_SALT,
+			BLOCKS_PER_EPOCH: "100",
+		};
+
+		const result = validatorConfigSchema.parse(validConfig);
+		expect(result).toEqual({
+			RPC_URL: MOCK_VALID_URL,
+			CONSENSUS_ADDRESS: MOCK_CHECKSUMMED_ADDRESS,
+			COORDINATOR_ADDRESS: MOCK_CHECKSUMMED_ADDRESS,
+			CHAIN_ID: 100,
+			PRIVATE_KEY: pk,
+			PARTICIPANTS: [
+				{ id: 1n, address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" },
+				{ id: 2n, address: "0x6Adb3baB5730852eB53987EA89D8e8f16393C200" },
+			],
+			GENESIS_SALT: MOCK_GENESIS_SALT,
+			BLOCKS_PER_EPOCH: 100n,
 		});
 	});
 
