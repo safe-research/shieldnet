@@ -415,8 +415,6 @@ contract Staking is Ownable {
                 withdrawalNodes[nextId].previous = withdrawalId;
             }
         }
-
-        emit WithdrawalInitiated(msg.sender, validator, withdrawalId, amount);
     }
 
     /**
