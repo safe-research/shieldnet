@@ -41,7 +41,7 @@ export const genesisSaltSchema = z.preprocess((val) => {
 }, hexBytes32Schema);
 
 const BLOCKTIME_IN_SECONDS = 5n; // value assumed for gnosis chain
-const BLOCKS_PER_EPOCH = (24n * 60n * 60n) / BLOCKTIME_IN_SECONDS; // ~ blocks for 5 minutes
+const BLOCKS_PER_EPOCH = (24n * 60n * 60n) / BLOCKTIME_IN_SECONDS; // ~ blocks for 1 day
 
 export const epochLengthSchema = z.preprocess((val) => {
 	if (val === undefined || val === "") {
