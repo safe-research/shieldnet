@@ -25,6 +25,7 @@ import type { StateStorage } from "../machine/storage/types.js";
 import type { EventTransition, StateTransition } from "../machine/transitions/types.js";
 import type { ConsensusState, MachineConfig, MachineStates, StateDiff } from "../machine/types.js";
 import type { Logger } from "../utils/logging.js";
+import { metrics } from "../utils/metrics.js";
 import { InMemoryQueue, type Queue } from "../utils/queue.js";
 
 const BLOCKS_PER_EPOCH = (24n * 60n * 60n) / 5n; // ~ blocks for 1 day
@@ -108,11 +109,15 @@ export class ShieldnetStateMachine {
 				for (const action of actions) {
 					this.#protocol.process(action);
 				}
+				metrics.transitions.labels({ result: "success" }).inc();
 			})
 			.catch((err) => {
 				this.#logger.warn(`Error performing state transition '${transition.id}':`, err);
+				metrics.transitions.labels({ result: "failure" }).inc();
 			})
 			.finally(() => {
+				metrics.blockNumber.set(Number(this.#lastProcessedBlock));
+				metrics.eventIndex.set(this.#lastProcessedIndex);
 				this.#transitionQueue.pop();
 				this.#currentTransition = undefined;
 				this.checkNextTransition();
