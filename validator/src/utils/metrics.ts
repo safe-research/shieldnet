@@ -2,71 +2,78 @@ import http, { type IncomingMessage, type Server, type ServerResponse } from "no
 import { Counter, collectDefaultMetrics, Gauge, Registry } from "prom-client";
 import type { Logger } from "./logging.js";
 
-// Collect some default NodeJS-related metrics.
-const register = new Registry();
-
-collectDefaultMetrics({
-	prefix: "validator_",
-	register,
-});
-
-export const metrics = {
-	blockNumber: new Gauge({
-		name: "validator_block_number",
-		help: "The last processed block number by the validator",
-		registers: [register],
-	}),
-	eventIndex: new Gauge({
-		name: "validator_event_index",
-		help: "The last processed event index by the validator",
-		registers: [register],
-	}),
-	transitions: new Counter({
-		name: "validator_transitions",
-		help: "Validator state transitions",
-		labelNames: ["result"],
-		registers: [register],
-	}),
+export type Metrics = {
+	blockNumber: Gauge;
+	eventIndex: Gauge;
+	transitions: Counter;
 };
 
 export type MetricsServiceOptions = {
 	logger: Logger;
+	host?: string;
 	port?: number;
 };
 
 export class MetricsService {
 	#logger: Logger;
+	#register: Registry;
+	#metrics: Metrics;
 	#server: Server;
-	#port: number;
+	#listen: { host: string; port: number };
 
-	constructor({ logger, port }: MetricsServiceOptions) {
+	constructor({ logger, host, port }: MetricsServiceOptions) {
 		this.#logger = logger;
+		this.#register = new Registry();
+		this.#metrics = {
+			blockNumber: new Gauge({
+				name: "validator_block_number",
+				help: "The last processed block number by the validator",
+				registers: [this.#register],
+			}),
+			eventIndex: new Gauge({
+				name: "validator_event_index",
+				help: "The last processed event index by the validator",
+				registers: [this.#register],
+			}),
+			transitions: new Counter({
+				name: "validator_transitions",
+				help: "Validator state transitions",
+				labelNames: ["result"],
+				registers: [this.#register],
+			}),
+		};
+		collectDefaultMetrics({
+			prefix: "validator_",
+			register: this.#register,
+		});
 		this.#server = http.createServer((req, res) => this.handler(req, res));
-		this.#port = port ?? 3555;
+		this.#listen = {
+			host: host ?? "localhost",
+			port: port ?? 3555,
+		};
+	}
+
+	get metrics(): Readonly<Metrics> {
+		return this.#metrics;
 	}
 
 	async start(): Promise<void> {
 		await new Promise((resolve) => {
-			this.#server.listen(
-				{
-					port: this.#port,
-				},
-				() => resolve(undefined),
-			);
+			this.#server.listen(this.#listen, () => resolve(undefined));
 		});
 
 		// In order to support `port = 0` for assigning a random port for
 		// for serving the metrics, make sure to read it back from the server
 		// address.
-		if (this.#port === 0) {
+		if (this.#listen.port === 0) {
 			const address = this.#server.address();
 			if (address === null || typeof address === "string") {
 				throw new Error("unexpected null or string server address after start");
 			}
-			this.#port = address.port;
+			this.#listen.port = address.port;
 		}
 
-		this.#logger.info(`serving metrics on :${this.#port}`);
+		this.#logger.info(`serving metrics on :${this.#listen.port}`);
 	}
 
 	stop(): Promise<void> {
@@ -78,8 +85,8 @@ export class MetricsService {
 
 	private async handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
 		if (req.url === "/metrics") {
-			res.writeHead(200, { "Content-Type": register.contentType });
-			res.end(await register.metrics());
+			res.writeHead(200, { "Content-Type": this.#register.contentType });
+			res.end(await this.#register.metrics());
 		} else {
 			res.writeHead(404, { "Content-Type": "text/plain" });
 			res.end("Not Found\n");

@@ -39,8 +39,8 @@ const config: ProtocolConfig = {
 const account = privateKeyToAccount(validatorConfig.PRIVATE_KEY);
 logger.info(`Using validator account ${account.address}`);
 
-const service = createValidatorService(account, rpcUrl, config, logger);
 const metrics = createMetricsService({ logger, port: validatorConfig.METRICS_PORT });
+const service = createValidatorService(account, rpcUrl, config, logger, metrics.metrics);
 
 // Handle graceful shutdown, for both `SIGINT` (i.e. Ctrl-C) and `SIGTERM` which
 // gets send when stopping a container or `kill`.
