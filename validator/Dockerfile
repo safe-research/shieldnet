@@ -38,7 +38,7 @@ COPY --from=builder /usr/src/app/validator/dist ./validator/dist
 # Additionally, `better-sqlite3` builds native code which is needed when
 # running, so make sure to copy that as well. This is a hacky work-around for
 # now, but should be revisited in the future.
-COPY --from=builder /usr/src/app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
+COPY --from=builder /usr/src/app/node_modules/better-sqlite3/build ./node_modules/better-sqlite3/build
 
 USER node
 ENV NODE_ENV production
