@@ -121,11 +121,26 @@ export class OnchainProtocol extends BaseProtocol {
 		return this.#signingClient.writeContract(request);
 	}
 
-	protected complain(_args: Complain): Promise<Hex> {
-		throw new Error("Method not implemented.");
+	protected async complain({ groupId, accused }: Complain): Promise<Hex> {
+		const { request } = await this.#publicClient.simulateContract({
+			address: this.#coordinator,
+			abi: COORDINATOR_FUNCTIONS,
+			functionName: "keyGenComplain",
+			args: [groupId, accused],
+			account: this.#signingClient.account,
+		});
+		return this.#signingClient.writeContract(request);
 	}
-	protected complaintReponse(_args: ComplaintResponse): Promise<Hex> {
-		throw new Error("Method not implemented.");
+
+	protected async complaintReponse({ groupId, plaintiff, secretShare }: ComplaintResponse): Promise<Hex> {
+		const { request } = await this.#publicClient.simulateContract({
+			address: this.#coordinator,
+			abi: COORDINATOR_FUNCTIONS,
+			functionName: "keyGenComplaintResponse",
+			args: [groupId, plaintiff, secretShare],
+			account: this.#signingClient.account,
+		});
+		return this.#signingClient.writeContract(request);
 	}
 
 	protected async confirmKeyGen({ groupId, callbackContext }: ConfirmKeyGen): Promise<Hex> {
