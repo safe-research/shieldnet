@@ -83,7 +83,7 @@ export abstract class BaseProtocol implements ShieldnetProtocol {
 			case "key_gen_complain":
 				return await this.complain(action);
 			case "key_gen_complaint_response":
-				return await this.complaintReponse(action);
+				return await this.complaintResponse(action);
 			case "key_gen_confirm":
 				return await this.confirmKeyGen(action);
 			case "sign_request":
@@ -106,7 +106,7 @@ export abstract class BaseProtocol implements ShieldnetProtocol {
 
 	protected abstract complain(args: Complain): Promise<Hex>;
 
-	protected abstract complaintReponse(args: ComplaintResponse): Promise<Hex>;
+	protected abstract complaintResponse(args: ComplaintResponse): Promise<Hex>;
 
 	protected abstract confirmKeyGen(args: ConfirmKeyGen): Promise<Hex>;
 

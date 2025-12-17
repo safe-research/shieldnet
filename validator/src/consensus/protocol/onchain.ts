@@ -132,7 +132,7 @@ export class OnchainProtocol extends BaseProtocol {
 		return this.#signingClient.writeContract(request);
 	}
 
-	protected async complaintReponse({ groupId, plaintiff, secretShare }: ComplaintResponse): Promise<Hex> {
+	protected async complaintResponse({ groupId, plaintiff, secretShare }: ComplaintResponse): Promise<Hex> {
 		const { request } = await this.#publicClient.simulateContract({
 			address: this.#coordinator,
 			abi: COORDINATOR_FUNCTIONS,

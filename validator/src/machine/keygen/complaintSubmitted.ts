@@ -23,18 +23,17 @@ export const handleComplaintSubmitted = async (
 		return {};
 	}
 
-	// Copy complaints records
-	const complaints = { ...machineStates.rollover.complaints };
+	const accusedId = event.accused.toString();
 	// Get or create complaints entry for accused
-	const complaint =
-		complaints[event.accused.toString()] !== undefined
-			? { ...complaints[event.accused.toString()] }
-			: { total: 0n, unresponded: 0n };
-	// Update entry values
-	complaint.total++;
-	complaint.unresponded++;
-	// Set updated entry in new state
-	complaints[event.accused.toString()] = complaint;
+	const complaint = machineStates.rollover.complaints[accusedId] ?? { total: 0n, unresponded: 0n };
+	// Copy complaints with update
+	const complaints = {
+		...machineStates.rollover.complaints,
+		[accusedId]: {
+			total: complaint.total + 1n,
+			unresponded: complaint.unresponded + 1n,
+		},
+	};
 
 	const rollover: RolloverState = {
 		...machineStates.rollover,
