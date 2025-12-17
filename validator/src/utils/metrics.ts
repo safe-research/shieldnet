@@ -19,7 +19,7 @@ export class MetricsService {
 	#register: Registry;
 	#metrics: Metrics;
 	#server: Server;
-	#listen: { host: string; port: number };
+	#listenOptions: { host: string; port: number };
 
 	constructor({ logger, host, port }: MetricsServiceOptions) {
 		this.#logger = logger;
@@ -47,7 +47,7 @@ export class MetricsService {
 			register: this.#register,
 		});
 		this.#server = http.createServer((req, res) => this.handler(req, res));
-		this.#listen = {
+		this.#listenOptions = {
 			host: host ?? "localhost",
 			port: port ?? 3555,
 		};
@@ -59,21 +59,21 @@ export class MetricsService {
 
 	async start(): Promise<void> {
 		await new Promise((resolve) => {
-			this.#server.listen(this.#listen, () => resolve(undefined));
+			this.#server.listen(this.#listenOptions, () => resolve(undefined));
 		});
 
 		// In order to support `port = 0` for assigning a random port for
 		// for serving the metrics, make sure to read it back from the server
 		// address.
-		if (this.#listen.port === 0) {
+		if (this.#listenOptions.port === 0) {
 			const address = this.#server.address();
 			if (address === null || typeof address === "string") {
 				throw new Error("unexpected null or string server address after start");
 			}
-			this.#listen.port = address.port;
+			this.#listenOptions.port = address.port;
 		}
 
-		this.#logger.info(`serving metrics on :${this.#listen.port}`);
+		this.#logger.info(`serving metrics on :${this.#listenOptions.port}`);
 	}
 
 	stop(): Promise<void> {
