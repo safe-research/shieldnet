@@ -408,10 +408,6 @@ struct
               |> Option.get
             in
             let (Local coefficients) = vss.coefficients in
-            let shares =
-              ParticipantMap.singleton me
-                (Some (FROST.KeyGen.secret_share coefficients me))
-            in
             let encrypted_shares =
               participant_set participants
               |> ParticipantSet.remove me |> ParticipantSet.to_list
@@ -433,7 +429,7 @@ struct
                   epoch;
                   group = { id = group; participants; key; me = Local me };
                   vss;
-                  shares = Local shares;
+                  shares = Local ParticipantMap.empty;
                   complaints = ParticipantMap.empty;
                   deadline = state.block + Configuration.key_gen_block_timeout;
                 }
@@ -471,25 +467,34 @@ struct
       when GroupId.equal st.group.id group_id -> begin
         let (Local me) = st.group.me in
         let (Local coefficients) = st.vss.coefficients in
-        let secret_share, actions_complaint =
-          let i =
-            FROST.Identifier.to_int me
-            - if FROST.Identifier.compare me identifier < 0 then 1 else 2
-          in
-          let encrypted = List.nth secret_shares i in
-          let participant_commitments =
-            ParticipantMap.find identifier st.vss.commitments
-          in
-          let value =
-            FROST.KeyGen.decrypt_secret_share coefficients
-              participant_commitments encrypted
-          in
-          if FROST.KeyGen.verify_secret_share participant_commitments value then
-            (Some value, [])
-          else (None, [ `Coordinator_key_gen_complain (group_id, identifier) ])
-        in
         let (Local shares) = st.shares in
-        let shares' = ParticipantMap.add identifier secret_share shares in
+        let shares', actions_complaint =
+          if FROST.Identifier.equal me identifier then
+            let my_share = FROST.KeyGen.secret_share coefficients me in
+            let shares' = ParticipantMap.add me (Some my_share) shares in
+            (shares', [])
+          else
+            let secret_share, actions_complaint =
+              let i =
+                FROST.Identifier.to_int me
+                - if FROST.Identifier.compare me identifier < 0 then 1 else 2
+              in
+              let encrypted = List.nth secret_shares i in
+              let participant_commitments =
+                ParticipantMap.find identifier st.vss.commitments
+              in
+              let value =
+                FROST.KeyGen.decrypt_secret_share coefficients
+                  participant_commitments encrypted
+              in
+              if FROST.KeyGen.verify_secret_share participant_commitments value
+              then (Some value, [])
+              else
+                (None, [ `Coordinator_key_gen_complain (group_id, identifier) ])
+            in
+            let shares' = ParticipantMap.add identifier secret_share shares in
+            (shares', actions_complaint)
+        in
         let state', actions_confirm =
           if
             AddressSet.cardinal st.group.participants
