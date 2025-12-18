@@ -37,9 +37,9 @@ export type KeygenInfo = {
  */
 export class KeyGenClient {
 	#storage: GroupInfoStorage & KeyGenInfoStorage;
-	#logger?: Logger;
+	#logger: Logger;
 
-	constructor(storage: GroupInfoStorage & KeyGenInfoStorage, logger?: Logger) {
+	constructor(storage: GroupInfoStorage & KeyGenInfoStorage, logger: Logger) {
 		this.#storage = storage;
 		this.#logger = logger;
 	}
@@ -210,7 +210,7 @@ export class KeyGenClient {
 		}
 		const participantId = this.#storage.participantId(groupId);
 		if (senderId === participantId) {
-			this.#logger?.debug("Register own shares");
+			this.#logger.debug("Register own shares");
 			const coefficients = this.#storage.coefficients(groupId);
 			this.#storage.registerSecretShare(groupId, participantId, evalPoly(coefficients, participantId));
 			return this.finalizeSharesIfPossible(groupId);
