@@ -7,6 +7,8 @@ import { BaseProtocol } from "./base.js";
 import type {
 	ActionWithTimeout,
 	AttestTransaction,
+	Complain,
+	ComplaintResponse,
 	ConfirmKeyGen,
 	PublishSecretShares,
 	PublishSignatureShare,
@@ -115,6 +117,28 @@ export class OnchainProtocol extends BaseProtocol {
 			],
 			account: this.#signingClient.account,
 			gas: 300_000n,
+		});
+		return this.#signingClient.writeContract(request);
+	}
+
+	protected async complain({ groupId, accused }: Complain): Promise<Hex> {
+		const { request } = await this.#publicClient.simulateContract({
+			address: this.#coordinator,
+			abi: COORDINATOR_FUNCTIONS,
+			functionName: "keyGenComplain",
+			args: [groupId, accused],
+			account: this.#signingClient.account,
+		});
+		return this.#signingClient.writeContract(request);
+	}
+
+	protected async complaintResponse({ groupId, plaintiff, secretShare }: ComplaintResponse): Promise<Hex> {
+		const { request } = await this.#publicClient.simulateContract({
+			address: this.#coordinator,
+			abi: COORDINATOR_FUNCTIONS,
+			functionName: "keyGenComplaintResponse",
+			args: [groupId, plaintiff, secretShare],
+			account: this.#signingClient.account,
 		});
 		return this.#signingClient.writeContract(request);
 	}

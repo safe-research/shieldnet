@@ -30,6 +30,8 @@ export const COORDINATOR_FUNCTIONS = parseAbi([
 	"function keyGenAndCommit(bytes32 participants, uint64 count, uint64 threshold, bytes32 context, uint256 identifier, bytes32[] poap, ((uint256 x, uint256 y)[] c, (uint256 x, uint256 y) r, uint256 mu) commitment) external",
 	"function keyGenCommit(bytes32 gid, uint256 identifier, bytes32[] poap, ((uint256 x, uint256 y)[] c, (uint256 x, uint256 y) r, uint256 mu) commitment) external",
 	"function keyGenSecretShare(bytes32 gid, ((uint256 x, uint256 y) y, uint256[] f) share) external",
+	"function keyGenComplain(bytes32 gid, uint256 accused) external",
+	"function keyGenComplaintResponse(bytes32 gid, uint256 plaintiff, uint256 secretShare) external",
 	"function keyGenConfirm(bytes32 gid) external",
 	"function keyGenConfirmWithCallback(bytes32 gid, (address target, bytes context) callback) external",
 	"function preprocess(bytes32 id, bytes32 commitment) external returns (uint32 chunk)",

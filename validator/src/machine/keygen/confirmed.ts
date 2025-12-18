@@ -32,18 +32,20 @@ export const handleKeyGenConfirmed = async (
 	const groupId = event.gid;
 
 	// Track this confirmation
-	const sharesFrom = [...machineStates.rollover.sharesFrom, event.identifier];
+	const confirmationsFrom = [...machineStates.rollover.confirmationsFrom, event.identifier];
 	const participants = signingClient.participants(groupId);
-	const allConfirmed = participants.every((p) => sharesFrom.includes(p));
+	const allConfirmed = participants.every((p) => confirmationsFrom.includes(p));
 
-	logger?.(`Group ${groupId} confirmation from ${event.identifier} (${sharesFrom.length}/${participants.length})`);
+	logger?.(
+		`Group ${groupId} confirmation from ${event.identifier} (${confirmationsFrom.length}/${participants.length})`,
+	);
 
 	// Still waiting for confirmations
 	if (!allConfirmed) {
 		return {
 			rollover: {
 				...machineStates.rollover,
-				sharesFrom,
+				confirmationsFrom,
 				lastParticipant: event.identifier,
 			},
 		};
