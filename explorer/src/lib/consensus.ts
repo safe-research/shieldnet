@@ -69,12 +69,17 @@ export const loadRecentTransactionProposals = async (
 	});
 	console.log({ logs });
 	return logs
+        .sort((left, right) => {
+            if (left.blockNumber !== right.blockNumber) {
+                return left.blockNumber < right.blockNumber ? 1 : -1;
+            }
+            return right.logIndex - left.logIndex;
+        })
 		.map((log) => {
 			const event = transactionProposedEventSchema.safeParse(log.args);
 			return event.success ? event.data : undefined;
 		})
-		.filter((entry) => entry !== undefined)
-		.reverse();
+		.filter((entry) => entry !== undefined);
 };
 
 export type TransactionDetails = {
