@@ -212,8 +212,7 @@ export class KeyGenClient {
 		if (senderId === participantId) {
 			this.#logger.debug("Register own shares");
 			const coefficients = this.#storage.coefficients(groupId);
-			this.#storage.registerSecretShare(groupId, participantId, evalPoly(coefficients, participantId));
-			return this.finalizeSharesIfPossible(groupId);
+			return registerSecretShare(groupId, participantId, evalPoly(coefficients, participantId));
 		}
 		// TODO: check if we should use a reasonable limit for the id (current uint256)
 		const shareIndex = participantId < senderId ? participantId : participantId - 1n;
