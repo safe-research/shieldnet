@@ -2,8 +2,8 @@
 pragma solidity ^0.8.30;
 
 import {Test} from "@forge-std/Test.sol";
-import {Staking} from "../src/Staking.sol";
-import {ERC20} from "@oz/token/ERC20/ERC20.sol";
+import {Staking, Ownable} from "../src/Staking.sol";
+import {ERC20, IERC20Errors} from "@oz/token/ERC20/ERC20.sol";
 
 contract MockERC20 is ERC20 {
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
@@ -142,6 +142,7 @@ contract StakingTest is Test {
 
     function test_RevertWhen_Constructor_InvalidDelay() public {
         vm.expectRevert(Staking.InvalidParameter.selector);
+        // forge-lint: disable-next-line(unsafe-typecast)
         new Staking(owner, address(token), uint128(CONFIG_TIME_DELAY + 1), CONFIG_TIME_DELAY);
     }
 
@@ -432,6 +433,7 @@ contract StakingTest is Test {
     function test_RevertWhen_ProposeWithdrawDelay_Invalid() public {
         vm.startPrank(owner);
         vm.expectRevert(Staking.InvalidParameter.selector);
+        // forge-lint: disable-next-line(unsafe-typecast)
         staking.proposeWithdrawDelay(uint128(CONFIG_TIME_DELAY + 1));
         vm.stopPrank();
     }
@@ -553,7 +555,9 @@ contract StakingTest is Test {
         token.approve(address(staking), 0);
 
         vm.prank(staker);
-        vm.expectRevert();
+        vm.expectRevert(
+            abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(staking), 0, 100 ether)
+        );
         staking.stake(validator, 100 ether);
     }
 
@@ -564,7 +568,9 @@ contract StakingTest is Test {
         vm.startPrank(poorStaker);
         token.approve(address(staking), type(uint256).max);
 
-        vm.expectRevert();
+        vm.expectRevert(
+            abi.encodeWithSelector(IERC20Errors.ERC20InsufficientBalance.selector, poorStaker, 10 ether, 100 ether)
+        );
         staking.stake(validator, 100 ether); // More than balance
         vm.stopPrank();
     }
@@ -822,19 +828,17 @@ contract StakingTest is Test {
         assertEq(next2, 0);
         assertEq(prev3, 1);
         assertEq(next3, 2);
-        vm.stopPrank();
     }
 
     function test_InitiateWithdrawalAtPosition_Head() public {
         uint256 stakeAmount = 100 ether;
-        vm.startPrank(staker);
+        vm.prank(staker);
         staking.stake(validator, stakeAmount);
 
         // Change withdraw Delay to 10s for easier testing
-        vm.startPrank(owner);
+        vm.prank(owner);
         staking.proposeWithdrawDelay(10);
         vm.warp(block.timestamp + CONFIG_TIME_DELAY);
-        vm.stopPrank();
 
         // 1. Initiate W1 at time T
         vm.startPrank(staker);
@@ -861,14 +865,12 @@ contract StakingTest is Test {
         assertEq(next1, 0);
         assertEq(prev2, 0);
         assertEq(next2, 1);
-        vm.stopPrank();
     }
 
     function test_RevertWhen_InitiateWithdrawalAtPosition_InvalidOrdering() public {
         uint256 stakeAmount = 100 ether;
-        vm.startPrank(staker);
+        vm.prank(staker);
         staking.stake(validator, stakeAmount);
-        vm.stopPrank();
 
         // Change withdraw Delay to 20s for easier testing and queue up the next withdraw delay to 1s
         vm.startPrank(owner);
@@ -1185,13 +1187,13 @@ contract StakingTest is Test {
         isRegistration[0] = true;
 
         vm.prank(staker);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, staker));
         staking.proposeValidators(validators, isRegistration);
     }
 
     function test_RevertWhen_ProposeWithdrawDelay_NotOwner() public {
         vm.prank(staker);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, staker));
         staking.proposeWithdrawDelay(2 days);
     }
 
@@ -1200,7 +1202,7 @@ contract StakingTest is Test {
         randomToken.mint(address(staking), 100 ether);
 
         vm.prank(staker);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, staker));
         staking.recoverTokens(address(randomToken), staker);
     }
 
