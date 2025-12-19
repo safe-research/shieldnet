@@ -230,6 +230,8 @@ contract StakingTest is Test {
         vm.expectEmit(true, false, false, true);
         emit ValidatorUpdated(other, true);
 
+        assertFalse(staking.isValidator(other));
+
         staking.executeValidatorChanges(validators, isRegistration, executableAt);
 
         assertTrue(staking.isValidator(other));
