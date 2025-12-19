@@ -12,7 +12,7 @@ set -euo pipefail
 #                   backing up any existing storage file. The `%s` in the
 #                   format string will be replaced with a timestamp.
 
-if [[ -f "$STORAGE_FILE" && -n "$STORAGE_BACKUP" ]]; then
+if [[ -f "${STORAGE_FILE:-}" && -n "${STORAGE_BACKUP:-}" ]]; then
 	timestamp="$(date +%s)"
 	backup_file="$(printf "$STORAGE_BACKUP" "$timestamp")"
 	cp "$STORAGE_FILE" "$backup_file"
