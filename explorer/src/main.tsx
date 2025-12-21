@@ -1,4 +1,4 @@
-import { createRouter, RouterProvider } from "@tanstack/react-router";
+import { createRouter, RouterProvider, stringifySearchWith } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
 
@@ -9,6 +9,7 @@ import { routeTree } from "@/routeTree.gen";
 
 import "@/styles.css";
 import reportWebVitals from "@/reportWebVitals.ts";
+import { jsonReplacer } from "./lib/utils";
 
 /**
  * TanStack Router instance configured with the generated route tree and TanStack Query context.
@@ -21,6 +22,7 @@ const router = createRouter({
 	},
 	defaultPreload: "intent",
 	scrollRestoration: true,
+	stringifySearch: stringifySearchWith((s) => JSON.stringify(s, jsonReplacer)),
 	defaultStructuralSharing: true,
 	defaultPreloadStaleTime: 0,
 });

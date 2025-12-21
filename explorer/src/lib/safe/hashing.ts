@@ -1,5 +1,6 @@
-import { type Hex, hashTypedData, zeroAddress } from "viem";
-import type { TransactionProposal } from "./consensus";
+import { type Hex, hashStruct, hashTypedData, zeroAddress } from "viem";
+import type { TransactionProposal } from "../consensus";
+import type { SafeTransaction } from "./service";
 
 const SAFE_TX_TYPE = {
 	SafeTx: [
@@ -42,3 +43,20 @@ export const calculateSafeTxHash = ({ transaction }: TransactionProposal): Hex =
 		message,
 	});
 };
+
+export const metaTxHash = (transaction: SafeTransaction): Hex =>
+	hashStruct({
+		types: {
+			MetaTransaction: [
+				{ type: "uint256", name: "chainId" },
+				{ type: "address", name: "account" },
+				{ type: "address", name: "to" },
+				{ type: "uint256", name: "value" },
+				{ type: "uint8", name: "operation" },
+				{ type: "bytes", name: "data" },
+				{ type: "uint256", name: "nonce" },
+			],
+		},
+		primaryType: "MetaTransaction",
+		data: transaction,
+	});

@@ -1,15 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { useMemo } from "react";
-import { formatEther, type Hex, size } from "viem";
-import { useSettings } from "@/hooks/useSettings";
-import { shortAddress } from "@/lib/address";
 import type { TransactionProposal } from "@/lib/consensus";
-import { calculateSafeTxHash } from "@/lib/safe";
+import { calculateSafeTxHash } from "@/lib/safe/hashing";
 import { Box } from "../Groups";
-
-const opString = (operation: 0 | 1) => (operation === 0 ? "CALL" : "DELEGATECALL");
-const valueString = (value: bigint) => `${formatEther(value)} ETH`;
-const dataString = (data: Hex) => `${size(data)} bytes of data`;
+import { SafeTxOverview } from "./SafeTxOverview";
 
 export const TransactionProposalDetails = ({
 	proposal,
@@ -21,35 +15,9 @@ export const TransactionProposalDetails = ({
 	const safeTxHash = useMemo(() => {
 		return calculateSafeTxHash(proposal);
 	}, [proposal]);
+	const timestamp = hideProposedAt ? undefined : proposal.proposedAt.toString();
 	return (
-		<>
-			<div className={"flex justify-between"}>
-				<p className={"text-xs"}>Safe Tx Hash: {safeTxHash}</p>
-				{hideProposedAt !== true && <p className={"text-xs"}>{proposal.proposedAt}</p>}
-			</div>
-			<p>
-				{shortAddress(proposal.transaction.account)} on {proposal.transaction.chainId}
-			</p>
-			<p>
-				{opString(proposal.transaction.operation)} {shortAddress(proposal.transaction.to)} with{" "}
-				{valueString(proposal.transaction.value)} and {dataString(proposal.transaction.data)}
-			</p>
-		</>
-	);
-};
-
-export const TransactionProposalDataDetails = ({ proposal }: { proposal: TransactionProposal }) => {
-	const [settings] = useSettings();
-	return (
-		<>
-			<div className={"flex justify-between"}>
-				<p className={"text-xs"}>Data ({dataString(proposal.transaction.data)})</p>
-				<a className={"text-xs"} href={`${settings.decoder}${proposal.transaction.data}`} target="_blank">
-					decode
-				</a>
-			</div>
-			<p className={"break-all font-mono"}>{proposal.transaction.data}</p>
-		</>
+		<SafeTxOverview transaction={proposal.transaction} title={`Safe Tx Hash: ${safeTxHash}`} timestamp={timestamp} />
 	);
 };
 

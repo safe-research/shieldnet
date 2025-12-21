@@ -56,11 +56,44 @@ export type TransactionProposal = z.output<typeof transactionProposedEventSchema
 
 const MAX_BLOCKS_RANGE = 50000n;
 
+export const loadMessagesForTransaction = async (
+	provider: PublicClient,
+	consensus: Address,
+	proposalTxHash: Hex,
+): Promise<TransactionProposal[]> => {
+	const blockNo = await provider.getBlockNumber();
+	const logs = await provider.getLogs({
+		address: consensus,
+		event: getAbiItem({
+			abi: consensusAbi,
+			name: "TransactionProposed",
+		}),
+		args: {
+			transactionHash: proposalTxHash,
+		},
+		fromBlock: blockNo - MAX_BLOCKS_RANGE,
+	});
+	return logs
+		.sort((left, right) => {
+			if (left.blockNumber !== right.blockNumber) {
+				return left.blockNumber < right.blockNumber ? 1 : -1;
+			}
+			return right.logIndex - left.logIndex;
+		})
+		.map((log) => {
+			const event = transactionProposedEventSchema.safeParse({
+				...log.args,
+				proposedAt: log.blockNumber,
+			});
+			return event.success ? event.data : undefined;
+		})
+		.filter((entry) => entry !== undefined);
+};
+
 export const loadRecentTransactionProposals = async (
 	provider: PublicClient,
 	consensus: Address,
 ): Promise<TransactionProposal[]> => {
-	console.log("loadRecentTransactionProposals");
 	const blockNo = await provider.getBlockNumber();
 	const logs = await provider.getLogs({
 		address: consensus,
@@ -70,7 +103,6 @@ export const loadRecentTransactionProposals = async (
 		}),
 		fromBlock: blockNo - MAX_BLOCKS_RANGE,
 	});
-	console.log({ logs });
 	return logs
 		.sort((left, right) => {
 			if (left.blockNumber !== right.blockNumber) {
