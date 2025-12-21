@@ -3,8 +3,6 @@ import { Link } from "@tanstack/react-router";
 import { useConsensusState } from "@/hooks/useConsensusState";
 import { SafeResearchBanner } from "./SafeResearch";
 
-// TODO: move to some util
-
 export default function Header() {
 	const state = useConsensusState();
 	return (

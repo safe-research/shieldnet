@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { Container } from "@/components/Groups";
-import { TransactionProposalList } from "@/components/transaction/proposals";
+import { TransactionProposalList } from "@/components/transaction/Proposals";
 import { useRecentTransactionProposals } from "@/hooks/useRecentTransactions";
 
 const SafeIllustration = () => (

@@ -25,7 +25,6 @@ export const loadConsensusState = async (provider: PublicClient, consensus: Addr
 		abi: consensusAbi,
 		functionName: "getActiveEpoch",
 	});
-	console.log({ epoch });
 	return {
 		currentEpoch: epoch,
 		currentGroupId: groupId,

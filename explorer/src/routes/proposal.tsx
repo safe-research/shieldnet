@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import z from "zod";
 import { ConditionalBackButton } from "@/components/BackButton";
-import { Box, Container } from "@/components/Groups";
-import { TransactionProposalDataDetails, TransactionProposalDetails } from "@/components/transaction/proposals";
+import { Box, Container, ContainerTitle } from "@/components/Groups";
+import { TransactionProposalDataDetails, TransactionProposalDetails } from "@/components/transaction/Proposals";
 import { useTransactionProposalDetails } from "@/hooks/useTransactionDetails";
 import { bytes32Schema } from "@/lib/schemas";
 
@@ -22,6 +22,7 @@ export function Proposal() {
 	return (
 		<Container>
 			<ConditionalBackButton />
+			<ContainerTitle>Proposal Details</ContainerTitle>
 			{details.isLoading && "Loading ..."}
 			{details.data !== null && (
 				<div className={"space-y-4"}>

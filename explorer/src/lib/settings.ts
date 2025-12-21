@@ -28,6 +28,6 @@ export function loadSettings(): Settings {
 	}
 }
 
-export function updateSettings(settings: Settings) {
+export function updateSettings(settings: Partial<Settings>) {
 	localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
 }

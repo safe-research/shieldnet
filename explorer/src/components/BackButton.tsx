@@ -1,5 +1,6 @@
 import type { ToPathOption } from "@tanstack/react-router";
 import { Link, useCanGoBack, useRouter } from "@tanstack/react-router";
+import { cn } from "@/lib/utils";
 
 interface BackButtonProps {
 	/** The path to link to. Should be a registered route. */
@@ -23,7 +24,7 @@ function BackButton({ to, search, children, className = "" }: BackButtonProps) {
 		<Link
 			to={to}
 			search={search}
-			className={`inline-flex items-center text-button-content hover:underline ${className}`}
+			className={cn("cursor-pointer inline-flex items-center text-sub-title hover:underline", className)}
 		>
 			← {children}
 		</Link>
@@ -43,7 +44,7 @@ function ConditionalBackButton({ className = "" }: { className?: string }) {
 		<button
 			type="button"
 			onClick={() => router.history.back()}
-			className={`inline-flex items-center text-button-content hover:underline ${className}`}
+			className={cn("cursor-pointer inline-flex items-center text-sub-title hover:underline", className)}
 		>
 			← Back
 		</button>
