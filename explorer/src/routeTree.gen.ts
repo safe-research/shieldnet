@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProposalRouteImport } from './routes/proposal'
+import { Route as EpochRouteImport } from './routes/epoch'
 import { Route as IndexRouteImport } from './routes/index'
 
 const SettingsRoute = SettingsRouteImport.update({
@@ -23,6 +24,11 @@ const ProposalRoute = ProposalRouteImport.update({
   path: '/proposal',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EpochRoute = EpochRouteImport.update({
+  id: '/epoch',
+  path: '/epoch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -31,30 +37,34 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/epoch': typeof EpochRoute
   '/proposal': typeof ProposalRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/epoch': typeof EpochRoute
   '/proposal': typeof ProposalRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/epoch': typeof EpochRoute
   '/proposal': typeof ProposalRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/proposal' | '/settings'
+  fullPaths: '/' | '/epoch' | '/proposal' | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/proposal' | '/settings'
-  id: '__root__' | '/' | '/proposal' | '/settings'
+  to: '/' | '/epoch' | '/proposal' | '/settings'
+  id: '__root__' | '/' | '/epoch' | '/proposal' | '/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  EpochRoute: typeof EpochRoute
   ProposalRoute: typeof ProposalRoute
   SettingsRoute: typeof SettingsRoute
 }
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProposalRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/epoch': {
+      id: '/epoch'
+      path: '/epoch'
+      fullPath: '/epoch'
+      preLoaderRoute: typeof EpochRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  EpochRoute: EpochRoute,
   ProposalRoute: ProposalRoute,
   SettingsRoute: SettingsRoute,
 }

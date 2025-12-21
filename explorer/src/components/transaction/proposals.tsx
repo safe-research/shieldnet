@@ -69,7 +69,7 @@ export const TransactionProposalList = ({
 				{proposals.slice(0, itemsToDisplay).map((proposal) => (
 					<div key={proposal.message}>
 						<Link to="/proposal" search={{ id: proposal.message }}>
-							<Box className={"hover:bg-gray-100"}>
+							<Box className={"hover:bg-surface-hover"}>
 								<TransactionProposalDetails proposal={proposal} />
 							</Box>
 						</Link>

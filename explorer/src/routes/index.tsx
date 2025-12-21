@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
+import { Container } from "@/components/Groups";
 import { TransactionProposalList } from "@/components/transaction/proposals";
 import { useRecentTransactionProposals } from "@/hooks/useRecentTransactions";
 
@@ -35,39 +36,36 @@ function AppInner() {
 	const navigate = useNavigate({ from: Route.fullPath });
 
 	const handleShowMore = () => {
-		// 2. Update the URL. This triggers a re-render automatically.
 		navigate({
-			search: (prev) => ({ ...prev, limit: prev.limit + PAGE_SIZE }),
+			search: (prev) => ({ ...prev, limit: (prev.limit ?? PAGE_SIZE) + PAGE_SIZE }),
 			resetScroll: false,
 			replace: true,
 		});
 	};
 	return (
-		<div className="bg-gray-50 h-full max-h-full">
-			<div className="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
-				<div className="text-center mb-12">
-					<h1 className="text-3xl font-bold text-gray-900 sm:text-4xl mb-4">Shieldnet Explorer</h1>
-					<p className="text-lg text-gray-700 max-w-2xl mx-auto">Explore the future of transaction security!</p>
-				</div>
-
-				{recentProposals.data.length > 0 ? (
-					<TransactionProposalList
-						proposals={recentProposals.data}
-						itemsToDisplay={limit}
-						onShowMore={handleShowMore}
-					/>
-				) : (
-					<div className="bg-white rounded-lg shadow-md p-8 border border-gray-200 max-w-2xl mx-auto">
-						<SafeIllustration />
-					</div>
-				)}
+		<Container>
+			<div className="text-center mb-12">
+				<h1 className="text-3xl font-bold text-title sm:text-4xl mb-4">Shieldnet Explorer</h1>
+				<p className="text-lg text-sub-title max-w-2xl mx-auto">Explore the future of transaction security!</p>
 			</div>
-		</div>
+
+			{recentProposals.data.length > 0 ? (
+				<TransactionProposalList
+					proposals={recentProposals.data}
+					itemsToDisplay={limit ?? PAGE_SIZE}
+					onShowMore={handleShowMore}
+				/>
+			) : (
+				<div className="bg-white rounded-lg shadow-md p-8 border border-surface-outline max-w-2xl mx-auto">
+					<SafeIllustration />
+				</div>
+			)}
+		</Container>
 	);
 }
 
 const entriesSearchSchema = z.object({
-	limit: z.number().catch(PAGE_SIZE),
+	limit: z.number().optional().catch(PAGE_SIZE),
 });
 
 export const Route = createFileRoute("/")({

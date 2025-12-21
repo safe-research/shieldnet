@@ -36,6 +36,28 @@
     
     <link rel="apple-touch-icon" href="/logo192.png" />
     <link rel="manifest" href="/manifest.json" />
+    <script>
+      // This script runs immediately, preventing the "white flash"
+      (function() {
+        try {
+          const theme = localStorage.getItem('theme');
+          const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+          
+          if (theme === 'dark' || (!theme && supportDarkMode)) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+          window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            if (!localStorage.getItem('theme')) { // Only update if user hasn't set a manual preference
+              document.documentElement.classList.toggle('dark', e.matches);
+            }
+          });
+        } catch (e) {
+          console.error("Theme detection failed", e);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

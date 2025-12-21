@@ -20,7 +20,11 @@ interface BackButtonProps {
  */
 function BackButton({ to, search, children, className = "" }: BackButtonProps) {
 	return (
-		<Link to={to} search={search} className={`inline-flex items-center text-black hover:underline ${className}`}>
+		<Link
+			to={to}
+			search={search}
+			className={`inline-flex items-center text-button-content hover:underline ${className}`}
+		>
 			← {children}
 		</Link>
 	);
@@ -39,7 +43,7 @@ function ConditionalBackButton({ className = "" }: { className?: string }) {
 		<button
 			type="button"
 			onClick={() => router.history.back()}
-			className={`inline-flex items-center text-black hover:underline ${className}`}
+			className={`inline-flex items-center text-button-content hover:underline ${className}`}
 		>
 			← Back
 		</button>

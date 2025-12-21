@@ -1,7 +1,7 @@
 export const SafeResearchBanner = () => {
 	return (
 		<div
-			className="flex items-center p-2 text-sm text-yellow-800 border border-yellow-300 rounded-lg bg-yellow-50"
+			className="flex items-center p-2 text-sm text-warning border border-warning-outline rounded-lg bg-warning-surface"
 			role="alert"
 		>
 			<svg
@@ -20,7 +20,7 @@ export const SafeResearchBanner = () => {
 
 export const SafeResearchFooter = ({ repo }: { repo: string }) => {
 	return (
-		<div className="text-sm text-gray-700 bg-gray-50 text-center text-gray pb-12">
+		<div className="text-sm text-title bg-surface-0 text-center pb-12">
 			<a href="https://github.com/safe-research" target="_blank" rel="noopener noreferrer" className="hover:underline">
 				Built by Safe Research
 			</a>
