@@ -15,7 +15,7 @@ export const TransactionProposalDetails = ({
 	disableLinks?: boolean;
 }) => {
 	const safeTxHash = useMemo(() => {
-		return calculateSafeTxHash(proposal);
+		return calculateSafeTxHash(proposal.transaction);
 	}, [proposal]);
 	const timestamp = hideProposedAt ? undefined : proposal.proposedAt.toString();
 	return (

@@ -1,5 +1,5 @@
 import { type Hex, hashStruct, hashTypedData, zeroAddress } from "viem";
-import type { TransactionProposal } from "../consensus";
+import type { MetaTransaction } from "../consensus";
 import type { SafeTransaction } from "./service";
 
 const SAFE_TX_TYPE = {
@@ -17,7 +17,7 @@ const SAFE_TX_TYPE = {
 	],
 };
 
-export const calculateSafeTxHash = ({ transaction }: TransactionProposal): Hex => {
+export const calculateSafeTxHash = (transaction: MetaTransaction): Hex => {
 	const domain = {
 		chainId: transaction.chainId,
 		verifyingContract: transaction.account,
