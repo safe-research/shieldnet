@@ -5,7 +5,7 @@ import type { GroupInfoStorage, KeyGenInfoStorage, Participant, SignatureRequest
 
 type GroupInfo = {
 	groupId: GroupId;
-	participants: Participant[];
+	participants: readonly Participant[];
 	participantId: bigint;
 	threshold: bigint;
 	verificationShare?: FrostPoint;
@@ -14,8 +14,8 @@ type GroupInfo = {
 };
 
 type KeyGenInfo = {
-	coefficients: bigint[];
-	commitments: Map<ParticipantId, FrostPoint[]>;
+	coefficients: readonly bigint[];
+	commitments: Map<ParticipantId, readonly FrostPoint[]>;
 	secretShares: Map<ParticipantId, bigint>;
 };
 
@@ -69,7 +69,7 @@ export class InMemoryClientStorage implements KeyGenInfoStorage, GroupInfoStorag
 		this.groupInfo(groupId);
 		if (this.#keyGenInfo.has(groupId)) throw new Error(`KeyGen for ${groupId} already registered!`);
 		this.#keyGenInfo.set(groupId, {
-			coefficients: [...coefficients],
+			coefficients,
 			commitments: new Map(),
 			secretShares: new Map(),
 		});
@@ -78,7 +78,7 @@ export class InMemoryClientStorage implements KeyGenInfoStorage, GroupInfoStorag
 		const info = this.keyGenInfo(groupId);
 		if (info.commitments.has(participantId))
 			throw new Error(`Commitments for ${groupId}:${participantId} already registered!`);
-		info.commitments.set(participantId, [...commitments]);
+		info.commitments.set(participantId, commitments);
 	}
 	registerSecretShare(groupId: GroupId, participantId: ParticipantId, share: bigint): void {
 		const info = this.keyGenInfo(groupId);
@@ -128,17 +128,17 @@ export class InMemoryClientStorage implements KeyGenInfoStorage, GroupInfoStorag
 		const info = this.keyGenInfo(groupId);
 		return info.coefficients[0];
 	}
-	coefficients(groupId: GroupId): bigint[] {
+	coefficients(groupId: GroupId): readonly bigint[] {
 		const info = this.keyGenInfo(groupId);
 		return info.coefficients;
 	}
-	commitments(groupId: GroupId, participantId: ParticipantId): FrostPoint[] {
+	commitments(groupId: GroupId, participantId: ParticipantId): readonly FrostPoint[] {
 		const info = this.keyGenInfo(groupId);
 		const commitments = info.commitments.get(participantId);
 		if (commitments === undefined) throw new Error(`No commitments for ${participantId} available!`);
 		return commitments;
 	}
-	commitmentsMap(groupId: GroupId): Map<ParticipantId, FrostPoint[]> {
+	commitmentsMap(groupId: GroupId): Map<ParticipantId, readonly FrostPoint[]> {
 		const info = this.keyGenInfo(groupId);
 		return info.commitments;
 	}
@@ -159,7 +159,7 @@ export class InMemoryClientStorage implements KeyGenInfoStorage, GroupInfoStorag
 		this.#groupInfo.set(groupId, {
 			participantId,
 			groupId,
-			participants: [...participants],
+			participants,
 			threshold,
 		});
 		return participantId;
@@ -182,7 +182,7 @@ export class InMemoryClientStorage implements KeyGenInfoStorage, GroupInfoStorag
 	publicKey(groupId: GroupId): FrostPoint | undefined {
 		return this.groupInfo(groupId).groupPublicKey;
 	}
-	participants(groupId: GroupId): Participant[] {
+	participants(groupId: GroupId): readonly Participant[] {
 		return this.groupInfo(groupId).participants;
 	}
 	threshold(groupId: GroupId): bigint {

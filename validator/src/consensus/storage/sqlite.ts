@@ -274,7 +274,7 @@ export class SqliteClientStorage implements GroupInfoStorage, KeyGenInfoStorage,
 		this.setGroupThisParticipantColumn(groupId, "signing_share", scalarToBytes(signingShare));
 	}
 
-	participants(groupId: GroupId): Participant[] {
+	participants(groupId: GroupId): readonly Participant[] {
 		const result = this.#db
 			.prepare("SELECT id, address FROM group_participants WHERE group_id = ? ORDER BY id ASC")
 			.all(groupId)
@@ -458,15 +458,15 @@ export class SqliteClientStorage implements GroupInfoStorage, KeyGenInfoStorage,
 		return this.getGroupThisParticipantColumn(groupId, "SUBSTRING(coefficients, 1, 32)", dbScalarSchema);
 	}
 
-	coefficients(groupId: GroupId): bigint[] {
+	coefficients(groupId: GroupId): readonly bigint[] {
 		return this.getGroupThisParticipantColumn(groupId, "coefficients", dbScalarArraySchema);
 	}
 
-	commitments(groupId: GroupId, participantId: ParticipantId): FrostPoint[] {
+	commitments(groupId: GroupId, participantId: ParticipantId): readonly FrostPoint[] {
 		return this.getGroupParticipantColumn(groupId, participantId, "commitments", dbPointArraySchema);
 	}
 
-	commitmentsMap(groupId: GroupId): Map<ParticipantId, FrostPoint[]> {
+	commitmentsMap(groupId: GroupId): Map<ParticipantId, readonly FrostPoint[]> {
 		// Use the `LEFT JOIN` trick described in `dbList` and in the
 		// `missingCommitments` query, adapted to mappings.
 

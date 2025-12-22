@@ -48,7 +48,7 @@ export class KeyGenClient {
 		return this.#storage.participantId(groupId);
 	}
 
-	participants(groupId: GroupId): Participant[] {
+	participants(groupId: GroupId): readonly Participant[] {
 		return this.#storage.participants(groupId);
 	}
 
