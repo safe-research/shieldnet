@@ -52,6 +52,10 @@ export class KeyGenClient {
 		return this.#storage.participants(groupId);
 	}
 
+	threshold(groupId: GroupId): bigint {
+		return this.#storage.threshold(groupId);
+	}
+
 	knownGroups(): GroupId[] {
 		return this.#storage.knownGroups();
 	}
