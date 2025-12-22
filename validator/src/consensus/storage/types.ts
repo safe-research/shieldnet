@@ -15,7 +15,7 @@ export type GroupInfoStorage = {
 
 	participantId(groupId: GroupId): ParticipantId;
 	publicKey(groupId: GroupId): FrostPoint | undefined;
-	participants(groupId: GroupId): readonly Participant[];
+	participants(groupId: GroupId): Participant[];
 	threshold(groupId: GroupId): bigint;
 	signingShare(groupId: GroupId): bigint | undefined;
 	verificationShare(groupId: GroupId): FrostPoint;
@@ -33,9 +33,9 @@ export type KeyGenInfoStorage = {
 	checkIfSecretSharesComplete(groupId: GroupId): boolean;
 
 	encryptionKey(groupId: GroupId): bigint;
-	coefficients(groupId: GroupId): readonly bigint[];
-	commitments(groupId: GroupId, participantId: ParticipantId): readonly FrostPoint[];
-	commitmentsMap(groupId: GroupId): Map<ParticipantId, readonly FrostPoint[]>;
+	coefficients(groupId: GroupId): bigint[];
+	commitments(groupId: GroupId, participantId: ParticipantId): FrostPoint[];
+	commitmentsMap(groupId: GroupId): Map<ParticipantId, FrostPoint[]>;
 	secretSharesMap(groupId: GroupId): Map<ParticipantId, bigint>;
 	clearKeyGen(groupId: GroupId): void;
 };

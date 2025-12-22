@@ -1,6 +1,5 @@
 import type { KeyGenClient } from "../../consensus/keyGen/client.js";
-import type { ShieldnetProtocol } from "../../consensus/protocol/types.js";
-import type { ComplaintResponse } from "../../consensus/protocol/types.js";
+import type { ComplaintResponse, ShieldnetProtocol } from "../../consensus/protocol/types.js";
 import type { KeyGenComplaintSubmittedEvent } from "../transitions/types.js";
 import type { MachineConfig, MachineStates, RolloverState, StateDiff } from "../types.js";
 import { calcGroupContext } from "./group.js";
@@ -37,21 +36,12 @@ export const handleComplaintSubmitted = async (
 		total: complaint.total + 1n,
 		unresponded: complaint.unresponded + 1n,
 	};
-	const complaints = {
-		...machineStates.rollover.complaints,
-		[accusedId]: nextComplaint,
-	};
-
-	const rollover: RolloverState = {
-		...machineStates.rollover,
-		complaints,
-	};
 
 	const threshold = keyGenClient.threshold(event.gid);
-	if (nextComplaint.total > threshold) {
+	if (nextComplaint.total >= threshold) {
 		const participants = keyGenClient.participants(event.gid);
 		const nextParticipants = participants.filter((participant) => participant.id !== event.accused);
-		logger?.(`Restarting key gen after complaints against participant ${accusedId}`);
+		logger?.(`Restarting key gen after too many complaints against participant ${accusedId}`);
 		const { diff } = triggerKeyGen(
 			keyGenClient,
 			machineStates.rollover.nextEpoch,
@@ -62,6 +52,14 @@ export const handleComplaintSubmitted = async (
 		);
 		return diff;
 	}
+
+	const rollover: RolloverState = {
+		...machineStates.rollover,
+		complaints: {
+			...machineStates.rollover.complaints,
+			[accusedId]: nextComplaint,
+		},
+	};
 
 	if (event.accused !== keyGenClient.participantId(event.gid)) {
 		return {

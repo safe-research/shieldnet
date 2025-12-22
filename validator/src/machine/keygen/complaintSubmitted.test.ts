@@ -335,7 +335,7 @@ describe("complaint submitted", () => {
 				nextEpoch: 10n,
 				deadline: 30n,
 				complaints: {
-					"2": { unresponded: 0n, total: 2n },
+					"2": { unresponded: 0n, total: 1n },
 				},
 			},
 			signing: {},
@@ -367,14 +367,6 @@ describe("complaint submitted", () => {
 		});
 		expect(consensus).toBeCalledTimes(1);
 		expect(setupGroup).toBeCalledTimes(1);
-		expect(setupGroup).toBeCalledWith(
-			[
-				participants[0],
-				participants[2],
-			],
-			2n,
-			2n,
-			calcGroupContext(ethAddress, 10n),
-		);
+		expect(setupGroup).toBeCalledWith([participants[0], participants[2]], 2n, 2n, calcGroupContext(ethAddress, 10n));
 	});
 });
