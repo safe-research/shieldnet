@@ -48,7 +48,7 @@ abstract contract MerkleTreeBase {
 
     function _buildWithHeight(uint256 height) internal {
         uint256 y = _build();
-		assert(height >= y);
+        assert(height >= y);
         bytes32 left = bytes32(0);
         while (y < height) {
             uint256 yy = y++;

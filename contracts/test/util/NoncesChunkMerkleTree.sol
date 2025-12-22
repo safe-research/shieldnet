@@ -21,11 +21,7 @@ contract NoncesChunkMerkleTree is MerkleTreeBase {
     }
 
     // forge-lint: disable-next-line(mixed-case-variable)
-    mapping(uint256 x => mapping(uint256 y => bytes32 digest)) private $tree;
-    // forge-lint: disable-next-line(mixed-case-variable)
     mapping(uint256 offset => Entry) private $entries;
-    // forge-lint: disable-next-line(mixed-case-variable)
-    bytes32 private $root;
 
     constructor(S[] memory nonces) {
         for (uint256 x = 0; x < nonces.length; x++) {
