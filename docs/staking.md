@@ -34,7 +34,7 @@ The contract is non-upgradeable and relies on `Ownable` for admin control. It do
 - `WithdrawalQueue`
   - **Purpose**: Tracks head/tail of a withdrawal list for a staker/validator pair.
   - **Invariants**:
-    - `head == 0 && tail == 0` indicates empty queue.
+    - `head == 0 && tail == 0` indicates empty queue. (`head != 0 <=> tail != 0`)
     - `head` and `tail` are withdrawal IDs; `0` is reserved as null.
 
 - `ConfigProposal`
@@ -140,7 +140,7 @@ Custom errors are used for gas efficiency and precise revert reasons:
   - **Ordering**: Ensures queue remains sorted by `claimableAt`.
 
 - `initiateWithdrawalAtPosition(validator, amount, previousId)`
-  - **Purpose**: Manual insertion for gas optimization.
+  - **Purpose**: Manual insertion required after changes to delay for adding new withdrawal and for gas optimization purposes.
   - **Security**: Caller must supply correct `previousId` to maintain ordering.
   - **Edge case**: Incorrect ordering or non-existent node reverts.
 
