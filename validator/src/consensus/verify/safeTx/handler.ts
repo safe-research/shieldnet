@@ -8,9 +8,7 @@ export interface TransactionCheck {
 }
 
 export class SafeTransactionHandler implements PacketHandler<SafeTransactionPacket> {
-	constructor(
-		private check: TransactionCheck,
-	) {}
+	constructor(private check: TransactionCheck) {}
 	async hashAndVerify(uncheckedPacket: SafeTransactionPacket): Promise<Hex> {
 		const packet = safeTransactionPacketSchema.parse(uncheckedPacket);
 		this.check.check(packet.proposal.transaction);

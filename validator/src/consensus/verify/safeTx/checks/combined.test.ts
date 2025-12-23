@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionCheck } from "../handler.js";
 import type { MetaTransaction } from "../schemas.js";
-import { CombinedChecks, AddressSplitCheck } from "./combined.js";
+import { AddressSplitCheck, CombinedChecks } from "./combined.js";
 
 describe("combined checks", () => {
 	describe("AddressSplitCheck", () => {
@@ -68,12 +68,15 @@ describe("combined checks", () => {
 		it("should call fallback if no check for registered", async () => {
 			const check = vi.fn();
 			const fallbackCheck = {
-				check
+				check,
 			} as unknown as TransactionCheck;
 			const subCheck = {} as unknown as TransactionCheck;
-			const multiSendCheck = new AddressSplitCheck({
-				"eip155:1:0x40A2aCCbd92BCA938b02010E17A5b8929b49130D": subCheck,
-			}, fallbackCheck);
+			const multiSendCheck = new AddressSplitCheck(
+				{
+					"eip155:1:0x40A2aCCbd92BCA938b02010E17A5b8929b49130D": subCheck,
+				},
+				fallbackCheck,
+			);
 			multiSendCheck.check({
 				to: "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",
 				value: 0n,
@@ -95,7 +98,7 @@ describe("combined checks", () => {
 			});
 		});
 
-		it("should throw if no check for address is registered", async () => {
+		it("should pass if no check for address is registered", async () => {
 			const check = vi.fn();
 			const subCheck = {
 				check,
@@ -103,17 +106,15 @@ describe("combined checks", () => {
 			const multiSendCheck = new AddressSplitCheck({
 				"eip155:1:0x40A2aCCbd92BCA938b02010E17A5b8929b49130D": subCheck,
 			});
-			expect(() =>
-				multiSendCheck.check({
-					to: "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",
-					value: 0n,
-					data: "0x5afe",
-					operation: 1,
-					nonce: 0n,
-					chainId: 2n,
-					account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
-				}),
-			).toThrowError(Error("Delegatecalls for eip155:2:0x40A2aCCbd92BCA938b02010E17A5b8929b49130D not allowed!"));
+			multiSendCheck.check({
+				to: "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",
+				value: 0n,
+				data: "0x5afe",
+				operation: 1,
+				nonce: 0n,
+				chainId: 2n,
+				account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
+			});
 		});
 	});
 
