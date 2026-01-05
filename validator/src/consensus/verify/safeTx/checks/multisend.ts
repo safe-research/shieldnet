@@ -10,7 +10,7 @@ const MULTI_SEND_SELECTOR = "0x8d80ff0a";
 // MultiSend data should always start with specific data pointer (0x20)
 const MULTI_SEND_DATA_START = `${MULTI_SEND_SELECTOR}0000000000000000000000000000000000000000000000000000000000000020`;
 
-export class MutliSend130Check implements TransactionCheck {
+export class MultiSendCallOnlyCheck implements TransactionCheck {
 	constructor(private txCheck: TransactionCheck) {}
 
 	decodeMultiSend({ account, chainId, nonce, data }: MetaTransaction): MetaTransaction[] {
@@ -26,7 +26,7 @@ export class MutliSend130Check implements TransactionCheck {
 		const multiSendDataLength = BigInt(`0x${data.slice(pointer, pointer + 64)}`);
 		pointer += 64;
 		// Calculate data padding that is appended by default abi encoders
-		const multiSendDataPadding = 64n - (multiSendDataLength % 64n);
+		const multiSendDataPadding = 32n - (multiSendDataLength % 32n);
 
 		if (multiSendDataLength + multiSendDataPadding !== BigInt(dataSize - MIN_LENGTH)) {
 			throw new Error("Invalid multi send data length");

@@ -121,7 +121,7 @@ describe("basic checks", () => {
 		});
 	});
 	describe("Supported Selectors", () => {
-		it("should throw for delegatecalls", async () => {
+		it("should throw for data shorter than a selector", async () => {
 			const selectors: Hex[] = [];
 			const tx: MetaTransaction = {
 				to: "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",
@@ -136,7 +136,7 @@ describe("basic checks", () => {
 			expect(() => check.check(tx)).toThrow();
 		});
 
-		it("should throw for delegatecalls", async () => {
+		it("should allow empty data when allowEmpty is true", async () => {
 			const selectors: Hex[] = [];
 			const tx: MetaTransaction = {
 				to: "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",
@@ -151,7 +151,7 @@ describe("basic checks", () => {
 			check.check(tx);
 		});
 
-		it("should throw for delegatecalls", async () => {
+		it("should allow a supported selector", async () => {
 			const selectors: Hex[] = ["0x5afe5afe"];
 			const tx: MetaTransaction = {
 				to: "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",

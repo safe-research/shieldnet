@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionCheck } from "../handler.js";
-import { MutliSend130Check } from "./multisend.js";
+import { MultiSendCallOnlyCheck } from "./multisend.js";
 
-describe("multisend 1.3.0 check", () => {
-	it("should throw on invalid packet", async () => {
+describe("MultiSendCallOnlyCheck", () => {
+	it("should decode and check sub-transactions from a valid multisend packet", async () => {
 		const check = vi.fn();
 		const subCheck = {
 			check,
 		} as unknown as TransactionCheck;
-		const multiSendCheck = new MutliSend130Check(subCheck);
+		const multiSendCheck = new MultiSendCallOnlyCheck(subCheck);
 		multiSendCheck.check({
 			to: "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",
 			value: 0n,

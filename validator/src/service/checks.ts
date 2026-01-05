@@ -5,7 +5,7 @@ import { GuardCheck } from "../consensus/verify/safeTx/checks/config/guards.js";
 import { SignMessageChecks } from "../consensus/verify/safeTx/checks/config/messages.js";
 import { AddModuleCheck, ModuleGuardCheck } from "../consensus/verify/safeTx/checks/config/modules.js";
 import { SingletonUpgradeChecks } from "../consensus/verify/safeTx/checks/config/singletons.js";
-import { MutliSend130Check } from "../consensus/verify/safeTx/checks/multisend.js";
+import { MultiSendCallOnlyCheck } from "../consensus/verify/safeTx/checks/multisend.js";
 import type { TransactionCheck } from "../consensus/verify/safeTx/handler.js";
 
 export const buildSafeTransactionCheck = (): TransactionCheck => {
@@ -26,7 +26,7 @@ export const buildSafeTransactionCheck = (): TransactionCheck => {
 		baseChecks,
 	);
 	// Add multisend checks, if not multisend, fallback to other allowed delegate calls
-	const multiSendCheck = new MutliSend130Check(baseChecks);
+	const multiSendCheck = new MultiSendCallOnlyCheck(baseChecks);
 	const supportedMultiSendChecks = new AddressSplitCheck(
 		{
 			"0xA83c336B20401Af773B6219BA5027174338D1836": multiSendCheck,
