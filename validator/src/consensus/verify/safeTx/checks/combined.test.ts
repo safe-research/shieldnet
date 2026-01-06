@@ -1,19 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionCheck } from "../handler.js";
 import type { MetaTransaction } from "../schemas.js";
-import { AddressSplitCheck, CombinedChecks } from "./combined.js";
+import { buildAddressSplitCheck, buildCombinedChecks } from "./combined.js";
 
 describe("combined checks", () => {
-	describe("AddressSplitCheck", () => {
+	describe("buildAddressSplitCheck", () => {
 		it("should forward correctly (chain independent)", async () => {
-			const check = vi.fn();
-			const subCheck = {
-				check,
-			} as unknown as TransactionCheck;
-			const multiSendCheck = new AddressSplitCheck({
+			const subCheck = vi.fn();
+			const addressCheck = buildAddressSplitCheck({
 				"0x40A2aCCbd92BCA938b02010E17A5b8929b49130D": subCheck,
 			});
-			multiSendCheck.check({
+			addressCheck({
 				to: "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",
 				value: 0n,
 				data: "0x5afe",
@@ -22,8 +19,8 @@ describe("combined checks", () => {
 				chainId: 1n,
 				account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 			});
-			expect(check).toBeCalledTimes(1);
-			expect(check).toBeCalledWith({
+			expect(subCheck).toBeCalledTimes(1);
+			expect(subCheck).toBeCalledWith({
 				to: "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",
 				value: 0n,
 				data: "0x5afe",
@@ -35,16 +32,13 @@ describe("combined checks", () => {
 		});
 
 		it("should forward correctly (chain specific)", async () => {
-			const check = vi.fn();
-			const subCheck = {
-				check,
-			} as unknown as TransactionCheck;
+			const subCheck = vi.fn();
 			const invalidCheck = {} as unknown as TransactionCheck;
-			const multiSendCheck = new AddressSplitCheck({
+			const addressCheck = buildAddressSplitCheck({
 				"eip155:1:0x40A2aCCbd92BCA938b02010E17A5b8929b49130D": subCheck,
 				"0x40A2aCCbd92BCA938b02010E17A5b8929b49130D": invalidCheck,
 			});
-			multiSendCheck.check({
+			addressCheck({
 				to: "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",
 				value: 0n,
 				data: "0x5afe",
@@ -53,8 +47,8 @@ describe("combined checks", () => {
 				chainId: 1n,
 				account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 			});
-			expect(check).toBeCalledTimes(1);
-			expect(check).toBeCalledWith({
+			expect(subCheck).toBeCalledTimes(1);
+			expect(subCheck).toBeCalledWith({
 				to: "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",
 				value: 0n,
 				data: "0x5afe",
@@ -66,18 +60,14 @@ describe("combined checks", () => {
 		});
 
 		it("should call fallback if no check for registered", async () => {
-			const check = vi.fn();
-			const fallbackCheck = {
-				check,
-			} as unknown as TransactionCheck;
-			const subCheck = {} as unknown as TransactionCheck;
-			const multiSendCheck = new AddressSplitCheck(
+			const subCheck = vi.fn();
+			const addressCheck = buildAddressSplitCheck(
 				{
 					"eip155:1:0x40A2aCCbd92BCA938b02010E17A5b8929b49130D": subCheck,
 				},
-				fallbackCheck,
+				subCheck,
 			);
-			multiSendCheck.check({
+			addressCheck({
 				to: "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",
 				value: 0n,
 				data: "0x5afe",
@@ -86,8 +76,8 @@ describe("combined checks", () => {
 				chainId: 2n,
 				account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 			});
-			expect(check).toBeCalledTimes(1);
-			expect(check).toBeCalledWith({
+			expect(subCheck).toBeCalledTimes(1);
+			expect(subCheck).toBeCalledWith({
 				to: "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",
 				value: 0n,
 				data: "0x5afe",
@@ -99,14 +89,11 @@ describe("combined checks", () => {
 		});
 
 		it("should pass if no check for address is registered", async () => {
-			const check = vi.fn();
-			const subCheck = {
-				check,
-			} as unknown as TransactionCheck;
-			const multiSendCheck = new AddressSplitCheck({
+			const subCheck = vi.fn();
+			const addressCheck = buildAddressSplitCheck({
 				"eip155:1:0x40A2aCCbd92BCA938b02010E17A5b8929b49130D": subCheck,
 			});
-			multiSendCheck.check({
+			addressCheck({
 				to: "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",
 				value: 0n,
 				data: "0x5afe",
@@ -118,20 +105,17 @@ describe("combined checks", () => {
 		});
 	});
 
-	describe("CombinedChecks", () => {
+	describe("buildCombinedChecks", () => {
 		it("should throw if any check throws", async () => {
-			const check = vi.fn();
-			const subCheck = {
-				check,
-			} as unknown as TransactionCheck;
-			const multiSendCheck = new CombinedChecks([subCheck, subCheck, subCheck, subCheck]);
-			check.mockImplementationOnce(() => {
+			const subCheck = vi.fn();
+			const combinedCheck = buildCombinedChecks([subCheck, subCheck, subCheck, subCheck]);
+			subCheck.mockImplementationOnce(() => {
 				return;
 			});
-			check.mockImplementationOnce(() => {
+			subCheck.mockImplementationOnce(() => {
 				return;
 			});
-			check.mockImplementationOnce(() => {
+			subCheck.mockImplementationOnce(() => {
 				throw new Error("Invalid");
 			});
 			const tx: MetaTransaction = {
@@ -143,18 +127,15 @@ describe("combined checks", () => {
 				chainId: 1n,
 				account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 			};
-			expect(() => multiSendCheck.check(tx)).toThrowError(Error("Invalid"));
-			expect(check).toBeCalledTimes(3);
-			expect(check).toBeCalledWith(tx);
+			expect(() => combinedCheck(tx)).toThrowError(Error("Invalid"));
+			expect(subCheck).toBeCalledTimes(3);
+			expect(subCheck).toBeCalledWith(tx);
 		});
 
 		it("should call all before success", async () => {
-			const check = vi.fn();
-			const subCheck = {
-				check,
-			} as unknown as TransactionCheck;
-			const multiSendCheck = new CombinedChecks([subCheck, subCheck, subCheck, subCheck]);
-			check.mockImplementation(() => {
+			const subCheck = vi.fn();
+			const combinedCheck = buildCombinedChecks([subCheck, subCheck, subCheck, subCheck]);
+			subCheck.mockImplementation(() => {
 				return;
 			});
 			const tx: MetaTransaction = {
@@ -166,9 +147,9 @@ describe("combined checks", () => {
 				chainId: 1n,
 				account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 			};
-			multiSendCheck.check(tx);
-			expect(check).toBeCalledTimes(4);
-			expect(check).toBeCalledWith(tx);
+			combinedCheck(tx);
+			expect(subCheck).toBeCalledTimes(4);
+			expect(subCheck).toBeCalledWith(tx);
 		});
 	});
 });

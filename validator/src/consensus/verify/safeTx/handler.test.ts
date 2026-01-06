@@ -40,8 +40,7 @@ describe("safeTx handler", () => {
 	});
 
 	it("should call check for delegatecall tx and return hash", async () => {
-		const check = vi.fn();
-		const testCheck = { check } as unknown as TransactionCheck;
+		const testCheck = vi.fn();
 		const handler = new SafeTransactionHandler(testCheck);
 		await expect(
 			handler.hashAndVerify({
@@ -64,8 +63,8 @@ describe("safeTx handler", () => {
 				},
 			}),
 		).resolves.toBe("0x3dea26ca3368073148d0dde80c6e2d2415133cf2c522c75cf3f5240e9231c2ab");
-		expect(check).toBeCalledTimes(1);
-		expect(check).toBeCalledWith({
+		expect(testCheck).toBeCalledTimes(1);
+		expect(testCheck).toBeCalledWith({
 			chainId: 1n,
 			account: "0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97",
 			to: "0x22Cb221caE98D6097082C80158B1472C45FEd729",
@@ -77,11 +76,10 @@ describe("safeTx handler", () => {
 	});
 
 	it("should throw if check throws (delegatecall)", async () => {
-		const check = vi.fn();
-		check.mockImplementationOnce(() => {
+		const testCheck = vi.fn();
+		testCheck.mockImplementationOnce(() => {
 			throw new Error("Invalid");
 		});
-		const testCheck = { check } as unknown as TransactionCheck;
 		const handler = new SafeTransactionHandler(testCheck);
 		await expect(
 			handler.hashAndVerify({
@@ -104,8 +102,8 @@ describe("safeTx handler", () => {
 				},
 			}),
 		).rejects.toStrictEqual(Error("Invalid"));
-		expect(check).toBeCalledTimes(1);
-		expect(check).toBeCalledWith({
+		expect(testCheck).toBeCalledTimes(1);
+		expect(testCheck).toBeCalledWith({
 			chainId: 1n,
 			account: "0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97",
 			to: "0x22Cb221caE98D6097082C80158B1472C45FEd729",
@@ -117,8 +115,7 @@ describe("safeTx handler", () => {
 	});
 
 	it("should call call check for call tx and return hash", async () => {
-		const check = vi.fn();
-		const testCheck = { check } as unknown as TransactionCheck;
+		const testCheck = vi.fn();
 		const handler = new SafeTransactionHandler(testCheck);
 		await expect(
 			handler.hashAndVerify({
@@ -141,8 +138,8 @@ describe("safeTx handler", () => {
 				},
 			}),
 		).resolves.toBe("0x35ea25a4b798dcc97b2ec8b2c1f87e44e77213340965099255e504f217a75436");
-		expect(check).toBeCalledTimes(1);
-		expect(check).toBeCalledWith({
+		expect(testCheck).toBeCalledTimes(1);
+		expect(testCheck).toBeCalledWith({
 			chainId: 1n,
 			account: "0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97",
 			to: "0x22Cb221caE98D6097082C80158B1472C45FEd729",
@@ -154,11 +151,10 @@ describe("safeTx handler", () => {
 	});
 
 	it("should throw if check throws (call)", async () => {
-		const check = vi.fn();
-		check.mockImplementationOnce(() => {
+		const testCheck = vi.fn();
+		testCheck.mockImplementationOnce(() => {
 			throw new Error("Invalid");
 		});
-		const testCheck = { check } as unknown as TransactionCheck;
 		const handler = new SafeTransactionHandler(testCheck);
 		await expect(
 			handler.hashAndVerify({
@@ -181,8 +177,8 @@ describe("safeTx handler", () => {
 				},
 			}),
 		).rejects.toStrictEqual(Error("Invalid"));
-		expect(check).toBeCalledTimes(1);
-		expect(check).toBeCalledWith({
+		expect(testCheck).toBeCalledTimes(1);
+		expect(testCheck).toBeCalledWith({
 			chainId: 1n,
 			account: "0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97",
 			to: "0x22Cb221caE98D6097082C80158B1472C45FEd729",

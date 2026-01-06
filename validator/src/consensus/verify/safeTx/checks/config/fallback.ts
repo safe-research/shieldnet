@@ -1,5 +1,5 @@
 import { type Address, zeroAddress } from "viem";
-import { createConfigCheck } from "./base.js";
+import { buildSelectorCheck } from "../basic.js";
 
 const ALLOWED_FALLBACK_HANDLERS: Address[] = [
 	"0x85a8ca358D388530ad0fB95D0cb89Dd44Fc242c3", // ExtensibleFallbackHandler - 1.5.0
@@ -9,8 +9,9 @@ const ALLOWED_FALLBACK_HANDLERS: Address[] = [
 	"0x017062a1dE2FE6b99BE3d9d37841FeD19F573804", // CompatibilityFallbackHandler - 1.4.1 - eip155
 ];
 
-export const FallbackHandlerCheck = createConfigCheck("function setFallbackHandler(address)", ([handler]) => {
-	if (handler !== zeroAddress && !ALLOWED_FALLBACK_HANDLERS.includes(handler)) {
-		throw Error(`Cannot set unknown fallback handler ${handler}`);
-	}
-});
+export const buildSetFallbackHandlerCheck = () =>
+	buildSelectorCheck("function setFallbackHandler(address)", ([handler]) => {
+		if (handler !== zeroAddress && !ALLOWED_FALLBACK_HANDLERS.includes(handler)) {
+			throw Error(`Cannot set unknown fallback handler ${handler}`);
+		}
+	});

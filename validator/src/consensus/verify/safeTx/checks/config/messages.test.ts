@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { MetaTransaction } from "../../schemas.js";
-import { SignMessageChecks } from "./messages.js";
+import { buildSignMessageChecks } from "./messages.js";
 
-describe("SignMessageChecks", () => {
+describe("buildSignMessageChecks", () => {
 	it("should have at least one allowed address", async () => {
-		expect(Object.keys(SignMessageChecks).length).toBeGreaterThan(0);
+		expect(Object.keys(buildSignMessageChecks()).length).toBeGreaterThan(0);
 	});
 
 	it("should not allow calls", async () => {
@@ -17,8 +17,8 @@ describe("SignMessageChecks", () => {
 			chainId: 1n,
 			account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 		};
-		for (const check of Object.values(SignMessageChecks)) {
-			expect(() => check.check(tx)).toThrow("Expected operation 1 got 0");
+		for (const check of Object.values(buildSignMessageChecks())) {
+			expect(() => check(tx)).toThrow("Expected operation 1 got 0");
 		}
 	});
 
@@ -32,8 +32,8 @@ describe("SignMessageChecks", () => {
 			chainId: 1n,
 			account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 		};
-		for (const check of Object.values(SignMessageChecks)) {
-			expect(() => check.check(tx)).toThrow("0x5afe5afe not supported");
+		for (const check of Object.values(buildSignMessageChecks())) {
+			expect(() => check(tx)).toThrow("0x5afe5afe not supported");
 		}
 	});
 
@@ -47,8 +47,8 @@ describe("SignMessageChecks", () => {
 			chainId: 1n,
 			account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 		};
-		for (const check of Object.values(SignMessageChecks)) {
-			check.check(tx);
+		for (const check of Object.values(buildSignMessageChecks())) {
+			check(tx);
 		}
 	});
 });

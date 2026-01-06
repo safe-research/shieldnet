@@ -1,11 +1,11 @@
 import { ethAddress } from "viem";
 import { describe, expect, it } from "vitest";
 import type { MetaTransaction } from "../../schemas.js";
-import { FallbackHandlerCheck } from "./fallback.js";
+import { buildSetFallbackHandlerCheck } from "./fallback.js";
 
 describe("fallback", () => {
-	describe("FallbackHandlerCheck", () => {
-		it("skip if selector is not to setFallbackHandler", async () => {
+	describe("buildSetFallbackHandlerCheck", () => {
+		it("should throw if unsupported data", async () => {
 			const tx: MetaTransaction = {
 				to: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 				value: 0n,
@@ -15,22 +15,9 @@ describe("fallback", () => {
 				chainId: 1n,
 				account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 			};
-			const check = new FallbackHandlerCheck();
-			check.check(tx);
-		});
-
-		it("allow zero address as module guard (to reset)", async () => {
-			const tx: MetaTransaction = {
-				to: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
-				value: 0n,
-				data: "0xf08a03230000000000000000000000000000000000000000000000000000000000000000",
-				operation: 0,
-				nonce: 0n,
-				chainId: 1n,
-				account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
-			};
-			const check = new FallbackHandlerCheck();
-			check.check(tx);
+			const check = buildSetFallbackHandlerCheck();
+			expect(Object.keys(check)).toStrictEqual(["0xf08a0323"]);
+			expect(() => check["0xf08a0323"](tx)).toThrow();
 		});
 
 		it("should throw for unknown guard", async () => {
@@ -43,10 +30,26 @@ describe("fallback", () => {
 				chainId: 1n,
 				account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 			};
-			const check = new FallbackHandlerCheck();
-			expect(() => check.check(tx)).toThrow(
+			const check = buildSetFallbackHandlerCheck();
+			expect(Object.keys(check)).toStrictEqual(["0xf08a0323"]);
+			expect(() => check["0xf08a0323"](tx)).toThrow(
 				"Cannot set unknown fallback handler 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
 			);
+		});
+
+		it("allow zero address as module guard (to reset)", async () => {
+			const tx: MetaTransaction = {
+				to: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
+				value: 0n,
+				data: "0xf08a03230000000000000000000000000000000000000000000000000000000000000000",
+				operation: 0,
+				nonce: 0n,
+				chainId: 1n,
+				account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
+			};
+			const check = buildSetFallbackHandlerCheck();
+			expect(Object.keys(check)).toStrictEqual(["0xf08a0323"]);
+			check["0xf08a0323"](tx);
 		});
 	});
 });

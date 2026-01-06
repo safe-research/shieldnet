@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { MetaTransaction } from "../../schemas.js";
-import { SingletonUpgradeChecks } from "./singletons.js";
+import { buildSingletonUpgradeChecks } from "./singletons.js";
 
-describe("SingletonUpgradeChecks", () => {
+describe("buildSingletonUpgradeChecks", () => {
 	it("should have at least one allowed address", async () => {
-		expect(Object.keys(SingletonUpgradeChecks).length).toBeGreaterThan(0);
+		expect(Object.keys(buildSingletonUpgradeChecks()).length).toBeGreaterThan(0);
 	});
 
 	it("should not allow calls", async () => {
@@ -17,8 +17,8 @@ describe("SingletonUpgradeChecks", () => {
 			chainId: 1n,
 			account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 		};
-		for (const check of Object.values(SingletonUpgradeChecks)) {
-			expect(() => check.check(tx)).toThrow("Expected operation 1 got 0");
+		for (const check of Object.values(buildSingletonUpgradeChecks())) {
+			expect(() => check(tx)).toThrow("Expected operation 1 got 0");
 		}
 	});
 
@@ -32,8 +32,8 @@ describe("SingletonUpgradeChecks", () => {
 			chainId: 1n,
 			account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 		};
-		for (const check of Object.values(SingletonUpgradeChecks)) {
-			expect(() => check.check(tx)).toThrow("0x5afe5afe not supported");
+		for (const check of Object.values(buildSingletonUpgradeChecks())) {
+			expect(() => check(tx)).toThrow("0x5afe5afe not supported");
 		}
 	});
 
@@ -47,8 +47,8 @@ describe("SingletonUpgradeChecks", () => {
 			chainId: 1n,
 			account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 		};
-		for (const check of Object.values(SingletonUpgradeChecks)) {
-			check.check(tx);
+		for (const check of Object.values(buildSingletonUpgradeChecks())) {
+			check(tx);
 		}
 	});
 
@@ -62,8 +62,8 @@ describe("SingletonUpgradeChecks", () => {
 			chainId: 1n,
 			account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 		};
-		for (const check of Object.values(SingletonUpgradeChecks)) {
-			check.check(tx);
+		for (const check of Object.values(buildSingletonUpgradeChecks())) {
+			check(tx);
 		}
 	});
 
@@ -77,8 +77,8 @@ describe("SingletonUpgradeChecks", () => {
 			chainId: 1n,
 			account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 		};
-		for (const check of Object.values(SingletonUpgradeChecks)) {
-			check.check(tx);
+		for (const check of Object.values(buildSingletonUpgradeChecks())) {
+			check(tx);
 		}
 	});
 
@@ -92,8 +92,8 @@ describe("SingletonUpgradeChecks", () => {
 			chainId: 1n,
 			account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 		};
-		for (const check of Object.values(SingletonUpgradeChecks)) {
-			check.check(tx);
+		for (const check of Object.values(buildSingletonUpgradeChecks())) {
+			check(tx);
 		}
 	});
 });

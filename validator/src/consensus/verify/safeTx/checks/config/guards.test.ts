@@ -1,11 +1,11 @@
 import { ethAddress } from "viem";
 import { describe, expect, it } from "vitest";
 import type { MetaTransaction } from "../../schemas.js";
-import { GuardCheck } from "./guards.js";
+import { buildSetGuardCheck } from "./guards.js";
 
 describe("guards", () => {
-	describe("GuardCheck", () => {
-		it("skip if selector is not to setGuard", async () => {
+	describe("buildSetGuardCheck", () => {
+		it("should throw if unsupported data", async () => {
 			const tx: MetaTransaction = {
 				to: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 				value: 0n,
@@ -15,22 +15,9 @@ describe("guards", () => {
 				chainId: 1n,
 				account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 			};
-			const check = new GuardCheck();
-			check.check(tx);
-		});
-
-		it("allow zero address as module guard (to reset)", async () => {
-			const tx: MetaTransaction = {
-				to: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
-				value: 0n,
-				data: "0xe19a9dd90000000000000000000000000000000000000000000000000000000000000000",
-				operation: 0,
-				nonce: 0n,
-				chainId: 1n,
-				account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
-			};
-			const check = new GuardCheck();
-			check.check(tx);
+			const check = buildSetGuardCheck();
+			expect(Object.keys(check)).toStrictEqual(["0xe19a9dd9"]);
+			expect(() => check["0xe19a9dd9"](tx)).toThrow();
 		});
 
 		it("should throw for unknown guard", async () => {
@@ -43,8 +30,26 @@ describe("guards", () => {
 				chainId: 1n,
 				account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
 			};
-			const check = new GuardCheck();
-			expect(() => check.check(tx)).toThrow("Cannot set unknown guard 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE");
+			const check = buildSetGuardCheck();
+			expect(Object.keys(check)).toStrictEqual(["0xe19a9dd9"]);
+			expect(() => check["0xe19a9dd9"](tx)).toThrow(
+				"Cannot set unknown guard 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+			);
+		});
+
+		it("allow zero address as module guard (to reset)", async () => {
+			const tx: MetaTransaction = {
+				to: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
+				value: 0n,
+				data: "0xe19a9dd90000000000000000000000000000000000000000000000000000000000000000",
+				operation: 0,
+				nonce: 0n,
+				chainId: 1n,
+				account: "0xF01888f0677547Ec07cd16c8680e699c96588E6B",
+			};
+			const check = buildSetGuardCheck();
+			expect(Object.keys(check)).toStrictEqual(["0xe19a9dd9"]);
+			check["0xe19a9dd9"](tx);
 		});
 	});
 });

@@ -19,6 +19,7 @@ import { createClientStorage, createStateStorage, silentLogger, testLogger, test
 import { toPoint } from "../frost/math.js";
 import type { GroupId } from "../frost/types.js";
 import { OnchainTransitionWatcher } from "../machine/transitions/watcher.js";
+import { buildSafeTransactionCheck } from "../service/checks.js";
 import { ShieldnetStateMachine as SchildNetzMaschine } from "../service/machine.js";
 import { CONSENSUS_EVENTS, COORDINATOR_EVENTS } from "../types/abis.js";
 import { InMemoryQueue } from "../utils/queue.js";
@@ -31,7 +32,6 @@ import { verifySignature } from "./signing/verify.js";
 import type { Participant } from "./storage/types.js";
 import { type PacketHandler, type Typed, VerificationEngine } from "./verify/engine.js";
 import { EpochRolloverHandler } from "./verify/rollover/handler.js";
-import { NoDelegateCallCheck } from "./verify/safeTx/checks/basic.js";
 import { SafeTransactionHandler } from "./verify/safeTx/handler.js";
 
 const BLOCKTIME_IN_SECONDS = 1;
@@ -115,7 +115,7 @@ describe("integration", () => {
 			const sc = new SigningClient(storage);
 			const kc = new KeyGenClient(storage, logger);
 			const verificationHandlers = new Map<string, PacketHandler<Typed>>();
-			const check = new NoDelegateCallCheck();
+			const check = buildSafeTransactionCheck();
 			verificationHandlers.set("safe_transaction_packet", new SafeTransactionHandler(check));
 			verificationHandlers.set("epoch_rollover_packet", new EpochRolloverHandler());
 			const verificationEngine = new VerificationEngine(verificationHandlers);
