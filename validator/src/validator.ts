@@ -1,5 +1,7 @@
 import dotenv from "dotenv";
-import { privateKeyToAccount } from "viem/accounts";
+import type { ChainFees } from "viem";
+import { createNonceManager, privateKeyToAccount } from "viem/accounts";
+import { jsonRpc } from "viem/nonce";
 import { z } from "zod";
 import { createValidatorService } from "./service/service.js";
 import type { ProtocolConfig } from "./types/interfaces.js";
@@ -32,7 +34,16 @@ const config: ProtocolConfig = {
 	blocksPerEpoch: validatorConfig.BLOCKS_PER_EPOCH,
 };
 
-const account = privateKeyToAccount(validatorConfig.PRIVATE_KEY);
+const fees: ChainFees = {
+	// Use a higher default multiplier to ensure transaction inclusion
+	baseFeeMultiplier: validatorConfig.BASE_FEE_MULTIPLIER ?? 2,
+	// Allow to set higher default priority fee to ensure transaction inclusion
+	maxPriorityFeePerGas: validatorConfig.PRIORITY_FEE_PER_GAS,
+};
+
+const account = privateKeyToAccount(validatorConfig.PRIVATE_KEY, {
+	nonceManager: createNonceManager({ source: jsonRpc() }),
+});
 logger.info(`Using validator account ${account.address}`);
 
 const metrics = createMetricsService({ logger, port: validatorConfig.METRICS_PORT });
@@ -43,6 +54,7 @@ const service = createValidatorService({
 	config,
 	logger,
 	metrics: metrics.metrics,
+	fees,
 });
 
 // Handle graceful shutdown, for both `SIGINT` (i.e. Ctrl-C) and `SIGTERM` which

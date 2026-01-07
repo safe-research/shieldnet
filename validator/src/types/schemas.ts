@@ -1,5 +1,5 @@
 import { type Address, getAddress, type Hex, isAddress, isHex, size, zeroHash } from "viem";
-import { z } from "zod";
+import { type ZodType, z } from "zod";
 import { supportedChains } from "./chains.js";
 
 export const logLevelSchema = z.enum(["error", "warn", "info", "debug", "silent"]);
@@ -31,11 +31,9 @@ export const hexDataSchema = z
 
 export const hexBytes32Schema = hexDataSchema.refine((bytes) => size(bytes) === 32, "Value is not 32 bytes long");
 
-export const supportedChainsSchema = z.coerce
-	.number()
-	.pipe(z.union(supportedChains.map((chain) => z.literal(chain.id))));
+const supportedChainsSchema = z.coerce.number().pipe(z.union(supportedChains.map((chain) => z.literal(chain.id))));
 
-export const participantsSchema = z
+const participantsSchema = z
 	.preprocess((val) => {
 		if (typeof val === "string") {
 			return val.split(",");
@@ -44,7 +42,7 @@ export const participantsSchema = z
 	}, z.array(checkedAddressSchema))
 	.transform((participants) => participants.map((address, i) => ({ address, id: BigInt(i + 1) })));
 
-export const genesisSaltSchema = z.preprocess((val) => {
+const genesisSaltSchema = z.preprocess((val) => {
 	if (val === undefined || val === "") {
 		return zeroHash;
 	}
@@ -54,12 +52,13 @@ export const genesisSaltSchema = z.preprocess((val) => {
 const BLOCKTIME_IN_SECONDS = 5n; // value assumed for gnosis chain
 const BLOCKS_PER_EPOCH = (24n * 60n * 60n) / BLOCKTIME_IN_SECONDS; // ~ blocks for 1 day
 
-export const epochLengthSchema = z.preprocess((val) => {
-	if (val === undefined || val === "") {
-		return BLOCKS_PER_EPOCH;
-	}
-	return val;
-}, z.coerce.bigint());
+const emptyToDefault = <T>(schema: ZodType<T>, defaultVal?: unknown): ZodType<T> =>
+	z.preprocess((val) => {
+		if (val === undefined || val === "") {
+			return defaultVal;
+		}
+		return val;
+	}, schema);
 
 export const validatorConfigSchema = z.object({
 	LOG_LEVEL: logLevelSchema.optional(),
@@ -72,7 +71,9 @@ export const validatorConfigSchema = z.object({
 	CHAIN_ID: supportedChainsSchema,
 	PARTICIPANTS: participantsSchema,
 	GENESIS_SALT: genesisSaltSchema,
-	BLOCKS_PER_EPOCH: epochLengthSchema,
+	BLOCKS_PER_EPOCH: emptyToDefault(z.coerce.bigint(), BLOCKS_PER_EPOCH),
+	BASE_FEE_MULTIPLIER: emptyToDefault(z.coerce.number().optional()),
+	PRIORITY_FEE_PER_GAS: emptyToDefault(z.coerce.bigint().optional()),
 });
 
 export const chunked = <T>(sz: number, transform: (b: Buffer) => T): ((b: Buffer) => T[]) => {

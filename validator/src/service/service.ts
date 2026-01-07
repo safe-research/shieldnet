@@ -2,6 +2,7 @@ import Sqlite3, { type Database } from "better-sqlite3";
 import {
 	type Account,
 	type Chain,
+	type ChainFees,
 	createPublicClient,
 	createWalletClient,
 	extractChain,
@@ -33,7 +34,6 @@ import { ShieldnetStateMachine } from "./machine.js";
 
 export class ValidatorService {
 	#logger: Logger;
-	#config: ProtocolConfig;
 	#publicClient: PublicClient;
 	#watcher: OnchainTransitionWatcher;
 	#stateMachine: ShieldnetStateMachine;
@@ -56,7 +56,6 @@ export class ValidatorService {
 		database?: Database;
 	}) {
 		this.#logger = logger;
-		this.#config = config;
 		this.#publicClient = createPublicClient({ chain, transport });
 		const walletClient = createWalletClient({ chain, transport, account });
 		const storage =
@@ -120,6 +119,7 @@ export const createValidatorService = ({
 	config,
 	logger,
 	metrics,
+	fees,
 }: {
 	account: Account;
 	rpcUrl: string;
@@ -127,12 +127,16 @@ export const createValidatorService = ({
 	config: ProtocolConfig;
 	logger: Logger;
 	metrics: Metrics;
+	fees?: ChainFees;
 }): ValidatorService => {
 	const transport = rpcUrl.startsWith("wss") ? webSocket(rpcUrl) : http(rpcUrl);
-	const chain = extractChain({
-		chains: supportedChains,
-		id: config.chainId,
-	});
+	const chain: Chain = {
+		...extractChain({
+			chains: supportedChains,
+			id: config.chainId,
+		}),
+		fees,
+	};
 	const database = storageFile !== undefined ? new Sqlite3(storageFile) : undefined;
 	return new ValidatorService({ account, transport, config, chain, logger, metrics, database });
 };
