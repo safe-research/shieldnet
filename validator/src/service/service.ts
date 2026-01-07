@@ -2,6 +2,8 @@ import Sqlite3, { type Database } from "better-sqlite3";
 import {
 	type Account,
 	type Chain,
+	type ChainFees,
+	createNonceManager,
 	createPublicClient,
 	createWalletClient,
 	extractChain,
@@ -10,6 +12,7 @@ import {
 	type Transport,
 	webSocket,
 } from "viem";
+import { jsonRpc } from "viem/nonce";
 import { KeyGenClient } from "../consensus/keyGen/client.js";
 import { OnchainProtocol } from "../consensus/protocol/onchain.js";
 import { SqliteActionQueue } from "../consensus/protocol/sqlite.js";
@@ -120,6 +123,7 @@ export const createValidatorService = ({
 	config,
 	logger,
 	metrics,
+	fees,
 }: {
 	account: Account;
 	rpcUrl: string;
@@ -127,12 +131,20 @@ export const createValidatorService = ({
 	config: ProtocolConfig;
 	logger: Logger;
 	metrics: Metrics;
+	fees?: ChainFees;
 }): ValidatorService => {
 	const transport = rpcUrl.startsWith("wss") ? webSocket(rpcUrl) : http(rpcUrl);
-	const chain = extractChain({
-		chains: supportedChains,
-		id: config.chainId,
-	});
+	if (account.nonceManager === undefined) {
+		// Enforce nonce manager
+		account.nonceManager = createNonceManager({ source: jsonRpc() });
+	}
+	const chain: Chain = {
+		...extractChain({
+			chains: supportedChains,
+			id: config.chainId,
+		}),
+		fees,
+	};
 	const database = storageFile !== undefined ? new Sqlite3(storageFile) : undefined;
 	return new ValidatorService({ account, transport, config, chain, logger, metrics, database });
 };

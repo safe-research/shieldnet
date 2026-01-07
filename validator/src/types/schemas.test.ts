@@ -1,3 +1,4 @@
+import { parseGwei } from "viem";
 import { generatePrivateKey } from "viem/accounts";
 import { describe, expect, it } from "vitest";
 import { frostPointSchema } from "../machine/transitions/schemas.js";
@@ -91,6 +92,36 @@ describe("validatorConfigSchema", () => {
 			BLOCKS_PER_EPOCH: 17280n,
 		});
 	});
+
+	it("should successfully parse a valid config object with empty blocks per epoch", () => {
+		const pk = generatePrivateKey();
+		const validConfig = {
+			RPC_URL: MOCK_VALID_URL,
+			CONSENSUS_ADDRESS: MOCK_CHECKSUMMED_ADDRESS,
+			COORDINATOR_ADDRESS: MOCK_CHECKSUMMED_ADDRESS,
+			CHAIN_ID: 100,
+			PRIVATE_KEY: pk,
+			PARTICIPANTS: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266,0x6Adb3baB5730852eB53987EA89D8e8f16393C200",
+			GENESIS_SALT: MOCK_GENESIS_SALT,
+			BLOCKS_PER_EPOCH: "",
+		};
+
+		const result = validatorConfigSchema.parse(validConfig);
+		expect(result).toEqual({
+			RPC_URL: MOCK_VALID_URL,
+			CONSENSUS_ADDRESS: MOCK_CHECKSUMMED_ADDRESS,
+			COORDINATOR_ADDRESS: MOCK_CHECKSUMMED_ADDRESS,
+			CHAIN_ID: 100,
+			PRIVATE_KEY: pk,
+			PARTICIPANTS: [
+				{ id: 1n, address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" },
+				{ id: 2n, address: "0x6Adb3baB5730852eB53987EA89D8e8f16393C200" },
+			],
+			GENESIS_SALT: MOCK_GENESIS_SALT,
+			BLOCKS_PER_EPOCH: 17280n,
+		});
+	});
+
 	it("should successfully parse a valid config object with blocks per epoch", () => {
 		const pk = generatePrivateKey();
 		const validConfig = {
@@ -118,6 +149,89 @@ describe("validatorConfigSchema", () => {
 			GENESIS_SALT: MOCK_GENESIS_SALT,
 			BLOCKS_PER_EPOCH: 100n,
 		});
+	});
+
+	it("should successfully parse a valid config object with empty fee parameters", () => {
+		const pk = generatePrivateKey();
+		const validConfig = {
+			RPC_URL: MOCK_VALID_URL,
+			CONSENSUS_ADDRESS: MOCK_CHECKSUMMED_ADDRESS,
+			COORDINATOR_ADDRESS: MOCK_CHECKSUMMED_ADDRESS,
+			CHAIN_ID: 100,
+			PRIVATE_KEY: pk,
+			PARTICIPANTS: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266,0x6Adb3baB5730852eB53987EA89D8e8f16393C200",
+			GENESIS_SALT: MOCK_GENESIS_SALT,
+			BASE_FEE_MULTIPLIER: "",
+			PRIORITY_FEE_PER_GAS: "",
+		};
+
+		const result = validatorConfigSchema.parse(validConfig);
+		expect(result).toEqual({
+			RPC_URL: MOCK_VALID_URL,
+			CONSENSUS_ADDRESS: MOCK_CHECKSUMMED_ADDRESS,
+			COORDINATOR_ADDRESS: MOCK_CHECKSUMMED_ADDRESS,
+			CHAIN_ID: 100,
+			PRIVATE_KEY: pk,
+			PARTICIPANTS: [
+				{ id: 1n, address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" },
+				{ id: 2n, address: "0x6Adb3baB5730852eB53987EA89D8e8f16393C200" },
+			],
+			GENESIS_SALT: MOCK_GENESIS_SALT,
+			BLOCKS_PER_EPOCH: 17280n,
+		});
+	});
+
+	it("should successfully parse a valid config object with valid fee parameters", () => {
+		const pk = generatePrivateKey();
+		const validConfig = {
+			RPC_URL: MOCK_VALID_URL,
+			CONSENSUS_ADDRESS: MOCK_CHECKSUMMED_ADDRESS,
+			COORDINATOR_ADDRESS: MOCK_CHECKSUMMED_ADDRESS,
+			CHAIN_ID: 100,
+			PRIVATE_KEY: pk,
+			PARTICIPANTS: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266,0x6Adb3baB5730852eB53987EA89D8e8f16393C200",
+			GENESIS_SALT: MOCK_GENESIS_SALT,
+			BASE_FEE_MULTIPLIER: "2.4",
+			PRIORITY_FEE_PER_GAS: parseGwei("0.1"),
+		};
+
+		const result = validatorConfigSchema.parse(validConfig);
+		expect(result).toEqual({
+			RPC_URL: MOCK_VALID_URL,
+			CONSENSUS_ADDRESS: MOCK_CHECKSUMMED_ADDRESS,
+			COORDINATOR_ADDRESS: MOCK_CHECKSUMMED_ADDRESS,
+			CHAIN_ID: 100,
+			PRIVATE_KEY: pk,
+			PARTICIPANTS: [
+				{ id: 1n, address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" },
+				{ id: 2n, address: "0x6Adb3baB5730852eB53987EA89D8e8f16393C200" },
+			],
+			GENESIS_SALT: MOCK_GENESIS_SALT,
+			BLOCKS_PER_EPOCH: 17280n,
+			BASE_FEE_MULTIPLIER: 2.4,
+			PRIORITY_FEE_PER_GAS: 100000000n,
+		});
+	});
+
+	it("should fail if fee params are invalid", () => {
+		const invalidConfig = {
+			BASE_FEE_MULTIPLIER: "2.4foo",
+			PRIORITY_FEE_PER_GAS: "0.1",
+		};
+
+		const result = validatorConfigSchema.safeParse(invalidConfig);
+		expect(result.success).toBe(false);
+
+		// Check that the error is specifically about the RPC_URL
+		if (!result.success) {
+			const multiplierError = result.error.issues.find((issue) => issue.path[0] === "BASE_FEE_MULTIPLIER");
+			expect(multiplierError).toBeDefined();
+			expect(multiplierError?.message).toBe("Invalid input: expected number, received NaN");
+
+			const priorityFeeError = result.error.issues.find((issue) => issue.path[0] === "PRIORITY_FEE_PER_GAS");
+			expect(priorityFeeError).toBeDefined();
+			expect(priorityFeeError?.message).toBe("Invalid input: expected bigint, received string");
+		}
 	});
 
 	it("should fail if RPC_URL is invalid", () => {

@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import type { ChainFees } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { z } from "zod";
 import { createValidatorService } from "./service/service.js";
@@ -32,6 +33,13 @@ const config: ProtocolConfig = {
 	blocksPerEpoch: validatorConfig.BLOCKS_PER_EPOCH,
 };
 
+const fees: ChainFees = {
+	// Use a higher default multiplier to ensure transaction inclusion
+	baseFeeMultiplier: validatorConfig.BASE_FEE_MULTIPLIER ?? 2,
+	// Allow to set higher default priority fee to ensure transaction inclusion
+	maxPriorityFeePerGas: validatorConfig.PRIORITY_FEE_PER_GAS,
+};
+
 const account = privateKeyToAccount(validatorConfig.PRIVATE_KEY);
 logger.info(`Using validator account ${account.address}`);
 
@@ -43,6 +51,7 @@ const service = createValidatorService({
 	config,
 	logger,
 	metrics: metrics.metrics,
+	fees,
 });
 
 // Handle graceful shutdown, for both `SIGINT` (i.e. Ctrl-C) and `SIGTERM` which
