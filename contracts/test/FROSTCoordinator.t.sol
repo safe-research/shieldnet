@@ -228,6 +228,14 @@ contract FROSTCoordinatorTest is Test {
             assertEq(y.x, yy.x);
             assertEq(y.y, yy.y);
         }
+
+        // EXTENSION: Confirmation
+        for (uint256 identifier = 1; identifier <= COUNT; identifier++) {
+            vm.expectEmit();
+            emit FROSTCoordinator.KeyGenConfirmed(gid, FROST.newIdentifier(identifier), identifier == COUNT);
+            vm.prank(participants.addr(identifier));
+            coordinator.keyGenConfirm(gid);
+        }
     }
 
     function test_Sign() public {
