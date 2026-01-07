@@ -9,11 +9,10 @@ export const CONSENSUS_EVENTS = parseAbi([
 
 export const COORDINATOR_EVENTS = parseAbi([
 	"event KeyGen(bytes32 indexed gid, bytes32 participants, uint16 count, uint16 threshold, bytes32 context)",
-	"event KeyGenAborted(bytes32 indexed gid)",
 	"event KeyGenCommitted(bytes32 indexed gid, uint256 identifier, ((uint256 x, uint256 y)[] c, (uint256 x, uint256 y) r, uint256 mu) commitment, bool committed)",
 	"event KeyGenSecretShared(bytes32 indexed gid, uint256 identifier, ((uint256 x, uint256 y) y, uint256[] f) share, bool shared)",
 	"event KeyGenConfirmed(bytes32 indexed gid, uint256 identifier, bool confirmed)",
-	"event keyGenComplained(bytes32 indexed gid, uint256 plaintiff, uint256 accused, bool compromised)",
+	"event KeyGenComplained(bytes32 indexed gid, uint256 plaintiff, uint256 accused, bool compromised)",
 	"event KeyGenComplaintResponded(bytes32 indexed gid, uint256 plaintiff, uint256 accused, uint256 secretShare)",
 	"event Preprocess(bytes32 indexed gid, uint256 identifier, uint64 chunk, bytes32 commitment)",
 	"event Sign(address indexed initiator, bytes32 indexed gid, bytes32 indexed message, bytes32 sid, uint64 sequence)",
@@ -21,6 +20,8 @@ export const COORDINATOR_EVENTS = parseAbi([
 	"event SignShared(bytes32 indexed sid, uint256 identifier, uint256 z, bytes32 root)",
 	"event SignCompleted(bytes32 indexed sid, ((uint256 x, uint256 y) r, uint256 z) signature)",
 ]);
+
+export const ALL_EVENTS = [...CONSENSUS_EVENTS, ...COORDINATOR_EVENTS] as const;
 
 export const COORDINATOR_FUNCTIONS = parseAbi([
 	"error AlreadyRegistered()",
