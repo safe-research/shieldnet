@@ -20,7 +20,8 @@ runs:
       shell: bash
       run: npm run coverage
 
-    - name: Discover, Fix, and Merge
+    - name: Process Coverage Files
+      id: process_coverage
       shell: bash
       run: |
         MERGE_ARGS=()
