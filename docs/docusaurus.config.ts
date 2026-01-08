@@ -46,7 +46,7 @@ const config: Config = {
         docs: {
           sidebarPath: './sidebars.ts',
           editUrl:
-            'https://github.com/safe-research/shieldnet/tree/main/docs/public/',
+            'https://github.com/safe-research/shieldnet/tree/main/docs/',
         },
         blog: false,
         theme: {
