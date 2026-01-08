@@ -10,11 +10,26 @@ runs:
   steps:
     # --- Dependencies for this action ---
     # We install lcov here so the main workflow doesn't have to know about it
-    - name: Install LCOV
+    - name: Install LCOV 
       shell: bash
       run: |
-        sudo apt-get update
-        sudo apt-get install -y lcov
+        # We clone the repository as the version via apt-get is faulty
+        echo "⬇️ Cloning LCOV repository..."
+        git clone https://github.com/linux-test-project/lcov.git /tmp/lcov
+        cd /tmp/lcov
+
+        # Checkout the specific commit hash
+        echo "📍 Checking out commit 1.16..."
+        git checkout dfeb7505ef372f806ddb280b52a90f41cd8169cd
+
+        sudo make install
+        
+        # Verify version to be sure
+        lcov --version
+        
+        # Cleanup
+        cd ..
+        rm -rf /tmp/lcov
 
     - name: Run Coverage
       shell: bash
@@ -59,10 +74,12 @@ runs:
                 # Run lcov summary on this specific file
                 # Extract the percentage (e.g., "85.4%")
                 PKG_STATS=$(lcov --summary "$LCOV_FILE" | grep "lines......" | cut -d ':' -f 2 | xargs)
+               
                 PKG_NAME=$(basename "$pkg")
                 
                 echo "   📊 $PKG_NAME: $PKG_STATS"
-                
+                lcov --list "$LCOV_FILE"
+
                 # Append row to table
                 REPORT_TABLE="${REPORT_TABLE}\n| **${PKG_NAME}** | ${PKG_STATS} |"
                 
