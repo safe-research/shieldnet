@@ -15,7 +15,8 @@
 		"typecheck": "tsc",
 		"check": "biome check && tsc",
 		"fix": "biome check --write",
-		"test": "exit 0"
+		"test": "exit 0",
+		"coverage": "exit 0"
 	},
 	"dependencies": {
 		"@docusaurus/core": "3.9.2",
