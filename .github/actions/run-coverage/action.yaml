@@ -23,7 +23,7 @@ runs:
     - name: Discover, Fix, and Merge
       shell: bash
       run: |
-        MERGE_ARGS=""
+        MERGE_ARGS=()
         # Initialize Markdown Table Header
         # We use \n for newlines which we will interpret later
         REPORT_TABLE="| Package | Coverage |\n| :--- | :--- |"
@@ -57,16 +57,16 @@ runs:
                 # --- B. Get Individual Stats ---
                 # Run lcov summary on this specific file
                 # Extract the percentage (e.g., "85.4%")
-                PKG_PCT=$(lcov --summary "$LCOV_FILE" | grep "lines......" | cut -d ':' -f 2 | xargs)
+                PKG_STATS=$(lcov --summary "$LCOV_FILE" | grep "lines......" | cut -d ':' -f 2 | xargs)
                 PKG_NAME=$(basename "$pkg")
                 
-                echo "   📊 $PKG_NAME: $PKG_PCT"
+                echo "   📊 $PKG_NAME: $PKG_STATS"
                 
                 # Append row to table
-                REPORT_TABLE="${REPORT_TABLE}\n| **${PKG_NAME}** | ${PKG_PCT} |"
+                REPORT_TABLE="${REPORT_TABLE}\n| **${PKG_NAME}** | ${PKG_STATS} |"
                 
                 # Add to merge list
-                MERGE_ARGS="$MERGE_ARGS --add-tracefile $LCOV_FILE"
+                MERGE_ARGS+=(--add-tracefile "$LCOV_FILE")
               else
                 echo "⚪️ No coverage found for $pkg (Skipping)"
               fi
@@ -82,11 +82,13 @@ runs:
 
         # 2. Merge all files
         echo "🔗 Merging all reports..."
-        lcov $MERGE_ARGS --output-file lcov.info
+        lcov "${MERGE_ARGS[@]}" --output-file lcov.info
 
         # 3. Get Total Summary
         OUTPUT=$(lcov --summary lcov.info)
-        TOTAL_PCT=$(echo "$OUTPUT" | grep "lines......" | cut -d ':' -f 2 | xargs)
+        TOTAL_STATS=$(echo "$OUTPUT" | grep "lines......" | cut -d ':' -f 2 | xargs)
+
+        echo "TOTAL_STATS=$TOTAL_STATS" >> $GITHUB_OUTPUT
 
         # 4. Export Variables for JS Step
         # Pass Total %
@@ -96,11 +98,6 @@ runs:
         echo "DETAILED_TABLE<<EOF" >> $GITHUB_OUTPUT
         echo -e "$REPORT_TABLE" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
-        
-        # Pass the Raw LCOV Output (for the <details> dropdown)
-        echo "RAW_SUMMARY<<EOF" >> $GITHUB_OUTPUT
-        echo "$OUTPUT" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
 
     - name: Post Coverage Comment
       uses: actions/github-script@v6
@@ -109,7 +106,6 @@ runs:
         script: |
           const totalStats = '${{ steps.process_coverage.outputs.TOTAL_STATS }}';
           const table = `${{ steps.process_coverage.outputs.DETAILED_TABLE }}`;
-          const rawSummary = `${{ steps.process_coverage.outputs.RAW_SUMMARY }}`;
           
           const formattedBody = `
           ### 🛡️ Test Coverage Report
@@ -117,14 +113,6 @@ runs:
           **Total Line Coverage:** ${totalStats}
           
           ${table}
-          
-          <details>
-          <summary>Click to see raw LCOV summary</summary>
-          
-          \`\`\`text
-          ${rawSummary}
-          \`\`\`
-          </details>
           `;
 
           const { data: comments } = await github.rest.issues.listComments({
