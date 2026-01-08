@@ -102,10 +102,16 @@ describe("EventWatcher", () => {
 	});
 
 	describe("onBlock", () => {
-		it("does not process new block updates before the previous is done", async () => {
+		it("does not process new block records before the previous is done", async () => {
 			for (const update of [
 				{ type: "watcher_update_warp_to_block", fromBlock: 123n, toBlock: 130n },
-				{ type: "watcher_update_new_block", blockNumber: 0n, blockHash: zeroHash, logsBloom: BLOOM_ZERO },
+				{
+					type: "watcher_update_new_block",
+					blockNumber: 0n,
+					blockHash: zeroHash,
+					blockTimestamp: 0n,
+					logsBloom: BLOOM_ZERO,
+				},
 			] as const) {
 				const { events } = setup();
 
@@ -296,6 +302,7 @@ describe("EventWatcher", () => {
 				type: "watcher_update_new_block",
 				blockNumber: 1337n,
 				blockHash: keccak256(toHex("1337")),
+				blockTimestamp: 0n,
 				logsBloom: BLOOM_ALL,
 			});
 
@@ -327,6 +334,7 @@ describe("EventWatcher", () => {
 				type: "watcher_update_new_block",
 				blockNumber: 1337n,
 				blockHash: keccak256(toHex("1337")),
+				blockTimestamp: 0n,
 				logsBloom: bloom(WATCH.address[0], toEventSelector(WATCH.events[1])),
 			});
 
@@ -351,6 +359,7 @@ describe("EventWatcher", () => {
 					type: "watcher_update_new_block",
 					blockNumber: 42n,
 					blockHash: keccak256(toHex("the answer to life, the universe, and everything")),
+					blockTimestamp: 0n,
 					logsBloom,
 				});
 
@@ -368,6 +377,7 @@ describe("EventWatcher", () => {
 				type: "watcher_update_new_block",
 				blockNumber: 42n,
 				blockHash: keccak256(toHex("the answer to life, the universe, and everything")),
+				blockTimestamp: 0n,
 				logsBloom: BLOOM_ALL,
 			});
 
@@ -385,6 +395,7 @@ describe("EventWatcher", () => {
 				type: "watcher_update_new_block",
 				blockNumber: 1337n,
 				blockHash: keccak256(toHex("1337")),
+				blockTimestamp: 0n,
 				logsBloom: BLOOM_ALL,
 			});
 
@@ -407,6 +418,7 @@ describe("EventWatcher", () => {
 				type: "watcher_update_new_block",
 				blockNumber: 1337n,
 				blockHash: keccak256(toHex("1337")),
+				blockTimestamp: 0n,
 				logsBloom: bloom(...WATCH.address, toEventSelector(WATCH.events[1])),
 			});
 
@@ -426,6 +438,7 @@ describe("EventWatcher", () => {
 				type: "watcher_update_new_block",
 				blockNumber: 1337n,
 				blockHash: keccak256(toHex("1337")),
+				blockTimestamp: 0n,
 				logsBloom: BLOOM_ALL,
 			});
 
@@ -440,6 +453,7 @@ describe("EventWatcher", () => {
 				type: "watcher_update_new_block",
 				blockNumber: 1337n,
 				blockHash: keccak256(toHex("1337")),
+				blockTimestamp: 0n,
 				logsBloom: BLOOM_ALL,
 			});
 
@@ -459,6 +473,7 @@ describe("EventWatcher", () => {
 					type: "watcher_update_new_block",
 					blockNumber: 1337n,
 					blockHash: keccak256(toHex("1337")),
+					blockTimestamp: 0n,
 					logsBloom: BLOOM_ALL,
 				},
 				{
@@ -483,6 +498,7 @@ describe("EventWatcher", () => {
 					type: "watcher_update_new_block",
 					blockNumber: 1337n,
 					blockHash: keccak256(toHex("1337")),
+					blockTimestamp: 0n,
 					logsBloom: BLOOM_ALL,
 				},
 				{

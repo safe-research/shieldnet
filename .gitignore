@@ -12,3 +12,5 @@ foundry.lock
 # Coverage related files
 coverage/
 lcov.info
+
+validator/indexer.db

@@ -98,11 +98,12 @@ const block = (
 const newBlockUpdate = (
 	b: {
 		number: bigint;
-	} & Partial<Pick<Block<bigint, false, "latest">, "hash" | "logsBloom">>,
+	} & Partial<Pick<Block<bigint, false, "latest">, "hash" | "timestamp" | "logsBloom">>,
 ) => ({
 	type: "watcher_update_new_block",
 	blockNumber: b.number,
 	blockHash: b.hash ?? numberToHex(b.number, { size: 32 }),
+	blockTimestamp: b.timestamp ?? (b.number * BigInt(CONFIG.blockTime)) / 1000n,
 	logsBloom: b.logsBloom ?? numberToHex(b.number, { size: 512 }),
 });
 

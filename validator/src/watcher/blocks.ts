@@ -47,7 +47,7 @@ export type CreateParams = Prettify<
 export type BlockUpdate =
 	| { type: "watcher_update_warp_to_block"; fromBlock: bigint; toBlock: bigint }
 	| { type: "watcher_update_uncle_block"; blockNumber: bigint }
-	| { type: "watcher_update_new_block"; blockNumber: bigint; blockHash: Hex; logsBloom: Hex };
+	| { type: "watcher_update_new_block"; blockNumber: bigint; blockHash: Hex; blockTimestamp: bigint; logsBloom: Hex };
 
 type Config = Settings & Options;
 type Block = ViemBlock<bigint, false, "latest">;
@@ -143,6 +143,7 @@ export class BlockWatcher {
 						type: "watcher_update_new_block",
 						blockNumber: block.number,
 						blockHash: block.hash,
+						blockTimestamp: block.timestamp,
 						logsBloom: block.logsBloom,
 					}) as const,
 			),
@@ -248,6 +249,7 @@ export class BlockWatcher {
 			type: "watcher_update_new_block",
 			blockNumber: block.number,
 			blockHash: block.hash,
+			blockTimestamp: block.timestamp,
 			logsBloom: block.logsBloom,
 		};
 	}
