@@ -1,0 +1,24 @@
+{
+  "id": "security/threat_model",
+  "title": "Threat Model",
+  "description": "TODO",
+  "source": "@site/docs/security/threat_model.md",
+  "sourceDirName": "security",
+  "slug": "/security/threat_model",
+  "permalink": "/docs/security/threat_model",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/safe-research/shieldnet/tree/main/docs/public/docs/security/threat_model.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docSidebar",
+  "previous": {
+    "title": "Rewards",
+    "permalink": "/docs/protocol/rewards"
+  },
+  "next": {
+    "title": "Audits",
+    "permalink": "/docs/security/audits"
+  }
+}

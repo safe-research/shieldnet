@@ -1,0 +1,24 @@
+{
+  "id": "protocol/rewards",
+  "title": "Rewards",
+  "description": "TODO",
+  "source": "@site/docs/protocol/rewards.md",
+  "sourceDirName": "protocol",
+  "slug": "/protocol/rewards",
+  "permalink": "/docs/protocol/rewards",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/safe-research/shieldnet/tree/main/docs/public/docs/protocol/rewards.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docSidebar",
+  "previous": {
+    "title": "Staking",
+    "permalink": "/docs/protocol/staking"
+  },
+  "next": {
+    "title": "Threat Model",
+    "permalink": "/docs/security/threat_model"
+  }
+}

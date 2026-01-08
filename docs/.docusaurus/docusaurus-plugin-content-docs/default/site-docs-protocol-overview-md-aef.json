@@ -1,0 +1,24 @@
+{
+  "id": "protocol/overview",
+  "title": "Overview",
+  "description": "TODO",
+  "source": "@site/docs/protocol/overview.md",
+  "sourceDirName": "protocol",
+  "slug": "/protocol/overview",
+  "permalink": "/docs/protocol/overview",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/safe-research/shieldnet/tree/main/docs/public/docs/protocol/overview.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docSidebar",
+  "previous": {
+    "title": "Explorer",
+    "permalink": "/docs/explorer"
+  },
+  "next": {
+    "title": "Validators",
+    "permalink": "/docs/protocol/validators"
+  }
+}

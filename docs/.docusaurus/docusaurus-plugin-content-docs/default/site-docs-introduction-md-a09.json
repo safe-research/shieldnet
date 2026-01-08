@@ -1,0 +1,20 @@
+{
+  "id": "introduction",
+  "title": "Introduction",
+  "description": "TODO",
+  "source": "@site/docs/introduction.md",
+  "sourceDirName": ".",
+  "slug": "/introduction",
+  "permalink": "/docs/introduction",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/safe-research/shieldnet/tree/main/docs/public/docs/introduction.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docSidebar",
+  "next": {
+    "title": "Use cases",
+    "permalink": "/docs/use_cases"
+  }
+}

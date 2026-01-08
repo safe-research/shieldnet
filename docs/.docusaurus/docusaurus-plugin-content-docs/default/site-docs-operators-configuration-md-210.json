@@ -1,0 +1,24 @@
+{
+  "id": "operators/configuration",
+  "title": "Configuration",
+  "description": "TODO",
+  "source": "@site/docs/operators/configuration.md",
+  "sourceDirName": "operators",
+  "slug": "/operators/configuration",
+  "permalink": "/docs/operators/configuration",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/safe-research/shieldnet/tree/main/docs/public/docs/operators/configuration.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docSidebar",
+  "previous": {
+    "title": "Overview",
+    "permalink": "/docs/operators/overview"
+  },
+  "next": {
+    "title": "Monitoring",
+    "permalink": "/docs/operators/monitoring"
+  }
+}

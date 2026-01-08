@@ -1,0 +1,24 @@
+{
+  "id": "protocol/staking",
+  "title": "Staking",
+  "description": "TODO",
+  "source": "@site/docs/protocol/staking.md",
+  "sourceDirName": "protocol",
+  "slug": "/protocol/staking",
+  "permalink": "/docs/protocol/staking",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/safe-research/shieldnet/tree/main/docs/public/docs/protocol/staking.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docSidebar",
+  "previous": {
+    "title": "Consensus",
+    "permalink": "/docs/protocol/consensus"
+  },
+  "next": {
+    "title": "Rewards",
+    "permalink": "/docs/protocol/rewards"
+  }
+}

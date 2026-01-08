@@ -1,0 +1,24 @@
+{
+  "id": "protocol/validators",
+  "title": "Validators",
+  "description": "TODO",
+  "source": "@site/docs/protocol/validators.md",
+  "sourceDirName": "protocol",
+  "slug": "/protocol/validators",
+  "permalink": "/docs/protocol/validators",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/safe-research/shieldnet/tree/main/docs/public/docs/protocol/validators.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docSidebar",
+  "previous": {
+    "title": "Overview",
+    "permalink": "/docs/protocol/overview"
+  },
+  "next": {
+    "title": "Consensus",
+    "permalink": "/docs/protocol/consensus"
+  }
+}
