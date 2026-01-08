@@ -81,17 +81,16 @@ runs:
            exit 1
         fi
 
-        # 2. Merge all files
         echo "🔗 Merging all reports..."
         lcov "${MERGE_ARGS[@]}" --output-file lcov.info
 
-        # 3. Get Total Summary
+        # 4. Get Total Summary
         OUTPUT=$(lcov --summary lcov.info)
         TOTAL_STATS=$(echo "$OUTPUT" | grep "lines......" | cut -d ':' -f 2 | xargs)
 
         echo "TOTAL_STATS=$TOTAL_STATS" >> $GITHUB_OUTPUT
 
-        # 4. Export Variables for JS Step
+        # 5. Export Variables for JS Step
         # Pass Total %
         echo "TOTAL_PCT=$TOTAL_PCT" >> $GITHUB_OUTPUT
         
@@ -108,8 +107,9 @@ runs:
           const totalStats = '${{ steps.process_coverage.outputs.TOTAL_STATS }}';
           const table = `${{ steps.process_coverage.outputs.DETAILED_TABLE }}`;
           
+          const title = "### 🛡️ Test Coverage Report"
           const formattedBody = `
-          ### 🛡️ Test Coverage Report
+          ${title}
           
           **Total Line Coverage:** ${totalStats}
           
@@ -121,7 +121,7 @@ runs:
             repo: context.repo.repo,
             issue_number: context.issue.number,
           });
-          const botComment = comments.find(c => c.body.includes('### 🛡️ Combined Test Coverage'));
+          const botComment = comments.find(c => c.body.includes(title));
 
           if (botComment) {
             await github.rest.issues.updateComment({
