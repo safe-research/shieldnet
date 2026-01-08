@@ -47,7 +47,7 @@ export type CreateParams = Prettify<
 export type Record =
 	| { type: "record_warp_to_block"; fromBlock: bigint; toBlock: bigint }
 	| { type: "record_uncle_block"; blockNumber: bigint }
-	| { type: "record_new_block"; blockNumber: bigint; blockHash: Hex; logsBloom: Hex };
+	| { type: "record_new_block"; blockNumber: bigint; blockHash: Hex; blockTimestamp: bigint; logsBloom: Hex };
 
 type Config = Settings & Options;
 type Block = ViemBlock<bigint, false, "latest">;
@@ -143,6 +143,7 @@ export class BlockIndexer {
 						type: "record_new_block",
 						blockNumber: block.number,
 						blockHash: block.hash,
+						blockTimestamp: block.timestamp,
 						logsBloom: block.logsBloom,
 					}) as const,
 			),
@@ -258,6 +259,7 @@ export class BlockIndexer {
 			type: "record_new_block",
 			blockNumber: block.number,
 			blockHash: block.hash,
+			blockTimestamp: block.timestamp,
 			logsBloom: block.logsBloom,
 		};
 	}
