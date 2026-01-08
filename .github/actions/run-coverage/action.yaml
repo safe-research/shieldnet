@@ -11,11 +11,13 @@ runs:
     # --- Dependencies for this action ---
     # We install lcov here so the main workflow doesn't have to know about it
     - name: Install LCOV
+      shell: bash
       run: |
         sudo apt-get update
         sudo apt-get install -y lcov
 
     - name: Run Coverage
+      shell: bash
       run: npm run coverage
 
     - name: Discover, Fix, and Merge
