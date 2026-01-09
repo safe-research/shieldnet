@@ -400,7 +400,8 @@ contract Staking is Ownable {
         (uint64 withdrawalId, uint128 claimableAt) = _initiateWithdrawal(msg.sender, amount, validator);
 
         // Create a withdrawal node.
-        withdrawalNodes[withdrawalId] = WithdrawalNode({amount: amount, claimableAt: claimableAt, previous: 0, next: 0, staker: msg.sender});
+        withdrawalNodes[withdrawalId] =
+            WithdrawalNode({amount: amount, claimableAt: claimableAt, previous: 0, next: 0, staker: msg.sender});
 
         // Add to the withdrawal queue.
         WithdrawalQueue storage queue = withdrawalQueues[msg.sender];
@@ -469,8 +470,9 @@ contract Staking is Ownable {
         }
 
         // Create a withdrawal node.
-        withdrawalNodes[withdrawalId] =
-            WithdrawalNode({amount: amount, claimableAt: claimableAt, previous: previousId, next: nextId, staker: msg.sender});
+        withdrawalNodes[withdrawalId] = WithdrawalNode({
+            amount: amount, claimableAt: claimableAt, previous: previousId, next: nextId, staker: msg.sender
+        });
 
         // Update previous and next nodes.
         if (previousId != 0) {
@@ -669,11 +671,7 @@ contract Staking is Ownable {
      * @return amount The withdrawal amount.
      * @return claimableAt The timestamp when claimable.
      */
-    function getNextClaimableWithdrawal(address staker)
-        external
-        view
-        returns (uint256 amount, uint256 claimableAt)
-    {
+    function getNextClaimableWithdrawal(address staker) external view returns (uint256 amount, uint256 claimableAt) {
         WithdrawalQueue memory queue = withdrawalQueues[staker];
         if (queue.head == 0) {
             return (0, 0);

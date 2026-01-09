@@ -595,7 +595,7 @@ contract StakingTest is Test {
         assertEq(head, 1);
         assertEq(tail, 1);
 
-        (uint256 amt, uint256 claimableAt, uint64 prev, uint64 next, ) = staking.withdrawalNodes(1);
+        (uint256 amt, uint256 claimableAt, uint64 prev, uint64 next,) = staking.withdrawalNodes(1);
         assertEq(amt, withdrawAmount);
         assertEq(claimableAt, block.timestamp + INITIAL_WITHDRAW_DELAY);
         assertEq(prev, 0);
