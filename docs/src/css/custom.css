@@ -1,30 +1,87 @@
 /**
- * Any CSS included here will be global. The classic template
- * bundles Infima by default. Infima is a CSS framework designed to
- * work well for content-centric websites.
+ * Safe-aligned + readable Docusaurus theme tweaks. Uses Infima as css framework.
  */
 
-/* You can override the default Infima variables here. */
+/* ---------- Base (Light theme) ---------- */
 :root {
-  --ifm-color-primary: #2e8555;
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
-  --ifm-color-primary-light: #33925d;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e;
+  /* Use a darker green for light mode so text + UI remain readable */
+  --ifm-color-primary: #00b368;
+  --ifm-color-primary-dark: #00a35f;
+  --ifm-color-primary-darker: #009a5a;
+  --ifm-color-primary-darkest: #007f4a;
+  --ifm-color-primary-light: #19c97d;
+  --ifm-color-primary-lighter: #2fd18a;
+  --ifm-color-primary-lightest: #59e0a7;
+
+  /* Critical: ensure readable text on "primary" backgrounds (hero, badges, buttons) */
+  --ifm-color-primary-contrast-foreground: #0b0e11;
+  --ifm-color-primary-contrast-background: var(--ifm-color-primary);
+
+  /* Links */
+  --ifm-link-color: var(--ifm-color-primary);
+  --ifm-link-hover-color: var(--ifm-color-primary-dark);
+
+  /* Code highlighting */
   --ifm-code-font-size: 95%;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+  --docusaurus-highlighted-code-line-bg: rgba(0, 179, 104, 0.12);
 }
 
-/* For readability concerns, you should choose a lighter palette in dark mode. */
+/* ---------- Dark theme (Primary target for Safe style) ---------- */
 [data-theme='dark'] {
-  --ifm-color-primary: #25c2a0;
-  --ifm-color-primary-dark: #21af90;
-  --ifm-color-primary-darker: #1fa588;
-  --ifm-color-primary-darkest: #1a8870;
-  --ifm-color-primary-light: #29d5b0;
-  --ifm-color-primary-lighter: #32d8b4;
-  --ifm-color-primary-lightest: #4fddbf;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+  /* Safe accent green (neon) works best in dark mode */
+  --ifm-color-primary: #12ff80;
+  --ifm-color-primary-dark: #00e673;
+  --ifm-color-primary-darker: #00cc66;
+  --ifm-color-primary-darkest: #00994d;
+  --ifm-color-primary-light: #3dff9a;
+  --ifm-color-primary-lighter: #66ffad;
+  --ifm-color-primary-lightest: #99ffcc;
+
+  /* Critical: readable text on neon primary backgrounds */
+  --ifm-color-primary-contrast-foreground: #0b0e11;
+  --ifm-color-primary-contrast-background: var(--ifm-color-primary);
+
+  /* Safe-like dark surfaces */
+  --ifm-background-color: #0b0e11;
+  --ifm-background-surface-color: #12161c;
+
+  /* Text */
+  --ifm-font-color-base: #e6e8eb;
+  --ifm-heading-color: #ffffff;
+
+  /* Muted text */
+  --ifm-color-emphasis-600: #a3a9b1;
+  --ifm-color-emphasis-500: #808892;
+
+  /* Code highlighting */
+  --docusaurus-highlighted-code-line-bg: rgba(18, 255, 128, 0.14);
+}
+
+/* ---------- Fix the homepage hero (avoid neon full-bleed background) ---------- */
+/* Docusaurus classic uses .hero--primary for the homepage header */
+.hero--primary {
+  background: var(--ifm-background-surface-color) !important;
+  color: var(--ifm-font-color-base) !important;
+}
+
+/* Make hero title pop (Safe-style) */
+.hero--primary .hero__title,
+.hero--primary .hero__subtitle {
+  color: var(--ifm-heading-color) !important;
+}
+
+/* Primary button styling: keep green accent, readable text */
+.hero--primary .button--secondary {
+  background: var(--ifm-color-primary) !important;
+  color: var(--ifm-color-primary-contrast-foreground) !important;
+  border-color: transparent !important;
+}
+
+.hero--primary .button--secondary:hover {
+  background: var(--ifm-color-primary-dark) !important;
+}
+
+/* ---------- Ensure "primary" badges/tags don’t go white-on-green ---------- */
+.badge--primary {
+  color: var(--ifm-color-primary-contrast-foreground) !important;
 }
