@@ -67,7 +67,7 @@ Delegate stake to validators and earn rewards for securing the network.
 ### Transaction checkers and security firms
 Provide detection logic and risk signals that can be enforced onchain via Shieldnet.
 
-→ See: [Integration → Transation checkers](/docs/integation/tx_checkers
+→ See: [Integration → Transaction checkers](/docs/integration/tx_checkers)
 
 ## Scope, limitations, and outlook
 
