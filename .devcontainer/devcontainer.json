@@ -1,5 +1,5 @@
 // Linux devcontainer.
-// For MacOS, refer to ./macos/decontainer.json
+// For MacOS, refer to ./macos/devcontainer.json
 {
 	"name": "Shieldnet (Linux)",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
