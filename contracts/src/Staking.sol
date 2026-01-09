@@ -20,7 +20,6 @@ contract Staking is Ownable {
      * @custom:param claimableAt The block timestamp when the withdrawal becomes claimable.
      * @custom:param previous The ID of the previous withdrawal in the queue (0 if this node is the head).
      * @custom:param next The ID of the next withdrawal in the queue (0 if this node is the tail).
-     * @custom:param staker The address of the staker who owns this withdrawal.
      * @dev The withdrawal queue for each staker is implemented as a doubly linked list to allow for
      *      efficient claims from queue.
      */
@@ -29,7 +28,6 @@ contract Staking is Ownable {
         uint128 claimableAt;
         uint64 previous;
         uint64 next;
-        address staker;
     }
 
     /**
@@ -127,9 +125,9 @@ contract Staking is Ownable {
     mapping(address staker => WithdrawalQueue queue) public withdrawalQueues;
 
     /**
-     * @notice Stores all withdrawal nodes by ID.
+     * @notice Stores all withdrawal nodes by staker -> withdrawal ID.
      */
-    mapping(uint64 withdrawalId => WithdrawalNode node) public withdrawalNodes;
+    mapping(address staker => mapping(uint64 withdrawalId => WithdrawalNode node)) public withdrawalNodes;
 
     /**
      * @notice Pending proposal for withdraw delay change.
@@ -291,8 +289,7 @@ contract Staking is Ownable {
     error InvalidParameter();
 
     /**
-     * @notice Thrown when a specified previous withdrawal ID is not from the
-     *         caller (staker). Also checks that the previous ID exists.
+     * @notice Thrown when the previous ID doesn't exist.
      */
     error InvalidPreviousId();
 
@@ -395,8 +392,8 @@ contract Staking is Ownable {
         (uint64 withdrawalId, uint128 claimableAt) = _initiateWithdrawal(msg.sender, amount, validator);
 
         // Create a withdrawal node.
-        withdrawalNodes[withdrawalId] =
-            WithdrawalNode({amount: amount, claimableAt: claimableAt, previous: 0, next: 0, staker: msg.sender});
+        withdrawalNodes[msg.sender][withdrawalId] =
+            WithdrawalNode({amount: amount, claimableAt: claimableAt, previous: 0, next: 0});
 
         // Add to the withdrawal queue.
         WithdrawalQueue storage queue = withdrawalQueues[msg.sender];
@@ -407,27 +404,27 @@ contract Staking is Ownable {
             // Check if the claimableAt of the tail is higher than the claimableAt of the new node. If so, traverse
             // backwards to find the correct position.
             uint64 currentId = queue.tail;
-            while (currentId != 0 && withdrawalNodes[currentId].claimableAt > claimableAt) {
-                currentId = withdrawalNodes[currentId].previous;
+            while (currentId != 0 && withdrawalNodes[msg.sender][currentId].claimableAt > claimableAt) {
+                currentId = withdrawalNodes[msg.sender][currentId].previous;
             }
             if (currentId == queue.tail) {
                 // Higher chances of this happening in most cases, so check first.
                 // Insert at tail.
-                withdrawalNodes[withdrawalId].previous = queue.tail;
-                withdrawalNodes[queue.tail].next = withdrawalId;
+                withdrawalNodes[msg.sender][withdrawalId].previous = queue.tail;
+                withdrawalNodes[msg.sender][queue.tail].next = withdrawalId;
                 queue.tail = withdrawalId;
             } else if (currentId == 0) {
                 // Insert at head.
-                withdrawalNodes[withdrawalId].next = queue.head;
-                withdrawalNodes[queue.head].previous = withdrawalId;
+                withdrawalNodes[msg.sender][withdrawalId].next = queue.head;
+                withdrawalNodes[msg.sender][queue.head].previous = withdrawalId;
                 queue.head = withdrawalId;
             } else {
                 // Insert in the middle.
-                uint64 nextId = withdrawalNodes[currentId].next;
-                withdrawalNodes[withdrawalId].previous = currentId;
-                withdrawalNodes[withdrawalId].next = nextId;
-                withdrawalNodes[currentId].next = withdrawalId;
-                withdrawalNodes[nextId].previous = withdrawalId;
+                uint64 nextId = withdrawalNodes[msg.sender][currentId].next;
+                withdrawalNodes[msg.sender][withdrawalId].previous = currentId;
+                withdrawalNodes[msg.sender][withdrawalId].next = nextId;
+                withdrawalNodes[msg.sender][currentId].next = withdrawalId;
+                withdrawalNodes[msg.sender][nextId].previous = withdrawalId;
             }
         }
     }
@@ -452,32 +449,31 @@ contract Staking is Ownable {
             // Inserting at head - get the current head as nextId.
             nextId = withdrawalQueues[msg.sender].head;
         } else {
-            require(withdrawalNodes[previousId].staker == msg.sender, InvalidPreviousId());
-            require(withdrawalNodes[previousId].claimableAt <= claimableAt, InvalidOrdering());
+            require(withdrawalNodes[msg.sender][previousId].claimableAt > 0, InvalidPreviousId());
+            require(withdrawalNodes[msg.sender][previousId].claimableAt <= claimableAt, InvalidOrdering());
 
-            nextId = withdrawalNodes[previousId].next;
+            nextId = withdrawalNodes[msg.sender][previousId].next;
         }
 
         // Validate ordering if queue is not empty.
         if (nextId != 0) {
-            require(withdrawalNodes[nextId].claimableAt >= claimableAt, InvalidOrdering());
+            require(withdrawalNodes[msg.sender][nextId].claimableAt >= claimableAt, InvalidOrdering());
         }
 
         // Create a withdrawal node.
-        withdrawalNodes[withdrawalId] = WithdrawalNode({
-            amount: amount, claimableAt: claimableAt, previous: previousId, next: nextId, staker: msg.sender
-        });
+        withdrawalNodes[msg.sender][withdrawalId] =
+            WithdrawalNode({amount: amount, claimableAt: claimableAt, previous: previousId, next: nextId});
 
         // Update previous and next nodes.
         if (previousId != 0) {
-            withdrawalNodes[previousId].next = withdrawalId;
+            withdrawalNodes[msg.sender][previousId].next = withdrawalId;
         } else {
             // Inserting at head.
             withdrawalQueues[msg.sender].head = withdrawalId;
         }
 
         if (nextId != 0) {
-            withdrawalNodes[nextId].previous = withdrawalId;
+            withdrawalNodes[msg.sender][nextId].previous = withdrawalId;
         } else {
             // Inserting at tail.
             withdrawalQueues[msg.sender].tail = withdrawalId;
@@ -495,7 +491,7 @@ contract Staking is Ownable {
         uint64 queueHead = withdrawalQueues[staker].head;
         require(queueHead != 0, WithdrawalQueueEmpty());
 
-        WithdrawalNode memory node = withdrawalNodes[queueHead];
+        WithdrawalNode memory node = withdrawalNodes[staker][queueHead];
         require(block.timestamp >= node.claimableAt, NoClaimableWithdrawal());
 
         uint256 amount = node.amount;
@@ -505,10 +501,10 @@ contract Staking is Ownable {
             withdrawalQueues[staker] = WithdrawalQueue({head: 0, tail: 0});
         } else {
             withdrawalQueues[staker].head = node.next;
-            withdrawalNodes[node.next].previous = 0;
+            withdrawalNodes[staker][node.next].previous = 0;
         }
 
-        delete withdrawalNodes[queueHead];
+        delete withdrawalNodes[staker][queueHead];
         totalPendingWithdrawals -= amount;
         emit WithdrawalClaimed(staker, queueHead, amount);
 
@@ -644,14 +640,14 @@ contract Staking is Ownable {
         uint64 currentId = queue.head;
         while (currentId != 0) {
             count++;
-            currentId = withdrawalNodes[currentId].next;
+            currentId = withdrawalNodes[staker][currentId].next;
         }
 
         // Populate the withdrawals array.
         WithdrawalInfo[] memory withdrawals = new WithdrawalInfo[](count);
         currentId = queue.head;
         for (uint256 i = 0; i < count; i++) {
-            WithdrawalNode memory node = withdrawalNodes[currentId];
+            WithdrawalNode memory node = withdrawalNodes[staker][currentId];
             withdrawals[i] = WithdrawalInfo({amount: node.amount, claimableAt: node.claimableAt});
             currentId = node.next;
         }
@@ -671,7 +667,7 @@ contract Staking is Ownable {
             return (0, 0);
         }
 
-        WithdrawalNode memory node = withdrawalNodes[queue.head];
+        WithdrawalNode memory node = withdrawalNodes[staker][queue.head];
         return (node.amount, node.claimableAt);
     }
 

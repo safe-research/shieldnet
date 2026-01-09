@@ -595,7 +595,7 @@ contract StakingTest is Test {
         assertEq(head, 1);
         assertEq(tail, 1);
 
-        (uint256 amt, uint256 claimableAt, uint64 prev, uint64 next,) = staking.withdrawalNodes(1);
+        (uint256 amt, uint256 claimableAt, uint64 prev, uint64 next) = staking.withdrawalNodes(staker, 1);
         assertEq(amt, withdrawAmount);
         assertEq(claimableAt, block.timestamp + INITIAL_WITHDRAW_DELAY);
         assertEq(prev, 0);
@@ -619,8 +619,8 @@ contract StakingTest is Test {
         assertEq(head, 1);
         assertEq(tail, 2);
 
-        (,,, uint64 next1,) = staking.withdrawalNodes(1);
-        (,, uint64 prev2, uint64 next2,) = staking.withdrawalNodes(2);
+        (,,, uint64 next1) = staking.withdrawalNodes(staker, 1);
+        (,, uint64 prev2, uint64 next2) = staking.withdrawalNodes(staker, 2);
 
         assertEq(next1, 2);
         assertEq(prev2, 1);
@@ -665,8 +665,8 @@ contract StakingTest is Test {
         assertEq(head, 2);
         assertEq(tail, 1);
 
-        (,, uint64 prev2, uint64 next2,) = staking.withdrawalNodes(2);
-        (,, uint64 prev1, uint64 next1,) = staking.withdrawalNodes(1);
+        (,, uint64 prev2, uint64 next2) = staking.withdrawalNodes(staker, 2);
+        (,, uint64 prev1, uint64 next1) = staking.withdrawalNodes(staker, 1);
 
         // Check links: 2 -> 1
         assertEq(next2, 1);
@@ -736,9 +736,9 @@ contract StakingTest is Test {
         assertEq(head, 1);
         assertEq(tail, 2);
 
-        (,,, uint64 next1,) = staking.withdrawalNodes(1);
-        (,, uint64 prev2,,) = staking.withdrawalNodes(2);
-        (,, uint64 prev3, uint64 next3,) = staking.withdrawalNodes(3);
+        (,,, uint64 next1) = staking.withdrawalNodes(staker, 1);
+        (,, uint64 prev2,) = staking.withdrawalNodes(staker, 2);
+        (,, uint64 prev3, uint64 next3) = staking.withdrawalNodes(staker, 3);
 
         // W1 -> W3 -> W2
         assertEq(next1, 3);
@@ -773,7 +773,7 @@ contract StakingTest is Test {
         assertEq(head, 1);
         assertEq(tail, 2);
 
-        (,, uint64 prev2, uint64 next2,) = staking.withdrawalNodes(2);
+        (,, uint64 prev2, uint64 next2) = staking.withdrawalNodes(staker, 2);
         assertEq(prev2, 1);
         assertEq(next2, 0);
 
@@ -819,9 +819,9 @@ contract StakingTest is Test {
         assertEq(tail, 2);
 
         // Check links: 1 -> 3 -> 2
-        (,, uint64 prev1, uint64 next1,) = staking.withdrawalNodes(1);
-        (,, uint64 prev2, uint64 next2,) = staking.withdrawalNodes(2);
-        (,, uint64 prev3, uint64 next3,) = staking.withdrawalNodes(3);
+        (,, uint64 prev1, uint64 next1) = staking.withdrawalNodes(staker, 1);
+        (,, uint64 prev2, uint64 next2) = staking.withdrawalNodes(staker, 2);
+        (,, uint64 prev3, uint64 next3) = staking.withdrawalNodes(staker, 3);
 
         assertEq(prev1, 0);
         assertEq(next1, 3);
@@ -859,8 +859,8 @@ contract StakingTest is Test {
         assertEq(tail, 1);
 
         // Check links: 2 -> 1
-        (,, uint64 prev1, uint64 next1,) = staking.withdrawalNodes(1);
-        (,, uint64 prev2, uint64 next2,) = staking.withdrawalNodes(2);
+        (,, uint64 prev1, uint64 next1) = staking.withdrawalNodes(staker, 1);
+        (,, uint64 prev2, uint64 next2) = staking.withdrawalNodes(staker, 2);
 
         assertEq(prev1, 2);
         assertEq(next1, 0);
