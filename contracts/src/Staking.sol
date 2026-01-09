@@ -393,8 +393,7 @@ contract Staking is Ownable {
 
         // Create a withdrawal node.
         mapping(uint64 => WithdrawalNode) storage stakerNodes = withdrawalNodes[msg.sender];
-        stakerNodes[withdrawalId] =
-            WithdrawalNode({amount: amount, claimableAt: claimableAt, previous: 0, next: 0});
+        stakerNodes[withdrawalId] = WithdrawalNode({amount: amount, claimableAt: claimableAt, previous: 0, next: 0});
 
         // Add to the withdrawal queue.
         WithdrawalQueue storage queue = withdrawalQueues[msg.sender];
