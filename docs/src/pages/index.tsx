@@ -14,7 +14,7 @@ function HomepageHeader() {
 					Shieldnet enforces transaction security onchain - protecting users from high-risk threats
 				</p>
 				<div className={styles.buttons}>
-					<a className="button button--secondary button--lg" href="/docs/introduction">
+					<a className="button button--secondary button--lg" href="docs/introduction">
 						Get Started
 					</a>
 				</div>
