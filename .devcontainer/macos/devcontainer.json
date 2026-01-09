@@ -3,16 +3,9 @@
 // Devcontainers don't support `extends` yet, hence we need to keep them in sync manually.
 
 {
-  "name": "Shieldnet (MacOS)",
-	"image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
+    "name": "Shieldnet (MacOS)",
+    "image": "mcr.microsoft.com/devcontainers/typescript-node:dev-24-bookworm"
 
-	"mounts": [
-  ],
-
-  "remoteEnv": {
-      "SSH_AUTH_SOCK": "/tmp/ssh-agent.sock"
-  },
-
-  "remoteUser": "node",
-	"updateRemoteUserUID": true
+    // User that VS Code connects as *inside* the container.
+    "remoteUser": "node"
 }
