@@ -96,7 +96,7 @@ export const checkKeyGenTimeouts = (
 		return {};
 	}
 
-	logger?.("keygen timeout", { timeoutInfo });
+	logger?.("Key gen timed out", { rollover: { id: machineStates.rollover.id }, timeoutInfo });
 	const [adjustedParticipants, nextEpoch] = timeoutInfo;
 
 	// For next key gen only consider active participants

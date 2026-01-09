@@ -62,7 +62,7 @@ export abstract class BaseProtocol implements ShieldnetProtocol {
 		this.performAction(action)
 			.then((transactionHash) => {
 				// If action was successfully sent to the node, remove it from queue
-				this.#logger.verbose(`sent action for ${action.id} transaction`, { ...actionSpan, transactionHash });
+				this.#logger.verbose(`Sent action for ${action.id} transaction`, { ...actionSpan, transactionHash });
 				this.#actionQueue.pop();
 				this.#currentAction = undefined;
 				this.checkNextAction();

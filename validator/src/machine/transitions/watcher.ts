@@ -72,13 +72,13 @@ export class OnchainTransitionWatcher {
 	handleTransition(transition: StateTransition) {
 		try {
 			if (!this.updateLastIndexedBlock(transition.block)) {
-				this.#logger.warn("received an out-of-order transition", { transition });
+				this.#logger.warn("Received an out-of-order transition", { transition });
 				return;
 			}
 			this.#onTransition(transition);
 		} catch (e: unknown) {
 			const err = e instanceof Error ? e : new Error(`unknown error: ${e}`);
-			this.#logger.error("an error occurred handling a state transition:", err);
+			this.#logger.error("An error occurred handling a state transition:", err);
 		}
 	}
 
@@ -101,7 +101,7 @@ export class OnchainTransitionWatcher {
 						this.handleTransition(transition);
 					}
 				},
-				onError: (err) => this.#logger.error("contract event watcher error:", err),
+				onError: (err) => this.#logger.error("Contract event watcher error:", err),
 			}),
 		);
 		this.#cleanupCallbacks.push(
@@ -115,7 +115,7 @@ export class OnchainTransitionWatcher {
 						});
 					}, 2000);
 				},
-				onError: (err) => this.#logger.error("block number watcher error:", err),
+				onError: (err) => this.#logger.error("Block number watcher error:", err),
 			}),
 		);
 	}

@@ -42,7 +42,7 @@ const checkSigningRequestTimeout = (
 ): StateDiff => {
 	// Still within deadline
 	if (status.deadline > block) return {};
-	logger?.(`signing request ${status.id} timed out`, { signingStatus: status });
+	logger?.(`Signing request ${status.id} timed out`, { signingStatus: status });
 	const stateDiff: StateDiff = {};
 	switch (status.id) {
 		case "waiting_for_attestation": {
@@ -158,7 +158,7 @@ const checkSigningRequestTimeout = (
 				status.id === "collect_nonce_commitments"
 					? signingClient.missingNonces(status.signatureId)
 					: signingClient.signers(status.signatureId).filter((s) => status.sharesFrom.indexOf(s) < 0);
-			logger?.("removing signers for not participating", { missingParticipants });
+			logger?.("Removing signers for not participating", { missingParticipants });
 			// For next key gen only consider active participants
 			const signers = machineConfig.defaultParticipants
 				.filter((p) => missingParticipants.indexOf(p.id) < 0)
