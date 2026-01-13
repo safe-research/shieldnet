@@ -160,12 +160,6 @@ describe("protocol - sqlite", () => {
 				nonce: 1,
 				transactionJson: "Invalid JSON!",
 			});
-			const _pending = db
-				.prepare(`
-				SELECT * FROM transaction_storage;
-			`)
-				.all();
-
 			expect(() => storage.pending(0)).toThrow("Unexpected token 'I', \"Invalid JSON!\" is not valid JSON");
 		});
 
@@ -298,16 +292,16 @@ describe("protocol - sqlite", () => {
 				{
 					to: entryPoint06Address,
 					value: 0n,
-					data: "0x5afe02",
+					data: "0x5afe03",
 					hash: null,
-					nonce: 2,
+					nonce: 3,
 				},
 				{
 					to: entryPoint06Address,
 					value: 0n,
-					data: "0x5afe03",
+					data: "0x5afe02",
 					hash: null,
-					nonce: 3,
+					nonce: 4,
 				},
 			]);
 		});

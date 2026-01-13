@@ -197,16 +197,9 @@ export class SqliteTxStorage implements TransactionStorage {
 		const result = this.#db
 			.prepare(`
 			INSERT INTO transaction_storage (nonce, transactionJson)
-			SELECT 
-				CASE 
-				-- Case 1: If minNonce is NOT in the table, use it.
-				WHEN NOT EXISTS (SELECT 1 FROM transaction_storage WHERE nonce = $minNonce) THEN $minNonce
-				
-				-- Case 2: Otherwise, take the highest nonce + 1
-				ELSE (SELECT MAX(nonce) + 1 FROM transaction_storage)
-				END,
-				$transactionJson
-			RETURNING nonce
+			SELECT MAX($minNonce, COALESCE(MAX(nonce) + 1, $minNonce)), $transactionJson
+			FROM transaction_storage
+			RETURNING nonce;
 		`)
 			.run({
 				minNonce,
