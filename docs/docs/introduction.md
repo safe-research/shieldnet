@@ -75,7 +75,7 @@ Shieldnet v1 focuses on:
 
 - **Safe transactions on EVM chains**
 - **Permissioned validator set**
-- **Pre-defined security policies**
+- **Pre-defined security security checks**
 - **Onchain enforcement via Safe guards**
 
 This is a deliberate starting point. Transaction security is complex, and Shieldnet prioritizes correctness, reliability, and measurable guarantees in its initial deployment.
