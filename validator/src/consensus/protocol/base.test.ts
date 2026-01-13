@@ -14,7 +14,49 @@ describe("BaseProtocol", () => {
 		vi.useRealTimers();
 	});
 
-	it("should retry actions that errored after timeout", async () => {
+	it("should retry actions that errored", async () => {
+		const timeoutSpy = vi.spyOn(global, "setTimeout");
+		const queue = new InMemoryQueue<ActionWithTimeout>();
+		const pushSpy = vi.spyOn(queue, "push");
+		const peekSpy = vi.spyOn(queue, "peek");
+		const popSpy = vi.spyOn(queue, "pop");
+		const logger = createLogger({});
+		const protocol = new TestProtocol(queue, logger);
+		const protocolSpy = vi.spyOn(protocol, "requestSignature");
+		expect(queue.peek()).toBeUndefined();
+		const action = TEST_ACTIONS[0][0];
+		protocol.process(action, 10000);
+		const actionWithTimeout = {
+			...action,
+			validUntil: Date.now() + 10000,
+		};
+		expect(queue.peek()).toStrictEqual(actionWithTimeout);
+		expect(pushSpy).toBeCalledTimes(1);
+		expect(pushSpy).toBeCalledWith(actionWithTimeout);
+		// Called 3 times: 2 times in the test, 1 time in the implementation
+		expect(peekSpy).toBeCalledTimes(3);
+		// Check if retry was scheduled via setTimeout
+		await vi.waitFor(() => {
+			expect(timeoutSpy).toHaveBeenCalled();
+		});
+		expect(protocolSpy).toBeCalledTimes(1);
+		// Test successful retry
+		protocolSpy.mockResolvedValueOnce(zeroHash);
+		vi.advanceTimersByTime(1000);
+		// Wait for retry to be successful
+		await vi.waitFor(() => {
+			expect(popSpy).toHaveBeenCalled();
+		});
+		expect(popSpy).toBeCalledTimes(1);
+		// Called 3 times before, 1 additional time by retry, 1 time after retry
+		expect(peekSpy).toBeCalledTimes(5);
+		expect(protocolSpy).toBeCalledTimes(2);
+		expect(protocolSpy).toBeCalledWith(actionWithTimeout);
+		// Queue should be empty now
+		expect(queue.peek()).toBeUndefined();
+	});
+
+	it("should drop actions after timeout", async () => {
 		const timeoutSpy = vi.spyOn(global, "setTimeout");
 		const queue = new InMemoryQueue<ActionWithTimeout>();
 		const pushSpy = vi.spyOn(queue, "push");
@@ -39,14 +81,20 @@ describe("BaseProtocol", () => {
 		await vi.waitFor(() => {
 			expect(timeoutSpy).toHaveBeenCalled();
 		});
-		// Test successful retry
-		protocolSpy.mockResolvedValueOnce(zeroHash);
+		// Initial try to executed the action
+		expect(protocolSpy).toBeCalledTimes(1);
+
+		// Test action timeout
 		vi.advanceTimersByTime(1000);
+		// Wait for retry to be successful
+		await vi.waitFor(() => {
+			expect(popSpy).toHaveBeenCalled();
+		});
+		expect(popSpy).toBeCalledTimes(1);
+		// No additional function should be triggered as the action was dropped
+		expect(protocolSpy).toBeCalledTimes(1);
 		// Called 3 times before, 1 additional time by retry, 1 time after retry
 		expect(peekSpy).toBeCalledTimes(5);
-		expect(popSpy).toBeCalledTimes(1);
-		expect(protocolSpy).toBeCalledTimes(1);
-		expect(protocolSpy).toBeCalledWith(actionWithTimeout);
 		// Queue should be empty now
 		expect(queue.peek()).toBeUndefined();
 	});
