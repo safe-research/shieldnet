@@ -34,12 +34,12 @@ const config: ProtocolConfig = {
 	genesisSalt: validatorConfig.GENESIS_SALT,
 	blocksPerEpoch: validatorConfig.BLOCKS_PER_EPOCH,
 };
-const watcher: WatcherConfig = {
+const watcherConfig: WatcherConfig = {
 	maxReorgDepth: validatorConfig.MAX_REORG_DEPTH ?? 5,
 	blockPageSize: validatorConfig.BLOCK_PAGE_SIZE,
 	maxLogsPerQuery: validatorConfig.MAX_LOGS_PER_QUERY,
 };
-logger.notice("Using configuration", { config, watcher });
+logger.notice("Using configuration", { config, watcherConfig });
 
 const fees: ChainFees = {
 	// Use a higher default multiplier to ensure transaction inclusion
@@ -59,7 +59,7 @@ const service = createValidatorService({
 	rpcUrl: validatorConfig.RPC_URL,
 	storageFile: validatorConfig.STORAGE_FILE,
 	config,
-	watcher,
+	watcherConfig,
 	logger,
 	metrics: metrics.metrics,
 	fees,

@@ -29,7 +29,7 @@ export type WatcherConfig = Pick<
 export class OnchainTransitionWatcher {
 	#logger: Logger;
 	#config: Config;
-	#watcher: WatcherConfig;
+	#watcherConfig: WatcherConfig;
 	#db: Database;
 	#publicClient: PublicClient;
 	#onTransition: (transition: StateTransition) => void;
@@ -39,20 +39,20 @@ export class OnchainTransitionWatcher {
 		database,
 		publicClient,
 		config,
-		watcher,
+		watcherConfig,
 		logger,
 		onTransition,
 	}: {
 		database: Database;
 		publicClient: PublicClient;
 		config: Config;
-		watcher: WatcherConfig;
+		watcherConfig: WatcherConfig;
 		onTransition: (transition: StateTransition) => void;
 		logger: Logger;
 	}) {
 		this.#db = database;
 		this.#config = config;
-		this.#watcher = watcher;
+		this.#watcherConfig = watcherConfig;
 		this.#logger = logger;
 		this.#publicClient = publicClient;
 		this.#onTransition = onTransition;
@@ -112,7 +112,7 @@ export class OnchainTransitionWatcher {
 		this.#stop = await watchBlocksAndEvents({
 			logger: this.#logger,
 			client: this.#publicClient,
-			...this.#watcher,
+			...this.#watcherConfig,
 			lastIndexedBlock,
 			blockTime,
 			address: [this.#config.consensus, this.#config.coordinator],

@@ -42,7 +42,7 @@ export class ValidatorService {
 		account,
 		transport,
 		config,
-		watcher,
+		watcherConfig,
 		chain,
 		logger,
 		metrics,
@@ -51,7 +51,7 @@ export class ValidatorService {
 		account: Account;
 		transport: Transport;
 		config: ProtocolConfig;
-		watcher: WatcherConfig;
+		watcherConfig: WatcherConfig;
 		chain: Chain;
 		logger: Logger;
 		metrics: Metrics;
@@ -100,7 +100,7 @@ export class ValidatorService {
 			publicClient: this.#publicClient,
 			database: database ?? new Sqlite3(":memory:"),
 			config,
-			watcher,
+			watcherConfig,
 			logger,
 			onTransition: (t) => {
 				this.#stateMachine.transition(t);
@@ -122,7 +122,7 @@ export const createValidatorService = ({
 	rpcUrl,
 	storageFile,
 	config,
-	watcher,
+	watcherConfig,
 	logger,
 	metrics,
 	fees,
@@ -131,7 +131,7 @@ export const createValidatorService = ({
 	rpcUrl: string;
 	storageFile?: string;
 	config: ProtocolConfig;
-	watcher: WatcherConfig;
+	watcherConfig: WatcherConfig;
 	logger: Logger;
 	metrics: Metrics;
 	fees?: ChainFees;
@@ -145,5 +145,5 @@ export const createValidatorService = ({
 		fees,
 	};
 	const database = storageFile !== undefined ? new Sqlite3(storageFile) : undefined;
-	return new ValidatorService({ account, transport, config, watcher, chain, logger, metrics, database });
+	return new ValidatorService({ account, transport, config, watcherConfig, chain, logger, metrics, database });
 };

@@ -165,7 +165,7 @@ describe("integration", () => {
 					consensus: consensus.address,
 					coordinator: coordinator.address,
 				},
-				watcher: {
+				watcherConfig: {
 					maxReorgDepth: 0,
 				},
 				logger,
@@ -214,9 +214,9 @@ describe("integration", () => {
 			},
 			(TEST_RUNTIME_IN_SECONDS / 3) * 1000,
 		);
-		// Wait right until right before the end of the test run time, (otherwise, we may have
-		// already seen the 60'th block and start an additional key gen process.
-		await new Promise((resolve) => setTimeout(resolve, (TEST_RUNTIME_IN_SECONDS - 1) * 1000));
+		// Stop a few seconds before the end of the test run time, (otherwise, we may have
+		// already seen the 60'th block and start an additional key gen process).
+		await new Promise((resolve) => setTimeout(resolve, (TEST_RUNTIME_IN_SECONDS - 5) * 1000));
 		const groups: Set<GroupId> = new Set();
 		for (const { kc } of clients) {
 			const knownGroups = kc.knownGroups();
