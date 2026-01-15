@@ -7,7 +7,7 @@ import rehypeKatex from 'rehype-katex';
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
 const config: Config = {
-  title: 'Shieldnet',
+  title: 'Safenet',
   tagline: 'Enforce transaction security onchain',
   // TODO replace with favicon
   favicon: 'img/favicon.ico',
@@ -41,7 +41,7 @@ const config: Config = {
     locales: ['en'],
   },
 
-stylesheets: [
+  stylesheets: [
     {
       href: 'https://cdn.jsdelivr.net/npm/katex@0.13.24/dist/katex.min.css',
       type: 'text/css',
@@ -60,7 +60,7 @@ stylesheets: [
           editUrl:
             'https://github.com/safe-research/shieldnet/tree/main/docs/',
           remarkPlugins: [remarkMath],
-          rehypePlugins: [rehypeKatex],  
+          rehypePlugins: [rehypeKatex],
         },
         blog: false,
         theme: {
@@ -77,10 +77,10 @@ stylesheets: [
       respectPrefersColorScheme: true,
     },
     navbar: {
-      title: 'Shieldnet',
+      title: 'Safenet',
       logo: {
-        alt: 'Shieldnet Logo',
-        // TODO replace with shieldnet logo
+        alt: 'Safenet Logo',
+        // TODO replace with Safenet logo
         src: 'img/logo.svg',
       },
       items: [
