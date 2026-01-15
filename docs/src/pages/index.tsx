@@ -8,10 +8,10 @@ function HomepageHeader() {
 		<header className={styles.heroBanner}>
 			<div className="container">
 				<Heading as="h1" className="hero__title">
-					Shieldnet
+					Safenet
 				</Heading>
 				<p className="hero__subtitle">
-					Shieldnet enforces transaction security onchain - protecting users from high-risk threats
+					Safenet enforces transaction security onchain - protecting users from high-risk threats
 				</p>
 				<Link className="button button--secondary button--lg" to="/docs/introduction">
 					Get Started
@@ -23,7 +23,7 @@ function HomepageHeader() {
 
 export default function Home() {
 	return (
-		<Layout title="Shieldnet" description="Shieldnet enforces transaction security onchain">
+		<Layout title="Safenet" description="Safenet enforces transaction security onchain">
 			<HomepageHeader />
 			<main>{/* TODO */}</main>
 		</Layout>
