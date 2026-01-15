@@ -54,7 +54,13 @@ export class Watcher<E extends Events> {
 	async #run() {
 		while (this.#running) {
 			try {
-				for (let logs = await this.#events.next(); logs !== null; logs = await this.#events.next()) {
+				while (true /* logs !== null */) {
+					const logs = await this.#events.next();
+					if (logs === null) {
+						break
+					}
+
+					// Trigger an update if we have some logs.
 					if (logs.length > 0) {
 						this.#onUpdate({ type: "watcher_update_new_logs", logs });
 					}
