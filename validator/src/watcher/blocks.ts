@@ -42,12 +42,12 @@ export type CreateParams = Prettify<
 >;
 
 /**
- * Block watcher records.
+ * Block watcher update.
  */
-export type Record =
-	| { type: "record_warp_to_block"; fromBlock: bigint; toBlock: bigint }
-	| { type: "record_uncle_block"; blockNumber: bigint }
-	| { type: "record_new_block"; blockNumber: bigint; blockHash: Hex; logsBloom: Hex };
+export type BlockUpdate =
+	| { type: "block_update_warp_to_block"; fromBlock: bigint; toBlock: bigint }
+	| { type: "block_update_uncle_block"; blockNumber: bigint }
+	| { type: "block_update_new_block"; blockNumber: bigint; blockHash: Hex; logsBloom: Hex };
 
 type Config = Settings & Options;
 type Block = ViemBlock<bigint, false, "latest">;
@@ -72,7 +72,7 @@ export class BlockWatcher {
 	#config: Config;
 	#pending: PendingBlock;
 	#blocks: Block[];
-	#queue: Record[];
+	#queue: BlockUpdate[];
 
 	private constructor(client: Client, config: Config) {
 		this.#client = client;
@@ -91,19 +91,19 @@ export class BlockWatcher {
 		if (lastIndexedBlock !== null) {
 			// In order to prevent edge-cases where there is a reorg for a block when the service
 			// was restarted, we always need to create a "fake" reorg `maxReorgDepth` deep in order
-			// to re-index the last blocks before the service shutdown. Queue an watcher record for
+			// to re-index the last blocks before the service shutdown. Queue a block update for
 			// uncling the block right after the last safe indexed block.
 			const uncle = bmax(lastIndexedBlock - BigInt(this.#config.maxReorgDepth - 1), 0n);
 			if (uncle <= lastIndexedBlock) {
-				this.#queue.push({ type: "record_uncle_block", blockNumber: uncle });
+				this.#queue.push({ type: "block_update_uncle_block", blockNumber: uncle });
 			}
 
-			// If possible, add a record warping to the reorg-safe block. This allows optimizations
+			// If possible, add an update warping to the reorg-safe block. This allows optimizations
 			// such as querying logs for block ranges where possible. Note that we cannot warp to
 			// the latest block, as it would be possible to do a `eth_getLogs` query and potentially
 			// retrieve data for an uncled block.
 			if (uncle <= safe) {
-				this.#queue.push({ type: "record_warp_to_block", fromBlock: uncle, toBlock: safe });
+				this.#queue.push({ type: "block_update_warp_to_block", fromBlock: uncle, toBlock: safe });
 			}
 		}
 
@@ -135,12 +135,12 @@ export class BlockWatcher {
 			}
 		}
 
-		// Queue records for the recent blocks.
+		// Queue block updates for the recent blocks.
 		this.#queue.push(
 			...this.#blocks.map(
 				(block) =>
 					({
-						type: "record_new_block",
+						type: "block_update_new_block",
 						blockNumber: block.number,
 						blockHash: block.hash,
 						logsBloom: block.logsBloom,
@@ -171,20 +171,20 @@ export class BlockWatcher {
 	}
 
 	/**
-	 * Consumes all queued events. This allows caller to synchronously process records that are
-	 * already ready from the watcher.
+	 * Consumes all queued events. This allows caller to synchronously process block updates that
+	 * are already ready from the watcher.
 	 *
 	 * This is currently used for testing.
 	 */
-	public queued(): Record[] {
+	public queued(): BlockUpdate[] {
 		return this.#queue.splice(0, this.#queue.length);
 	}
 
 	/**
-	 * Retrieve the next record from the block watcher.
+	 * Retrieve the next block update from the watcher.
 	 */
-	public async next(): Promise<Record> {
-		// First, see if we have a queued record that we can return immediately.
+	public async next(): Promise<BlockUpdate> {
+		// First, see if we have a queued update that we can return immediately.
 		const queued = this.#queue.shift();
 		if (queued !== undefined) {
 			return queued;
@@ -230,7 +230,7 @@ export class BlockWatcher {
 				number: lastBlock.number,
 				timestampMs: lastBlock.timestamp * 1000n,
 			};
-			return { type: "record_uncle_block", blockNumber: lastBlock.number };
+			return { type: "block_update_uncle_block", blockNumber: lastBlock.number };
 		}
 
 		// Update our internal accounting:
@@ -245,7 +245,7 @@ export class BlockWatcher {
 		this.#updateNextPendingBlock(block);
 
 		return {
-			type: "record_new_block",
+			type: "block_update_new_block",
 			blockNumber: block.number,
 			blockHash: block.hash,
 			logsBloom: block.logsBloom,

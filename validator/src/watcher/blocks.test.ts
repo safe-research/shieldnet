@@ -64,7 +64,7 @@ const setupNext = async (config: { latestBlock: bigint; startTime: number; maxRe
 	// `withImplementation` call can change the value and thinks `created: null`.
 	const blocks = created as unknown as BlockWatcher;
 
-	// Skip the queued records.
+	// Skip the queued block updates.
 	blocks.queued();
 
 	// Setup useful default mocks for the timer.
@@ -95,12 +95,12 @@ const block = (
 	logsBloom: b.logsBloom ?? numberToHex(b.number, { size: 512 }),
 });
 
-const newBlockRecord = (
+const newBlockUpdate = (
 	b: {
 		number: bigint;
 	} & Partial<Pick<Block<bigint, false, "latest">, "hash" | "logsBloom">>,
 ) => ({
-	type: "record_new_block",
+	type: "block_update_new_block",
 	blockNumber: b.number,
 	blockHash: b.hash ?? numberToHex(b.number, { size: 32 }),
 	logsBloom: b.logsBloom ?? numberToHex(b.number, { size: 512 }),
@@ -117,7 +117,7 @@ describe("BlockWatcher", () => {
 			const blocks = await create();
 			expect(mocks.getBlock.mock.calls).toEqual([[{ blockTag: "latest" }], [{ blockNumber: 999n }]]);
 
-			expect(blocks.queued()).toStrictEqual([newBlockRecord({ number: 999n }), newBlockRecord({ number: 1000n })]);
+			expect(blocks.queued()).toStrictEqual([newBlockUpdate({ number: 999n }), newBlockUpdate({ number: 1000n })]);
 		});
 
 		it("should support continuing from last indexed block", async () => {
@@ -131,18 +131,18 @@ describe("BlockWatcher", () => {
 
 			expect(blocks.queued()).toStrictEqual([
 				{
-					type: "record_uncle_block",
+					type: "block_update_uncle_block",
 					// Uncling 899, means that we go back to block 898 after starting on 900, which makes
 					// sense given our 2 max reorg depth. I hope there is no off-by-one error!
 					blockNumber: 899n,
 				},
 				{
-					type: "record_warp_to_block",
+					type: "block_update_warp_to_block",
 					fromBlock: 899n,
 					toBlock: 998n,
 				},
-				newBlockRecord({ number: 999n }),
-				newBlockRecord({ number: 1000n }),
+				newBlockUpdate({ number: 999n }),
+				newBlockUpdate({ number: 1000n }),
 			]);
 		});
 
@@ -156,7 +156,7 @@ describe("BlockWatcher", () => {
 
 			expect(blocks.queued()).toStrictEqual([
 				{
-					type: "record_warp_to_block",
+					type: "block_update_warp_to_block",
 					fromBlock: 901n,
 					toBlock: 1000n,
 				},
@@ -188,9 +188,9 @@ describe("BlockWatcher", () => {
 			]);
 
 			expect(blocks.queued()).toStrictEqual([
-				newBlockRecord({ number: 998n }),
-				newBlockRecord({ number: 999n }),
-				newBlockRecord({ number: 1000n }),
+				newBlockUpdate({ number: 998n }),
+				newBlockUpdate({ number: 999n }),
+				newBlockUpdate({ number: 1000n }),
 			]);
 		});
 	});
@@ -201,11 +201,11 @@ describe("BlockWatcher", () => {
 
 			mocks.getBlock.mockResolvedValueOnce(block({ number: 1001n }));
 
-			const record = await next();
+			const update = await next();
 			expect(mocks.sleep.mock.calls).toEqual([[1900 + 500]]);
 			expect(mocks.getBlock.mock.calls).toEqual([[{ blockNumber: 1001n }]]);
 
-			expect(record).toStrictEqual(newBlockRecord({ number: 1001n }));
+			expect(update).toStrictEqual(newBlockUpdate({ number: 1001n }));
 		});
 
 		it("retries if block is not ready when expected", async () => {
@@ -215,7 +215,7 @@ describe("BlockWatcher", () => {
 			mocks.getBlock.mockRejectedValueOnce(new BlockNotFoundError({ blockNumber: 1001n }));
 			mocks.getBlock.mockResolvedValueOnce(block({ number: 1001n }));
 
-			const record = await next();
+			const update = await next();
 			expect(mocks.sleep.mock.calls).toEqual([[1900 + 500], [200], [100]]);
 			expect(mocks.getBlock.mock.calls).toEqual([
 				[{ blockNumber: 1001n }],
@@ -223,7 +223,7 @@ describe("BlockWatcher", () => {
 				[{ blockNumber: 1001n }],
 			]);
 
-			expect(record).toStrictEqual(newBlockRecord({ number: 1001n }));
+			expect(update).toStrictEqual(newBlockUpdate({ number: 1001n }));
 		});
 
 		it("skips slots", async () => {
@@ -235,7 +235,7 @@ describe("BlockWatcher", () => {
 			mocks.getBlock.mockRejectedValueOnce(new BlockNotFoundError({ blockNumber: 1001n }));
 			mocks.getBlock.mockResolvedValueOnce(block({ number: 1001n }));
 
-			const record = await next();
+			const update = await next();
 			expect(mocks.sleep.mock.calls).toEqual([[1900 + 500], [200], [100], [50], [1650]]);
 			expect(mocks.getBlock.mock.calls).toEqual([
 				[{ blockNumber: 1001n }],
@@ -245,7 +245,7 @@ describe("BlockWatcher", () => {
 				[{ blockNumber: 1001n }],
 			]);
 
-			expect(record).toStrictEqual(newBlockRecord({ number: 1001n }));
+			expect(update).toStrictEqual(newBlockUpdate({ number: 1001n }));
 		});
 
 		it("supports deep reorgs", async () => {
@@ -265,7 +265,7 @@ describe("BlockWatcher", () => {
 				block({ number: 999n, hash: keccak256(toHex("reorg999")), parentHash: keccak256(toHex("reorg998")) }),
 			);
 
-			const records = [await next(), await next(), await next(), await next(), await next()];
+			const updates = [await next(), await next(), await next(), await next(), await next()];
 			expect(mocks.sleep.mock.calls).toEqual([[1900 + 500]]);
 			expect(mocks.getBlock.mock.calls).toEqual([
 				[{ blockNumber: 1001n }],
@@ -275,12 +275,12 @@ describe("BlockWatcher", () => {
 				[{ blockNumber: 999n }],
 			]);
 
-			expect(records).toStrictEqual([
-				{ type: "record_uncle_block", blockNumber: 1000n },
-				{ type: "record_uncle_block", blockNumber: 999n },
-				{ type: "record_uncle_block", blockNumber: 998n },
-				newBlockRecord({ number: 998n, hash: keccak256(toHex("reorg998")) }),
-				newBlockRecord({ number: 999n, hash: keccak256(toHex("reorg999")) }),
+			expect(updates).toStrictEqual([
+				{ type: "block_update_uncle_block", blockNumber: 1000n },
+				{ type: "block_update_uncle_block", blockNumber: 999n },
+				{ type: "block_update_uncle_block", blockNumber: 998n },
+				newBlockUpdate({ number: 998n, hash: keccak256(toHex("reorg998")) }),
+				newBlockUpdate({ number: 999n, hash: keccak256(toHex("reorg999")) }),
 			]);
 		});
 	});
