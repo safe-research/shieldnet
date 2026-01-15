@@ -5,12 +5,12 @@
  * <https://github.com/ethereum/go-ethereum/blob/f3c696fa1db75d0f78ea47dd0975f6f0de6fdd84/core/types/bloom9.go#L86>
  */
 
-import { type Hex, keccak256, size, slice } from "viem";
+import { type Hex, keccak256, size } from "viem";
 
-const bitIndex = (bytes: Hex, index: number): number => {
+const bitIndex = (bytes: DataView, index: number): number => {
 	// Bloom filter is 2048 bits, meaning the bit index is 2 bytes in the range `[0, 2048)`.
 	const offset = index * 2;
-	return Number(slice(bytes, offset, offset + 2)) & 0x7ff;
+	return bytes.getUint16(offset) & 0x7ff;
 };
 
 const LUT: (number | null)[] = [..."0123456789abcdef"].reduce((lut, c, i) => {
@@ -41,7 +41,7 @@ export const isInBloom = (bloom: Hex, data: Hex): boolean => {
 		throw new Error("invalid bloom filter");
 	}
 
-	const digest = keccak256(data);
+	const digest = new DataView(keccak256(data, "bytes").buffer);
 	return (
 		isBitSet(bloom, bitIndex(digest, 0)) && isBitSet(bloom, bitIndex(digest, 1)) && isBitSet(bloom, bitIndex(digest, 2))
 	);

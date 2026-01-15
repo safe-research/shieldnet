@@ -15,7 +15,7 @@ import {
 } from "viem";
 import { isInBloom } from "../utils/bloom.js";
 import type { Logger } from "../utils/logging.js";
-import type { Record } from "./blocks.js";
+import type { BlockUpdate } from "./blocks.js";
 
 export type Client = Pick<PublicClient, "getLogs">;
 
@@ -96,11 +96,6 @@ export class EventWatcher<I extends readonly AbiEvent[]> {
 	async #getLogsOneQueryAllEvents(
 		query: { blockHash: Hex; logsBloom: Hex } | { blockHash?: undefined; fromBlock: bigint; toBlock: bigint },
 	) {
-		const blockRange =
-			query.blockHash !== undefined
-				? { blockHash: query.blockHash }
-				: { fromBlock: query.fromBlock, toBlock: query.toBlock };
-
 		// Skip log queries where we can determine that they are not in the block by checking the
 		// bloom filter. We require that at least one of the contract addresses are in the bloom
 		// filter **and** that at least one of the topics are in the bloom filter.
@@ -110,6 +105,11 @@ export class EventWatcher<I extends readonly AbiEvent[]> {
 		) {
 			return [];
 		}
+
+		const blockRange =
+			query.blockHash !== undefined
+				? { blockHash: query.blockHash }
+				: { fromBlock: query.fromBlock, toBlock: query.toBlock };
 
 		const logs = await this.#client.getLogs({
 			strict: true,
@@ -148,6 +148,11 @@ export class EventWatcher<I extends readonly AbiEvent[]> {
 
 				let eventLogs: Log<I>[] = [];
 				try {
+					// Unfortunately, a type assertion is needed here. In general, the viem `Log`
+					// types between `Log<undefined, AbiEvent[]>` and `Log<AbiEvent, undefined>`
+					// aren't really compatible with each other. However, the logs for a single
+					// event `E` is a sub-type of logs of all the events including `E`; making
+					// this type assertion safe.
 					eventLogs = (await this.#client.getLogs({
 						strict: true,
 						address: this.#address,
@@ -219,32 +224,32 @@ export class EventWatcher<I extends readonly AbiEvent[]> {
 		}
 	}
 
-	onBlock(record: Record) {
+	onBlockUpdate(update: BlockUpdate) {
 		if (this.#step.type !== "idle") {
-			throw new Error("cannot handle new block record");
+			throw new Error("cannot handle new block update");
 		}
 
 		let step: Step;
-		switch (record.type) {
-			case "record_warp_to_block": {
+		switch (update.type) {
+			case "block_update_warp_to_block": {
 				step = {
 					type: "warping",
-					fromBlock: record.fromBlock,
-					toBlock: record.toBlock,
+					fromBlock: update.fromBlock,
+					toBlock: update.toBlock,
 					pageSize: BigInt(this.#config.blockPageSize),
 				};
 				break;
 			}
-			case "record_uncle_block": {
+			case "block_update_uncle_block": {
 				// We don't need to query events for uncled blocks.
 				step = { type: "idle" };
 				break;
 			}
-			case "record_new_block": {
+			case "block_update_new_block": {
 				step = {
 					type: "block",
-					blockHash: record.blockHash,
-					logsBloom: record.logsBloom,
+					blockHash: update.blockHash,
+					logsBloom: update.logsBloom,
 					retries: 0,
 				};
 				break;
