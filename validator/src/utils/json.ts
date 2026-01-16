@@ -15,5 +15,20 @@ export function jsonReplacer(_key: string, value: unknown): unknown {
 			y: point.y.toString(), // Convert BigInt to string
 		};
 	}
+	// Handle errors.
+	if (value instanceof Error) {
+		return {
+			// The default Error fields are not enumerable, so we need to manually read them, as
+			// they will not be included by the `...` splat operation.
+			name: value.name,
+			message: value.message,
+			cause: value.cause,
+			stack: value.stack,
+
+			// Type assert to prevert compiler errors saying that `message` field above will be
+			// overwritten (which is not true as `message` is not enumerable for errors).
+			...(value as object),
+		};
+	}
 	return value;
 }
