@@ -4,6 +4,7 @@ import {
 	type Chain,
 	encodeFunctionData,
 	type Hex,
+	NonceTooLowError,
 	type PublicClient,
 	type SimulateContractParameters,
 	TransactionReceiptNotFoundError,
@@ -118,6 +119,11 @@ export class OnchainProtocol extends BaseProtocol {
 				try {
 					await this.submitTransaction(tx);
 				} catch (error) {
+					if (error instanceof NonceTooLowError) {
+						this.#logger.warn(`Nonce already used. Dropping pending transaction for ${tx.nonce}!`, { error });
+						this.#txStorage.setExecuted(tx.nonce);
+						continue;
+					}
 					this.#logger.warn(`Error submitting transaction for ${tx.nonce}!`, { error });
 				}
 			}
