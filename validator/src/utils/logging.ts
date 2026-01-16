@@ -1,5 +1,6 @@
 import util from "node:util";
 import winston, { type Logger as WinstonLogger } from "winston";
+import { jsonReplacer } from "./json.js";
 
 const LEVELS = {
 	error: 0,
@@ -34,21 +35,6 @@ const prettyFormat = winston.format.printf(({ timestamp, level, message, [SPLAT]
 		.join(" ");
 	return `[${timestamp} ${level}]: ${text}`;
 });
-
-const jsonReplacer = (key: string, value: unknown) => {
-	if (typeof value === "bigint") {
-		return value.toString();
-	}
-	if (value instanceof Error) {
-		const error = value as unknown as Record<string, unknown>;
-		const fields: Record<string, unknown> = {};
-		for (const propertyName of Object.getOwnPropertyNames(error)) {
-			fields[propertyName] = error[propertyName];
-		}
-		return fields;
-	}
-	return value;
-};
 
 export const createLogger = (options: LoggingOptions): Logger => {
 	winston.addColors({
