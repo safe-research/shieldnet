@@ -4,6 +4,7 @@ import {
 	keccak256,
 	NonceTooLowError,
 	type PublicClient,
+	type SendTransactionParameters,
 	TransactionExecutionError,
 	TransactionReceiptNotFoundError,
 	type Transport,
@@ -11,7 +12,6 @@ import {
 } from "viem";
 import { entryPoint09Address } from "viem/account-abstraction";
 import { gnosisChiado } from "viem/chains";
-import type { SendTransactionParameters } from "viem/zksync";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { testLogger } from "../../__tests__/config.js";
 import { TEST_ACTIONS, TEST_CONSENSUS, TEST_COORDINATOR } from "../../__tests__/data/protocol.js";
