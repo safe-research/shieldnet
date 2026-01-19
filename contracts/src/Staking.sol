@@ -405,10 +405,8 @@ contract Staking is Ownable {
             // backwards to find the correct position.
             uint64 queueTail = queue.tail;
             uint64 currentId = queueTail;
-            WithdrawalNode storage currentNode = stakerNodes[currentId];
-            while (currentId != 0 && currentNode.claimableAt > claimableAt) {
-                currentId = currentNode.previous;
-                currentNode = stakerNodes[currentId];
+            while (currentId != 0 && stakerNodes[currentId].claimableAt > claimableAt) {
+                currentId = stakerNodes[currentId].previous;
             }
             WithdrawalNode storage withdrawalNode = stakerNodes[withdrawalId];
             if (currentId == queueTail) {
@@ -425,6 +423,7 @@ contract Staking is Ownable {
                 queue.head = withdrawalId;
             } else {
                 // Insert in the middle.
+                WithdrawalNode storage currentNode = stakerNodes[currentId];
                 uint64 nextId = currentNode.next;
                 withdrawalNode.previous = currentId;
                 withdrawalNode.next = nextId;
