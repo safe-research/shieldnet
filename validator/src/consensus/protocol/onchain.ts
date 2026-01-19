@@ -52,17 +52,27 @@ export class OnchainProtocol extends BaseProtocol {
 	#txStatusPollingSeconds: number;
 	#timeBeforeResubmitSeconds: number;
 
-	constructor(
-		publicClient: PublicClient,
-		signingClient: WalletClient<Transport, Chain, Account>,
-		consensus: Address,
-		coordinator: Address,
-		queue: Queue<ActionWithTimeout>,
-		txStorage: TransactionStorage,
-		logger: Logger,
-		txStatusPollingSeconds = 5,
-		timeBeforeResubmitSeconds: number = txStatusPollingSeconds,
-	) {
+	constructor({
+		publicClient,
+		signingClient,
+		consensus,
+		coordinator,
+		queue,
+		txStorage,
+		logger,
+		txStatusPollingSeconds,
+		timeBeforeResubmitSeconds,
+	}: {
+		publicClient: PublicClient;
+		signingClient: WalletClient<Transport, Chain, Account>;
+		consensus: Address;
+		coordinator: Address;
+		queue: Queue<ActionWithTimeout>;
+		txStorage: TransactionStorage;
+		logger: Logger;
+		txStatusPollingSeconds?: number;
+		timeBeforeResubmitSeconds?: number;
+	}) {
 		super(queue, logger);
 		this.#publicClient = publicClient;
 		this.#signingClient = signingClient;
@@ -70,9 +80,11 @@ export class OnchainProtocol extends BaseProtocol {
 		this.#consensus = consensus;
 		this.#coordinator = coordinator;
 		this.#logger = logger;
-		this.#txStatusPollingSeconds = txStatusPollingSeconds;
-		this.#timeBeforeResubmitSeconds = timeBeforeResubmitSeconds;
-		this.checkPending();
+		// By default polling is disabled
+		this.#txStatusPollingSeconds = txStatusPollingSeconds ?? 0;
+		// By default it should be 1 block (falling back to eth mainnet blocktime)
+		this.#timeBeforeResubmitSeconds = timeBeforeResubmitSeconds ?? publicClient.chain?.blockTime ?? 12000 / 1000;
+		this.checkPendingActions();
 	}
 
 	chainId(): bigint {
@@ -88,7 +100,7 @@ export class OnchainProtocol extends BaseProtocol {
 		return this.#coordinator;
 	}
 
-	private async checkPending() {
+	async checkPendingActions() {
 		try {
 			// We will only mark transaction as executed when get to the point of deciding if we need to resubmit them
 			const pendingTxs = this.#txStorage.pending(this.#timeBeforeResubmitSeconds);
@@ -135,7 +147,9 @@ export class OnchainProtocol extends BaseProtocol {
 		} catch (error) {
 			this.#logger.error("Error while checking pending transactions.", { error });
 		} finally {
-			setTimeout(() => this.checkPending(), this.#txStatusPollingSeconds * 1000);
+			if (this.#txStatusPollingSeconds > 0) {
+				setTimeout(() => this.checkPendingActions(), this.#txStatusPollingSeconds * 1000);
+			}
 		}
 	}
 
