@@ -132,15 +132,15 @@ describe("integration", () => {
 			});
 			const actionStorage = new InMemoryQueue<ActionWithTimeout>();
 			const txStorage = new SqliteTxStorage(database);
-			const protocol = new OnchainProtocol(
+			const protocol = new OnchainProtocol({
 				publicClient,
 				signingClient,
-				consensus.address,
-				coordinator.address,
-				actionStorage,
+				consensus: consensus.address,
+				coordinator: coordinator.address,
+				queue: actionStorage,
 				txStorage,
 				logger,
-			);
+			});
 			const stateStorage = createStateStorage(database);
 			const sm = new SchildNetzMaschine({
 				participants,
@@ -168,6 +168,9 @@ describe("integration", () => {
 				logger,
 				onTransition: (t) => {
 					sm.transition(t);
+					if (t.id === "block_new") {
+						protocol.checkPendingActions();
+					}
 				},
 			});
 			return {

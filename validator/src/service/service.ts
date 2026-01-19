@@ -74,15 +74,15 @@ export class ValidatorService {
 		const actionStorage =
 			database !== undefined ? new SqliteActionQueue(database) : new InMemoryQueue<ActionWithTimeout>();
 		const txStorage = new SqliteTxStorage(database ?? new Sqlite3(":memory:"));
-		const protocol = new OnchainProtocol(
-			this.#publicClient,
-			walletClient,
-			config.consensus,
-			config.coordinator,
-			actionStorage,
+		const protocol = new OnchainProtocol({
+			publicClient: this.#publicClient,
+			signingClient: walletClient,
+			consensus: config.consensus,
+			coordinator: config.coordinator,
+			queue: actionStorage,
 			txStorage,
-			this.#logger,
-		);
+			logger: this.#logger,
+		});
 		const stateStorage = database !== undefined ? new SqliteStateStorage(database) : new InMemoryStateStorage();
 		this.#stateMachine = new ShieldnetStateMachine({
 			participants: config.participants,
@@ -104,6 +104,10 @@ export class ValidatorService {
 			logger,
 			onTransition: (t) => {
 				this.#stateMachine.transition(t);
+				// If we get a new block check pending actions
+				if (t.id === "block_new") {
+					protocol.checkPendingActions();
+				}
 			},
 		});
 	}

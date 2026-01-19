@@ -8,10 +8,8 @@ import {
 	type PublicClient,
 	type SimulateContractParameters,
 	TransactionExecutionError,
-	TransactionReceiptNotFoundError,
 	type Transport,
 	type WalletClient,
-	zeroHash,
 } from "viem";
 import type { FrostPoint, GroupId, SignatureId } from "../../frost/types.js";
 import { CONSENSUS_FUNCTIONS, COORDINATOR_FUNCTIONS } from "../../types/abis.js";
@@ -39,6 +37,7 @@ export interface TransactionStorage {
 	register(tx: EthTransactionData, minNonce: number): number;
 	setHash(nonce: number, txHash: Hex): void;
 	setExecuted(nonce: number): void;
+	setAllBeforeAsExecuted(nonce: number): number;
 	pending(createdDiff: number): (EthTransactionData & { nonce: number; hash: Hex | null })[];
 }
 
@@ -49,20 +48,27 @@ export class OnchainProtocol extends BaseProtocol {
 	#consensus: Address;
 	#coordinator: Address;
 	#logger: Logger;
-	#txStatusPollingSeconds: number;
 	#timeBeforeResubmitSeconds: number;
 
-	constructor(
-		publicClient: PublicClient,
-		signingClient: WalletClient<Transport, Chain, Account>,
-		consensus: Address,
-		coordinator: Address,
-		queue: Queue<ActionWithTimeout>,
-		txStorage: TransactionStorage,
-		logger: Logger,
-		txStatusPollingSeconds = 5,
-		timeBeforeResubmitSeconds: number = txStatusPollingSeconds,
-	) {
+	constructor({
+		publicClient,
+		signingClient,
+		consensus,
+		coordinator,
+		queue,
+		txStorage,
+		logger,
+		timeBeforeResubmitSeconds,
+	}: {
+		publicClient: PublicClient;
+		signingClient: WalletClient<Transport, Chain, Account>;
+		consensus: Address;
+		coordinator: Address;
+		queue: Queue<ActionWithTimeout>;
+		txStorage: TransactionStorage;
+		logger: Logger;
+		timeBeforeResubmitSeconds?: number;
+	}) {
 		super(queue, logger);
 		this.#publicClient = publicClient;
 		this.#signingClient = signingClient;
@@ -70,9 +76,9 @@ export class OnchainProtocol extends BaseProtocol {
 		this.#consensus = consensus;
 		this.#coordinator = coordinator;
 		this.#logger = logger;
-		this.#txStatusPollingSeconds = txStatusPollingSeconds;
-		this.#timeBeforeResubmitSeconds = timeBeforeResubmitSeconds;
-		this.checkPending();
+		// By default it should be 1 block (falling back to eth mainnet blocktime)
+		this.#timeBeforeResubmitSeconds = timeBeforeResubmitSeconds ?? (publicClient.chain?.blockTime ?? 12000) / 1000;
+		this.checkPendingActions();
 	}
 
 	chainId(): bigint {
@@ -88,33 +94,19 @@ export class OnchainProtocol extends BaseProtocol {
 		return this.#coordinator;
 	}
 
-	private async checkPending() {
+	async checkPendingActions() {
 		try {
+			const currentNonce = await this.#publicClient.getTransactionCount({
+				address: this.#signingClient.account.address,
+				blockTag: "latest",
+			});
+			const executedTxs = this.#txStorage.setAllBeforeAsExecuted(currentNonce);
+			if (executedTxs > 0) {
+				this.#logger.debug(`Marked ${executedTxs} transactions as executed`);
+			}
 			// We will only mark transaction as executed when get to the point of deciding if we need to resubmit them
 			const pendingTxs = this.#txStorage.pending(this.#timeBeforeResubmitSeconds);
 			for (const tx of pendingTxs) {
-				try {
-					// If we don't have a hash we throw an error to trigger resubmission
-					if (tx.hash === null) {
-						throw new TransactionReceiptNotFoundError({ hash: zeroHash });
-					}
-					const receipt = await this.#publicClient.getTransactionReceipt({
-						hash: tx.hash,
-					});
-					this.#logger.debug(
-						`Transaction with nonce ${tx.nonce} has been executed at block ${receipt.blockNumber}!`,
-						tx,
-						receipt,
-					);
-					this.#txStorage.setExecuted(tx.nonce);
-					continue;
-				} catch (error) {
-					// Any other error than transaction not found is unexpected
-					if (!(error instanceof TransactionReceiptNotFoundError)) {
-						this.#logger.warn(`Unexpected error fetching receipt for ${tx.nonce}!`, { error });
-						continue;
-					}
-				}
 				// If we don't find the transaction or it has no blockHash then we resubmit it
 				this.#logger.debug(`Resubmit transaction for ${tx.nonce}!`, tx);
 				try {
@@ -134,8 +126,6 @@ export class OnchainProtocol extends BaseProtocol {
 			}
 		} catch (error) {
 			this.#logger.error("Error while checking pending transactions.", { error });
-		} finally {
-			setTimeout(() => this.checkPending(), this.#txStatusPollingSeconds * 1000);
 		}
 	}
 
