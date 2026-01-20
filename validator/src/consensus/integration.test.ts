@@ -177,7 +177,7 @@ describe("integration", () => {
 		}
 	});
 
-	it("keygen timeouts", { timeout: TEST_RUNTIME_IN_SECONDS * 1000 * 5 }, async ({ skip }) => {
+	it("keygen timeout", { timeout: TEST_RUNTIME_IN_SECONDS * 1000 * 5 }, async ({ skip }) => {
 		const setupInfo = await setup({ timeout: 10n, blocksPerEpoch: 60n });
 		if (setupInfo === undefined) {
 			skip();
@@ -191,15 +191,11 @@ describe("integration", () => {
 			address: coordinator.address,
 			abi: COORDINATOR_EVENTS,
 			eventName: "KeyGenConfirmed",
-			onLogs: (logs) => {
-				for (const log of logs) {
-					if (log.args.identifier === 3n) {
-						testLogger.notice("Stop client with index 2");
-						unsubscribe();
-						clients[2].service.stop();
-						return;
-					}
-				}
+			onLogs: () => {
+				testLogger.notice("Stop client with index 2, keygen will timeout");
+				unsubscribe();
+				clients[2].service.stop();
+				return;
 			},
 		});
 		// We want to have enough time for 1 key rotation (including timeouts)
@@ -220,6 +216,66 @@ describe("integration", () => {
 			2,
 			2,
 			calcGroupContext(consensus.address, proposedEpoch as bigint),
+		);
+		const expectedKey = await testClient.readContract({
+			...coordinator,
+			functionName: "groupKey",
+			args: [expectedGroup],
+		});
+		const stagedGroupKey = stagedEpochs[0].args.groupKey;
+		expect(stagedGroupKey).toStrictEqual(expectedKey);
+	});
+
+	it("keygen abort", { timeout: TEST_RUNTIME_IN_SECONDS * 1000 * 5 }, async ({ skip }) => {
+		const blocksPerEpoch = 20n;
+		const setupInfo = await setup({ timeout: 5n, blocksPerEpoch });
+		if (setupInfo === undefined) {
+			skip();
+			// We need the return here to make sure that setup is not undefined in the next steps
+			return;
+		}
+		const { clients, coordinator, consensus, participants, triggerKeyGen } = setupInfo;
+		await triggerKeyGen();
+		// Stop one service after genesis keygen
+		const unsubscribe = testClient.watchContractEvent({
+			address: coordinator.address,
+			abi: COORDINATOR_EVENTS,
+			eventName: "KeyGenConfirmed",
+			onLogs: () => {
+				testLogger.notice("Stop 2 clients, no keygen is possible");
+				unsubscribe();
+				clients[1].service.stop();
+				clients[2].service.stop();
+				return;
+			},
+		});
+		const abortedEpoch = (await testClient.getBlockNumber()) / blocksPerEpoch + 1n;
+		// We want to have enough time for 1 key rotation (including timeouts)
+		await new Promise((resolve) => setTimeout(resolve, 20000));
+
+		// Start clients again
+		clients[1].service.start();
+		clients[2].service.start();
+
+		// We want to have enough time for 1 more key rotation
+		await new Promise((resolve) => setTimeout(resolve, 10000));
+		// Check number of staged epochs
+		const epochStagedEvent = CONSENSUS_EVENTS.filter((e) => e.name === "EpochStaged")[0];
+		const stagedEpochs = await testClient.getLogs({
+			address: consensus.address,
+			event: epochStagedEvent,
+			fromBlock: "earliest",
+		});
+		expect(stagedEpochs.length).toBe(1);
+		const proposedEpoch = (await testClient.getBlockNumber()) / blocksPerEpoch + 1n;
+		expect(stagedEpochs[0].args.proposedEpoch).toBe(proposedEpoch);
+		expect(abortedEpoch).not.toBe(proposedEpoch);
+		// Calculate group id with original group
+		const expectedGroup = calcGroupId(
+			calculateParticipantsRoot(participants),
+			3,
+			2,
+			calcGroupContext(consensus.address, proposedEpoch),
 		);
 		const expectedKey = await testClient.readContract({
 			...coordinator,
