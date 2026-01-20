@@ -11,15 +11,17 @@ import {
 	walletActions,
 	zeroHash,
 } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { type Account, privateKeyToAccount } from "viem/accounts";
 import { anvil } from "viem/chains";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { silentLogger, testLogger, testMetrics } from "../__tests__/config.js";
 import { toPoint } from "../frost/math.js";
+import { calcGroupContext } from "../machine/keygen/group.js";
 import type { WatcherConfig } from "../machine/transitions/watcher.js";
-import { createValidatorService } from "../service/service.js";
+import { createValidatorService, type ValidatorService } from "../service/service.js";
 import { CONSENSUS_EVENTS, COORDINATOR_EVENTS } from "../types/abis.js";
 import type { ProtocolConfig } from "../types/interfaces.js";
+import { calcGroupId } from "./keyGen/utils.js";
 import { calculateParticipantsRoot } from "./merkle.js";
 import { verifySignature } from "./signing/verify.js";
 import type { Participant } from "./storage/types.js";
@@ -45,7 +47,8 @@ describe("integration", () => {
 	})
 		.extend(publicActions)
 		.extend(walletActions);
-	let snapshotId: Hex;
+	let snapshotId: Hex | undefined;
+	let currentClients: { account: Account; service: ValidatorService }[] | undefined;
 
 	beforeAll(async () => {
 		try {
@@ -55,7 +58,7 @@ describe("integration", () => {
 		}
 	});
 
-	const setup = async () => {
+	const setup = async ({ blocksPerEpoch, timeout }: { blocksPerEpoch?: bigint; timeout?: bigint }) => {
 		// Make sure to first start the Anvil testnode (run `anvil` in the root)
 		// and run the deployment script: forge script DeployScript --rpc-url http://127.0.0.1:8545 --unlocked --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --broadcast
 		const deploymentInfoFile = path.join(
@@ -76,6 +79,8 @@ describe("integration", () => {
 			return undefined;
 		}
 		await testClient.revert({ id: snapshotId });
+		// Snapshots get consumed, create a new one to ensure that always one is present
+		snapshotId = await testClient.snapshot();
 		await testClient.setIntervalMining({ interval: BLOCKTIME_IN_SECONDS });
 
 		const deploymentInfo = JSON.parse(fs.readFileSync(deploymentInfoFile, "utf-8"));
@@ -116,7 +121,9 @@ describe("integration", () => {
 				coordinator: coordinator.address,
 				participants,
 				genesisSalt: zeroHash,
-				blocksPerEpoch: BLOCKS_PER_EPOCH,
+				blocksPerEpoch: blocksPerEpoch ?? BLOCKS_PER_EPOCH,
+				keyGenTimeout: timeout,
+				signingTimeout: timeout,
 			};
 			const watcherConfig: WatcherConfig = {
 				maxReorgDepth: 1,
@@ -131,10 +138,13 @@ describe("integration", () => {
 				metrics: testMetrics,
 			});
 			return {
-				acccount: a,
+				account: a,
 				service,
 			};
 		});
+		// Store clients for cleanup
+		currentClients = clients;
+
 		for (const { service } of clients) {
 			await service.start();
 		}
@@ -158,14 +168,76 @@ describe("integration", () => {
 		};
 	};
 
-	it("keygen and signing flow", { timeout: TEST_RUNTIME_IN_SECONDS * 1000 * 5 }, async ({ skip }) => {
-		const setupInfo = await setup();
+	afterEach(async () => {
+		// Cleanup services
+		for (const { service } of currentClients ?? []) {
+			try {
+				await service.stop();
+			} catch (_e) {}
+		}
+	});
+
+	it("keygen timeouts", { timeout: TEST_RUNTIME_IN_SECONDS * 1000 * 5 }, async ({ skip }) => {
+		const setupInfo = await setup({ timeout: 10n, blocksPerEpoch: 60n });
 		if (setupInfo === undefined) {
 			skip();
 			// We need the return here to make sure that setup is not undefined in the next steps
 			return;
 		}
-		const { coordinator, consensus, triggerKeyGen } = setupInfo;
+		const { clients, coordinator, consensus, participants, triggerKeyGen } = setupInfo;
+		await triggerKeyGen();
+		// Stop one service after genesis keygen
+		const unsubscribe = testClient.watchContractEvent({
+			address: coordinator.address,
+			abi: COORDINATOR_EVENTS,
+			eventName: "KeyGenConfirmed",
+			onLogs: (logs) => {
+				for (const log of logs) {
+					if (log.args.identifier === 3n) {
+						testLogger.notice("Stop client with index 2");
+						unsubscribe();
+						clients[2].service.stop();
+						return;
+					}
+				}
+			},
+		});
+		// We want to have enough time for 1 key rotation (including timeouts)
+		await new Promise((resolve) => setTimeout(resolve, 25000));
+		// Check number of staged epochs
+		const epochStagedEvent = CONSENSUS_EVENTS.filter((e) => e.name === "EpochStaged")[0];
+		const stagedEpochs = await testClient.getLogs({
+			address: consensus.address,
+			event: epochStagedEvent,
+			fromBlock: "earliest",
+		});
+		expect(stagedEpochs.length).toBe(1);
+		const proposedEpoch = stagedEpochs[0].args.proposedEpoch;
+		expect(proposedEpoch).toBeDefined();
+		// Calculate group id for reduced group
+		const expectedGroup = calcGroupId(
+			calculateParticipantsRoot([participants[0], participants[1]]),
+			2,
+			2,
+			calcGroupContext(consensus.address, proposedEpoch as bigint),
+		);
+		const expectedKey = await testClient.readContract({
+			...coordinator,
+			functionName: "groupKey",
+			args: [expectedGroup],
+		});
+		const stagedGroupKey = stagedEpochs[0].args.groupKey;
+		expect(stagedGroupKey).toStrictEqual(expectedKey);
+	});
+
+	it("keygen and signing flow", { timeout: TEST_RUNTIME_IN_SECONDS * 1000 * 5 }, async ({ skip }) => {
+		const setupInfo = await setup({});
+		if (setupInfo === undefined) {
+			skip();
+			// We need the return here to make sure that setup is not undefined in the next steps
+			return;
+		}
+		const { coordinator, consensus, triggerKeyGen, clients } = setupInfo;
 		await triggerKeyGen();
 		// Setup done ... SchildNetz läuft ... lets send some signature requests
 		const transaction = {
@@ -190,7 +262,7 @@ describe("integration", () => {
 		// Stop a few seconds before the end of the test run time, (otherwise, we may have
 		// already seen the 60'th block and start an additional key gen process).
 		await new Promise((resolve) => setTimeout(resolve, (TEST_RUNTIME_IN_SECONDS - 5) * 1000));
-		// Load transaction proposal for tx hash
+		// Check number of staged epochs
 		const epochStagedEvent = CONSENSUS_EVENTS.filter((e) => e.name === "EpochStaged")[0];
 		const stagedEpochs = await testClient.getLogs({
 			address: consensus.address,
@@ -280,5 +352,9 @@ describe("integration", () => {
 		expect(
 			verifySignature(toPoint(attestation.r), attestation.z, toPoint(groupKey), proposal.args.message),
 		).toBeTruthy();
+		for (const { service } of clients)
+			try {
+				await service.stop();
+			} catch (_e) {}
 	});
 });
