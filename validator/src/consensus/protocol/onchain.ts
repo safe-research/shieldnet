@@ -122,7 +122,7 @@ export class OnchainProtocol extends BaseProtocol {
 						// Nonce error might be nested as cause error
 						(error instanceof TransactionExecutionError && error.cause instanceof NonceTooLowError)
 					) {
-						this.#logger.warn(`Nonce already used. Dropping pending transaction for ${tx.nonce}!`, { error });
+						this.#logger.info(`Nonce already used. Marking transaction with nonce ${tx.nonce} as executed!`, { error });
 						this.#txStorage.setExecuted(tx.nonce);
 						continue;
 					}
