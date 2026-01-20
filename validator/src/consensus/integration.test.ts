@@ -192,10 +192,10 @@ describe("integration", () => {
 			abi: COORDINATOR_EVENTS,
 			eventName: "KeyGenConfirmed",
 			onLogs: () => {
-				testLogger.notice("Stop client with index 2, keygen will timeout");
+				// Only react to first completed keygen
 				unsubscribe();
+				testLogger.notice("Stop client with index 2, keygen will timeout");
 				clients[2].service.stop();
-				return;
 			},
 		});
 		// We want to have enough time for 1 key rotation (including timeouts)
@@ -242,11 +242,11 @@ describe("integration", () => {
 			abi: COORDINATOR_EVENTS,
 			eventName: "KeyGenConfirmed",
 			onLogs: () => {
-				testLogger.notice("Stop 2 clients, no keygen is possible");
+				// Only react to first completed keygen
 				unsubscribe();
+				testLogger.notice("Stop 2 clients, no keygen is possible");
 				clients[1].service.stop();
 				clients[2].service.stop();
-				return;
 			},
 		});
 		const abortedEpoch = (await testClient.getBlockNumber()) / blocksPerEpoch + 1n;
@@ -293,7 +293,7 @@ describe("integration", () => {
 			// We need the return here to make sure that setup is not undefined in the next steps
 			return;
 		}
-		const { coordinator, consensus, triggerKeyGen, clients } = setupInfo;
+		const { coordinator, consensus, triggerKeyGen } = setupInfo;
 		await triggerKeyGen();
 		// Setup done ... SchildNetz läuft ... lets send some signature requests
 		const transaction = {
@@ -408,9 +408,5 @@ describe("integration", () => {
 		expect(
 			verifySignature(toPoint(attestation.r), attestation.z, toPoint(groupKey), proposal.args.message),
 		).toBeTruthy();
-		for (const { service } of clients)
-			try {
-				await service.stop();
-			} catch (_e) {}
 	});
 });
