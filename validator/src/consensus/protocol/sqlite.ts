@@ -218,12 +218,22 @@ export class SqliteTxStorage implements TransactionStorage {
 		updateStmt.run(txHash, nonce);
 	}
 
-	pending(createdDiff: number): (EthTransactionData & { nonce: number; hash: Hex | null })[] {
+	setSubmittedForPending(blockNumber: bigint): number {
+		const updateStmt = this.#db.prepare(`
+			UPDATE transaction_storage
+			SET submittedAt = ?
+			WHERE submittedAt IS NULL;
+		`);
+		const result = updateStmt.run(blockNumber);
+		return result.changes;
+	}
+
+	submittedUpTo(blockNumber: bigint): (EthTransactionData & { nonce: number; hash: Hex | null })[] {
 		const pendingTxsStmt = this.#db.prepare(`
 			SELECT * FROM transaction_storage 
-			WHERE createdAt <= (unixepoch() - ?);
+			WHERE submittedAt <= ?;
 		`);
-		const pendingTxsResult = pendingTxsStmt.all(createdDiff);
+		const pendingTxsResult = pendingTxsStmt.all(blockNumber);
 		const pendingTxs = txStorageSchema.parse(pendingTxsResult);
 		return pendingTxs.map((tx) => {
 			return {

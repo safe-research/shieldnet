@@ -4,7 +4,6 @@ import Sqlite3 from "better-sqlite3";
 import { entryPoint06Address } from "viem/account-abstraction";
 import { describe, expect, it } from "vitest";
 import { TEST_ACTIONS } from "../../__tests__/data/protocol.js";
-import { jsonReplacer } from "../../utils/json.js";
 import { SqliteActionQueue, SqliteTxStorage } from "./sqlite.js";
 
 describe("protocol - sqlite", () => {
@@ -88,7 +87,7 @@ describe("protocol - sqlite", () => {
 
 			// Check that it works with tx storage operations
 			const storage = new SqliteTxStorage(db);
-			expect(storage.pending(0)).toStrictEqual([]);
+			expect(storage.submittedUpTo(0n)).toStrictEqual([]);
 		});
 
 		it("should throw on mihrated db", () => {
@@ -108,68 +107,63 @@ describe("protocol - sqlite", () => {
 			const db = new Sqlite3(":memory:");
 			const storage = new SqliteTxStorage(db);
 			db.prepare(`
-				INSERT INTO transaction_storage (nonce, transactionJson)
-				VALUES ($nonce, $transactionJson);
+				INSERT INTO transaction_storage (nonce, transactionJson, submittedAt)
+				VALUES ($nonce, $transactionJson, $submittedAt);
 			`).run({
 				nonce: 1,
 				transactionJson: "Invalid JSON!",
+				submittedAt: 0,
 			});
-			expect(() => storage.pending(0)).toThrow("Unexpected token 'I', \"Invalid JSON!\" is not valid JSON");
+			expect(() => storage.submittedUpTo(0n)).toThrow("Unexpected token 'I', \"Invalid JSON!\" is not valid JSON");
 		});
 
 		it("should return empty if nothing stored", () => {
 			const storage = new SqliteTxStorage(new Sqlite3(":memory:"));
-			expect(storage.pending(0)).toStrictEqual([]);
+			expect(storage.submittedUpTo(0n)).toStrictEqual([]);
 		});
 
 		it("should only return entries that have are within the limit", () => {
 			const db = new Sqlite3(":memory:");
 			const storage = new SqliteTxStorage(db);
-			// Insert before the time
-			db.prepare(`
-				INSERT INTO transaction_storage (nonce, transactionJson, createdAt)
-				VALUES ($nonce, $transactionJson, $createdAt);
-			`).run({
-				nonce: 1,
-				transactionJson: JSON.stringify(
-					{
-						to: entryPoint06Address,
-						value: 0n,
-						data: "0x",
-					},
-					jsonReplacer,
-				),
-				createdAt: Date.now() / 1000 - 600,
-			});
 			storage.register(
 				{
 					to: entryPoint06Address,
 					value: 0n,
-					data: "0x5afe",
+					data: "0x5afe01",
 				},
 				1,
 			);
-			expect(storage.pending(300)).toStrictEqual([
+			storage.setSubmittedForPending(100n);
+			storage.register(
 				{
 					to: entryPoint06Address,
 					value: 0n,
-					data: "0x",
+					data: "0x5afe02",
+				},
+				2,
+			);
+			storage.setSubmittedForPending(400n);
+			expect(storage.submittedUpTo(300n)).toStrictEqual([
+				{
+					to: entryPoint06Address,
+					value: 0n,
+					data: "0x5afe01",
 					hash: null,
 					nonce: 1,
 				},
 			]);
-			expect(storage.pending(0)).toStrictEqual([
+			expect(storage.submittedUpTo(4200n)).toStrictEqual([
 				{
 					to: entryPoint06Address,
 					value: 0n,
-					data: "0x",
+					data: "0x5afe01",
 					hash: null,
 					nonce: 1,
 				},
 				{
 					to: entryPoint06Address,
 					value: 0n,
-					data: "0x5afe",
+					data: "0x5afe02",
 					hash: null,
 					nonce: 2,
 				},
@@ -187,7 +181,8 @@ describe("protocol - sqlite", () => {
 				},
 				1,
 			);
-			expect(storage.pending(0)).toStrictEqual([
+			storage.setSubmittedForPending(0n);
+			expect(storage.submittedUpTo(0n)).toStrictEqual([
 				{
 					to: entryPoint06Address,
 					value: 0n,
@@ -197,7 +192,7 @@ describe("protocol - sqlite", () => {
 				},
 			]);
 			storage.setHash(1, "0x5afe5afe");
-			expect(storage.pending(0)).toStrictEqual([
+			expect(storage.submittedUpTo(0n)).toStrictEqual([
 				{
 					to: entryPoint06Address,
 					value: 0n,
@@ -235,7 +230,8 @@ describe("protocol - sqlite", () => {
 				},
 				2,
 			);
-			expect(storage.pending(0)).toStrictEqual([
+			storage.setSubmittedForPending(0n);
+			expect(storage.submittedUpTo(0n)).toStrictEqual([
 				{
 					to: entryPoint06Address,
 					value: 0n,
@@ -280,7 +276,8 @@ describe("protocol - sqlite", () => {
 				},
 				1,
 			);
-			expect(storage.pending(0)).toStrictEqual([
+			storage.setSubmittedForPending(0n);
+			expect(storage.submittedUpTo(0n)).toStrictEqual([
 				{
 					to: entryPoint06Address,
 					value: 0n,
@@ -298,7 +295,7 @@ describe("protocol - sqlite", () => {
 				},
 			]);
 			storage.setExecuted(1);
-			expect(storage.pending(0)).toStrictEqual([
+			expect(storage.submittedUpTo(0n)).toStrictEqual([
 				{
 					to: entryPoint06Address,
 					value: 0n,
@@ -310,7 +307,7 @@ describe("protocol - sqlite", () => {
 			]);
 		});
 
-		it("should return correct number of updated transaction", () => {
+		it("should return correct number of updated executed transaction", () => {
 			const db = new Sqlite3(":memory:");
 			const storage = new SqliteTxStorage(db);
 			storage.register(
@@ -340,6 +337,39 @@ describe("protocol - sqlite", () => {
 				1,
 			);
 			expect(storage.setAllBeforeAsExecuted(3)).toBe(2);
+		});
+
+		it("should return correct number of updated pending transaction", () => {
+			const db = new Sqlite3(":memory:");
+			const storage = new SqliteTxStorage(db);
+			storage.register(
+				{
+					to: entryPoint06Address,
+					value: 0n,
+					data: "0x5afe01",
+				},
+				1,
+			);
+			storage.register(
+				{
+					to: entryPoint06Address,
+					value: 0n,
+					data: "0x5afe02",
+					gas: 200_000n,
+				},
+				1,
+			);
+			expect(storage.setSubmittedForPending(0n)).toBe(2);
+			storage.register(
+				{
+					to: entryPoint06Address,
+					value: 0n,
+					data: "0x5afe03",
+					gas: 200_000n,
+				},
+				1,
+			);
+			expect(storage.setSubmittedForPending(0n)).toBe(1);
 		});
 	});
 });
