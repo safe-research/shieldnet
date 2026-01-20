@@ -393,12 +393,13 @@ contract Staking is Ownable {
 
         // Create a withdrawal node.
         mapping(uint64 => WithdrawalNode) storage stakerNodes = withdrawalNodes[msg.sender];
-        stakerNodes[withdrawalId] = WithdrawalNode({amount: amount, claimableAt: claimableAt, previous: 0, next: 0});
+        WithdrawalNode memory withdrawalNode =
+            WithdrawalNode({amount: amount, claimableAt: claimableAt, previous: 0, next: 0});
 
         // Add to the withdrawal queue.
         WithdrawalQueue storage queue = withdrawalQueues[msg.sender];
-        // If queue is empty, set head and tail to new node.
         if (queue.head == 0) {
+            // If queue is empty, set head and tail to new node.
             withdrawalQueues[msg.sender] = WithdrawalQueue({head: withdrawalId, tail: withdrawalId});
         } else {
             // Check if the claimableAt of the tail is higher than the claimableAt of the new node. If so, traverse
@@ -408,7 +409,7 @@ contract Staking is Ownable {
             while (currentId != 0 && stakerNodes[currentId].claimableAt > claimableAt) {
                 currentId = stakerNodes[currentId].previous;
             }
-            WithdrawalNode storage withdrawalNode = stakerNodes[withdrawalId];
+
             if (currentId == queueTail) {
                 // Higher chances of this happening in most cases, so check first.
                 // Insert at tail.
@@ -431,6 +432,9 @@ contract Staking is Ownable {
                 stakerNodes[nextId].previous = withdrawalId;
             }
         }
+
+        // Store the updated withdrawal node.
+        stakerNodes[withdrawalId] = withdrawalNode;
     }
 
     /**
