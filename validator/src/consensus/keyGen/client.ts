@@ -218,13 +218,12 @@ export class KeyGenClient {
 			const coefficients = this.#storage.coefficients(groupId);
 			return this.registerSecretShare(groupId, participantId, evalPoly(coefficients, participantId));
 		}
-		// TODO: check if we should use a reasonable limit for the id (current uint256)
-		const shareIndex = participantId < senderId ? participantId : participantId - 1n;
-		// Note: Number(shareIndex) is theoretically an unsafe cast
+		const shareIndex = participants.filter(({ id }) => id !== senderId).findIndex(({ id }) => id === participantId);
+		if (shareIndex < 0) throw new Error("Could not find self in participants");
 		const key = this.#storage.encryptionKey(groupId);
 		const commitments = this.#storage.commitments(groupId, senderId);
 		if (commitments === undefined) throw new Error(`Commitments for ${groupId}:${senderId} are not available!`);
-		const partialShare = ecdh(peerShares[Number(shareIndex) - 1], key, commitments[0]);
+		const partialShare = ecdh(peerShares[shareIndex], key, commitments[0]);
 		const partialVerificationShare = evalCommitment(commitments, participantId);
 		if (!verifyKey(partialVerificationShare, partialShare)) {
 			// Share is invalid, abort as this would result in an invalid signing share

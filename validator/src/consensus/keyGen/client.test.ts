@@ -16,8 +16,8 @@ describe("keyGen", () => {
 		const threshold = 2;
 		const validatorAddresses = Array.from({ length: Number(count) }, () => createRandomAccount());
 		log(`Run test with ${count} validators and threshold ${threshold}`);
-		const participants: Participant[] = validatorAddresses.map((a, i) => {
-			return { id: BigInt(i + 1), address: a.address };
+		const participants: Participant[] = validatorAddresses.map((a) => {
+			return { id: BigInt(a.address), address: a.address };
 		});
 		const participantsRoot = calculateParticipantsRoot(participants);
 		const context = keccak256(participantsRoot);

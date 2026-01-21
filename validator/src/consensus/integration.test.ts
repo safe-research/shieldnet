@@ -194,8 +194,8 @@ describe("integration", () => {
 			onLogs: () => {
 				// Only react to first completed keygen
 				unsubscribe();
-				testLogger.notice("Stop client with index 2, keygen will timeout");
-				clients[2].service.stop();
+				testLogger.notice("Stop client with index 1, keygen will timeout");
+				clients[1].service.stop();
 			},
 		});
 		// We want to have enough time for 1 key rotation (including timeouts)
@@ -212,7 +212,7 @@ describe("integration", () => {
 		expect(proposedEpoch).toBeDefined();
 		// Calculate group id for reduced group
 		const expectedGroup = calcGroupId(
-			calculateParticipantsRoot([participants[0], participants[1]]),
+			calculateParticipantsRoot([participants[0], participants[2]]),
 			2,
 			2,
 			calcGroupContext(consensus.address, proposedEpoch as bigint),
