@@ -9,6 +9,8 @@ export interface ProtocolConfig {
 	blocksPerEpoch: bigint;
 	participants: Participant[];
 	genesisSalt: Hex;
+	keyGenTimeout?: bigint;
+	signingTimeout?: bigint;
 }
 
 export type AbiPoint = { x: bigint; y: bigint };

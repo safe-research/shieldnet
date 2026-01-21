@@ -95,6 +95,8 @@ export class ValidatorService {
 			keyGenClient,
 			signingClient,
 			verificationEngine,
+			keyGenTimeout: config.keyGenTimeout,
+			signingTimeout: config.signingTimeout,
 		});
 		this.#watcher = new OnchainTransitionWatcher({
 			publicClient: this.#publicClient,
