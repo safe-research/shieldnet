@@ -7,7 +7,8 @@ end
 
 module Abi = struct
   type t =
-    [ `Uint32 of int
+    [ `Uint16 of int
+    | `Uint32 of int
     | `Uint64 of int
     | `Uint256 of int
     | `Address of Address.t
