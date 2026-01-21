@@ -172,27 +172,33 @@ struct
 
   let participant_identifier participants address =
     (* We explicitely define the participant identifier to be its index in the
-       sorted list of active participants starting at 1. Note that OCaml `Set`
-       type is an ordered set, so we don't need to resort here. We implement it
-       by spliting the set at the participant's address, so that the cardinal of
-       the `left` subset is the number of addresses that are smaller than the
-       participant `address`, which allows us to trivially compute the FROST
-       identifier for that participant address. Note that we return `None` in
-       case the `address` is not present in the `participants` set. *)
-    let left, present, _ = AddressSet.split address participants in
-    if present then
-      Some (FROST.Identifier.of_int (1 + AddressSet.cardinal left))
-    else None
+       sorted list of all participants starting at 1. This means that
+       participant identifiers are stable across different active participant
+       sets. *)
+    AddressSet.find_opt address participants
+    |> Option.map (fun _ ->
+        (* The participant is part of the active participant set, so count how
+           many participants come **before** it in the full participant set. *)
+        let before, _, _ =
+          AddressSet.split address Configuration.all_participants
+        in
+        FROST.Identifier.of_int (1 + AddressSet.cardinal before))
 
   let participant_address participants identifier =
     let i = FROST.Identifier.to_int identifier - 1 in
-    List.nth (AddressSet.to_list participants) i
+    (* Find the address of the participant from the full participant list. *)
+    let address =
+      List.nth (AddressSet.to_list Configuration.all_participants) i
+    in
+    (* Ensure that it is in the active participant set. *)
+    AddressSet.find address participants
 
   let participants_tree participants =
     (* Note that sets are ordered in OCaml, so no need to sort the address set
        before computing each participant's identifier. *)
-    AddressSet.to_list participants
+    AddressSet.to_list Configuration.all_participants
     |> List.mapi (fun i a -> (FROST.Identifier.of_int (i + 1), a))
+    |> List.filter (fun (_, a) -> AddressSet.mem a participants)
 
   let participant_identifiers participants =
     participants_tree participants |> List.map (fun (id, _) -> id)
@@ -473,8 +479,11 @@ struct
             (Some my_share, [])
           else
             let i =
-              FROST.Identifier.to_int me
-              - if FROST.Identifier.compare me identifier < 0 then 1 else 2
+              participant_identifiers st.group.participants
+              |> List.filter (fun id ->
+                  not @@ FROST.Identifier.equal id identifier)
+              |> List.find_index (FROST.Identifier.equal me)
+              |> Option.get
             in
             let encrypted = List.nth secret_shares i in
             let participant_commitments =
