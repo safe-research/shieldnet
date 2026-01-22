@@ -63,7 +63,6 @@ contract ConsensusTest is Test {
 
     function test_GetCurrentEpochs_StagedEpoch() public {
         consensus.stageEpoch(0x5afe, 0x100, FROSTGroupId.T.wrap(keccak256("testGroup")), FROSTSignatureId.T.wrap(""));
-        // Use vm.expectCall(address(dep), abi.encodeWithSelector(dep.foo.selector, param1, paramN));
         (Consensus.Epochs memory epochs) = consensus.getCurrentEpochs();
         assertEq(0, epochs.previous);
         assertEq(0, epochs.active);
@@ -75,7 +74,6 @@ contract ConsensusTest is Test {
         consensus.stageEpoch(
             0x5afe, uint64(block.number + 1), FROSTGroupId.T.wrap(keccak256("testGroup")), FROSTSignatureId.T.wrap("")
         );
-        // Use vm.expectCall(address(dep), abi.encodeWithSelector(dep.foo.selector, param1, paramN));
         vm.roll(block.number + 1);
         (Consensus.Epochs memory epochs) = consensus.getCurrentEpochs();
         assertEq(0, epochs.previous);
