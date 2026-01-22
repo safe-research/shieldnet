@@ -31,12 +31,6 @@ const BLOCK_TIME_MS = 200;
 const BLOCKS_PER_EPOCH = 20n;
 const TEST_RUNTIME_IN_SECONDS = 60;
 
-/**
- * The integration test will bootstrap the setup from genesis and run for 1 minute.
- * Block time is 1 second, so 60 blocks will be mined.
- * Epoch time is 20 blocks per epoch.
- * It is expected that 4 groups will be created: genesis + 2 epoch rotations + 1 staged epoch
- */
 describe("integration", () => {
 	const testClient = createTestClient({
 		mode: "anvil",
@@ -54,7 +48,7 @@ describe("integration", () => {
 		try {
 			snapshotId = await testClient.snapshot();
 		} catch {
-			testLogger.notice("Could not set snapshot");
+			testLogger.notice("Could not set snapshot! Anvil not available");
 		}
 	});
 
@@ -67,8 +61,7 @@ describe("integration", () => {
 		timeout?: bigint;
 		blockTimeMs?: number;
 	}) => {
-		// Make sure to first start the Anvil testnode (run `anvil` in the root)
-		// and run the deployment script: forge script DeployScript --rpc-url http://127.0.0.1:8545 --unlocked --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --broadcast
+		// Check deployment information is available
 		const deploymentInfoFile = path.join(
 			process.cwd(),
 			"..",
@@ -83,6 +76,7 @@ describe("integration", () => {
 			// Deployment info not present
 			return undefined;
 		}
+		// No snapshot available, anvil most likely not running
 		if (snapshotId === undefined) {
 			return undefined;
 		}
@@ -120,7 +114,7 @@ describe("integration", () => {
 		} as const;
 		testLogger.notice(`Use consensus at ${consensus.address}`);
 
-		// Private keys from Anvil testnet
+		// Private keys from anvil testnet
 		const accounts = [
 			privateKeyToAccount("0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"),
 			privateKeyToAccount("0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a"),
@@ -202,10 +196,10 @@ describe("integration", () => {
 	});
 
 	it("keygen timeout", { timeout: TEST_RUNTIME_IN_SECONDS * 1000 * 5 }, async ({ skip }) => {
-		const setupInfo = await setup({ timeout: 5n, blocksPerEpoch: 60n });
+		const setupInfo = await setup({ timeout: 5n, blocksPerEpoch: 40n });
 		if (setupInfo === undefined) {
 			skip();
-			// We need the return here to make sure that setup is not undefined in the next steps
+			// Don't run the test code
 			return;
 		}
 		const { clients, coordinator, consensus, participants, triggerKeyGen } = setupInfo;
@@ -224,8 +218,8 @@ describe("integration", () => {
 				clients[2].service.stop();
 			},
 		});
-		// We want to have enough time for 1 key rotation (including timeouts)
-		await waitForBlock(testClient, 60n);
+		// Wait for end of epoch
+		await waitForBlock(testClient, 40n);
 		// Check number of staged epochs
 		const epochStagedEvent = CONSENSUS_EVENTS.filter((e) => e.name === "EpochStaged")[0];
 		const stagedEpochs = await testClient.getLogs({
@@ -257,7 +251,7 @@ describe("integration", () => {
 		const setupInfo = await setup({ timeout: 5n, blocksPerEpoch });
 		if (setupInfo === undefined) {
 			skip();
-			// We need the return here to make sure that setup is not undefined in the next steps
+			// Don't run the test code
 			return;
 		}
 		const { clients, coordinator, consensus, participants, triggerKeyGen } = setupInfo;
@@ -278,7 +272,7 @@ describe("integration", () => {
 			},
 		});
 		const abortedEpoch = (await testClient.getBlockNumber({ cacheTime: 0 })) / blocksPerEpoch + 1n;
-		// We want to have enough time for 1 key rotation (including timeouts)
+		// Wait until the end of the aborted epoch
 		await waitForBlock(testClient, abortedEpoch * blocksPerEpoch);
 
 		// Start clients again
@@ -286,7 +280,7 @@ describe("integration", () => {
 		clients[1].service.start();
 		clients[2].service.start();
 
-		// We want to have enough time for 1 more key rotation
+		// Wait until the end of the next epoch
 		await waitForBlock(testClient, (abortedEpoch + 1n) * blocksPerEpoch);
 
 		// Check number of staged epochs
@@ -320,7 +314,7 @@ describe("integration", () => {
 		const setupInfo = await setup({});
 		if (setupInfo === undefined) {
 			skip();
-			// We need the return here to make sure that setup is not undefined in the next steps
+			// Don't run the test code
 			return;
 		}
 		const { coordinator, consensus, triggerKeyGen } = setupInfo;
