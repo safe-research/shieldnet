@@ -1,6 +1,7 @@
 import { zeroAddress, zeroHash } from "viem";
 import { describe, expect, it, vi } from "vitest";
 import type { ShieldnetProtocol } from "../../consensus/protocol/types.js";
+import type { SigningClient } from "../../consensus/signing/client.js";
 import type { VerificationEngine } from "../../consensus/verify/engine.js";
 import type { TransactionProposedEvent } from "../transitions/types.js";
 import type { ConsensusState, MachineConfig } from "../types.js";
@@ -29,6 +30,10 @@ const MACHINE_CONFIG: MachineConfig = {
 		},
 		{
 			id: 7n,
+			address: zeroAddress,
+		},
+		{
+			id: 10n,
 			address: zeroAddress,
 		},
 	],
@@ -61,11 +66,19 @@ describe("transaction proposed", () => {
 	it("should not handle proposed event if epoch group is unknown", async () => {
 		const protocol: ShieldnetProtocol = {} as unknown as ShieldnetProtocol;
 		const verificationEngine: VerificationEngine = {} as unknown as VerificationEngine;
+		const signingClient: SigningClient = {} as unknown as SigningClient;
 		const consensus = {
 			...CONSENSUS_STATE,
 			epochGroups: {},
 		};
-		const diff = await handleTransactionProposed(MACHINE_CONFIG, protocol, verificationEngine, consensus, EVENT);
+		const diff = await handleTransactionProposed(
+			MACHINE_CONFIG,
+			protocol,
+			verificationEngine,
+			signingClient,
+			consensus,
+			EVENT,
+		);
 
 		expect(diff).toStrictEqual({});
 	});
@@ -80,8 +93,9 @@ describe("transaction proposed", () => {
 		const verificationEngine: VerificationEngine = {
 			verify,
 		} as unknown as VerificationEngine;
+		const signingClient: SigningClient = {} as unknown as SigningClient;
 		await expect(
-			handleTransactionProposed(MACHINE_CONFIG, protocol, verificationEngine, CONSENSUS_STATE, EVENT),
+			handleTransactionProposed(MACHINE_CONFIG, protocol, verificationEngine, signingClient, CONSENSUS_STATE, EVENT),
 		).rejects.toStrictEqual(new Error("could not verify"));
 		expect(verify).toBeCalledTimes(1);
 		expect(verify).toBeCalledWith({
@@ -107,7 +121,20 @@ describe("transaction proposed", () => {
 		const verificationEngine: VerificationEngine = {
 			verify,
 		} as unknown as VerificationEngine;
-		const diff = await handleTransactionProposed(MACHINE_CONFIG, protocol, verificationEngine, CONSENSUS_STATE, EVENT);
+		const participants = vi.fn();
+		// Only use a partial set of the default participants
+		participants.mockReturnValue([3n, 7n]);
+		const signingClient: SigningClient = {
+			participants,
+		} as unknown as SigningClient;
+		const diff = await handleTransactionProposed(
+			MACHINE_CONFIG,
+			protocol,
+			verificationEngine,
+			signingClient,
+			CONSENSUS_STATE,
+			EVENT,
+		);
 		const packet = {
 			type: "safe_transaction_packet",
 			domain: {
@@ -128,7 +155,7 @@ describe("transaction proposed", () => {
 				id: "waiting_for_request",
 				responsible: undefined,
 				packet,
-				signers: [1n, 3n, 7n],
+				signers: [3n, 7n],
 				deadline: 22n,
 			},
 		]);
