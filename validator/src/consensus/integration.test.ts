@@ -15,6 +15,7 @@ import { type Account, privateKeyToAccount } from "viem/accounts";
 import { anvil } from "viem/chains";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { silentLogger, testLogger, testMetrics } from "../__tests__/config.js";
+import { waitForBlock, waitForBlocks } from "../__tests__/utils.js";
 import { toPoint } from "../frost/math.js";
 import { calcGroupContext } from "../machine/keygen/group.js";
 import type { WatcherConfig } from "../machine/transitions/watcher.js";
@@ -26,18 +27,10 @@ import { calculateParticipantsRoot } from "./merkle.js";
 import { verifySignature } from "./signing/verify.js";
 import type { Participant } from "./storage/types.js";
 
-const BLOCKTIME_IN_SECONDS = 1;
+const BLOCK_TIME_MS = 200;
 const BLOCKS_PER_EPOCH = 20n;
 const TEST_RUNTIME_IN_SECONDS = 60;
-// 2 epoch rotations + 1 staged epoch
-const EXPECTED_GROUPS = TEST_RUNTIME_IN_SECONDS / Number(BLOCKS_PER_EPOCH);
 
-/**
- * The integration test will bootstrap the setup from genesis and run for 1 minute.
- * Block time is 1 second, so 60 blocks will be mined.
- * Epoch time is 20 blocks per epoch.
- * It is expected that 4 groups will be created: genesis + 2 epoch rotations + 1 staged epoch
- */
 describe("integration", () => {
 	const testClient = createTestClient({
 		mode: "anvil",
@@ -48,19 +41,27 @@ describe("integration", () => {
 		.extend(publicActions)
 		.extend(walletActions);
 	let snapshotId: Hex | undefined;
+	let miner: NodeJS.Timeout | undefined;
 	let currentClients: { account: Account; service: ValidatorService }[] | undefined;
 
 	beforeAll(async () => {
 		try {
 			snapshotId = await testClient.snapshot();
 		} catch {
-			testLogger.notice("Could not set snapshot");
+			testLogger.notice("Could not set snapshot! Anvil not available");
 		}
 	});
 
-	const setup = async ({ blocksPerEpoch, timeout }: { blocksPerEpoch?: bigint; timeout?: bigint }) => {
-		// Make sure to first start the Anvil testnode (run `anvil` in the root)
-		// and run the deployment script: forge script DeployScript --rpc-url http://127.0.0.1:8545 --unlocked --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --broadcast
+	const setup = async ({
+		blocksPerEpoch,
+		timeout,
+		blockTimeMs,
+	}: {
+		blocksPerEpoch?: bigint;
+		timeout?: bigint;
+		blockTimeMs?: number;
+	}) => {
+		// Check deployment information is available
 		const deploymentInfoFile = path.join(
 			process.cwd(),
 			"..",
@@ -75,13 +76,23 @@ describe("integration", () => {
 			// Deployment info not present
 			return undefined;
 		}
+		// No snapshot available, anvil most likely not running
 		if (snapshotId === undefined) {
 			return undefined;
 		}
 		await testClient.revert({ id: snapshotId });
 		// Snapshots get consumed, create a new one to ensure that always one is present
 		snapshotId = await testClient.snapshot();
-		await testClient.setIntervalMining({ interval: BLOCKTIME_IN_SECONDS });
+
+		const blockTime = blockTimeMs ?? BLOCK_TIME_MS;
+		if (blockTime > 0) {
+			// Disable anvil auto and interval minging
+			await testClient.setAutomine(false);
+			await testClient.setIntervalMining({ interval: 0 });
+			miner = setInterval(async () => {
+				await testClient.mine({ blocks: 1 });
+			}, blockTime);
+		}
 
 		const deploymentInfo = JSON.parse(fs.readFileSync(deploymentInfoFile, "utf-8"));
 		const coordinator = {
@@ -103,7 +114,7 @@ describe("integration", () => {
 		} as const;
 		testLogger.notice(`Use consensus at ${consensus.address}`);
 
-		// Private keys from Anvil testnet
+		// Private keys from anvil testnet
 		const accounts = [
 			privateKeyToAccount("0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"),
 			privateKeyToAccount("0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a"),
@@ -127,7 +138,7 @@ describe("integration", () => {
 			};
 			const watcherConfig: WatcherConfig = {
 				maxReorgDepth: 1,
-				blockTimeOverride: BLOCKTIME_IN_SECONDS * 1000,
+				blockTimeOverride: blockTime,
 			};
 			const service = createValidatorService({
 				account: a,
@@ -175,31 +186,40 @@ describe("integration", () => {
 				await service.stop();
 			} catch (_e) {}
 		}
+		// Cleanup miner
+		if (miner !== undefined) {
+			try {
+				clearTimeout(miner);
+			} catch (_e) {}
+			miner = undefined;
+		}
 	});
 
 	it("keygen timeout", { timeout: TEST_RUNTIME_IN_SECONDS * 1000 * 5 }, async ({ skip }) => {
-		const setupInfo = await setup({ timeout: 10n, blocksPerEpoch: 60n });
+		const setupInfo = await setup({ timeout: 5n, blocksPerEpoch: 40n });
 		if (setupInfo === undefined) {
 			skip();
-			// We need the return here to make sure that setup is not undefined in the next steps
+			// Don't run the test code
 			return;
 		}
 		const { clients, coordinator, consensus, participants, triggerKeyGen } = setupInfo;
 		await triggerKeyGen();
 		// Stop one service after genesis keygen
 		const unsubscribe = testClient.watchContractEvent({
+			poll: true,
+			pollingInterval: 100,
 			address: coordinator.address,
 			abi: COORDINATOR_EVENTS,
 			eventName: "KeyGenConfirmed",
 			onLogs: () => {
 				// Only react to first completed keygen
 				unsubscribe();
-				testLogger.notice("Stop client with index 1, keygen will timeout");
-				clients[1].service.stop();
+				testLogger.notice("Stop client with index 2, keygen will timeout");
+				clients[2].service.stop();
 			},
 		});
-		// We want to have enough time for 1 key rotation (including timeouts)
-		await new Promise((resolve) => setTimeout(resolve, 25000));
+		// Wait for end of epoch
+		await waitForBlock(testClient, 40n);
 		// Check number of staged epochs
 		const epochStagedEvent = CONSENSUS_EVENTS.filter((e) => e.name === "EpochStaged")[0];
 		const stagedEpochs = await testClient.getLogs({
@@ -212,7 +232,7 @@ describe("integration", () => {
 		expect(proposedEpoch).toBeDefined();
 		// Calculate group id for reduced group
 		const expectedGroup = calcGroupId(
-			calculateParticipantsRoot([participants[0], participants[2]]),
+			calculateParticipantsRoot([participants[0], participants[1]]),
 			2,
 			2,
 			calcGroupContext(consensus.address, proposedEpoch as bigint),
@@ -231,13 +251,15 @@ describe("integration", () => {
 		const setupInfo = await setup({ timeout: 5n, blocksPerEpoch });
 		if (setupInfo === undefined) {
 			skip();
-			// We need the return here to make sure that setup is not undefined in the next steps
+			// Don't run the test code
 			return;
 		}
 		const { clients, coordinator, consensus, participants, triggerKeyGen } = setupInfo;
 		await triggerKeyGen();
 		// Stop one service after genesis keygen
 		const unsubscribe = testClient.watchContractEvent({
+			poll: true,
+			pollingInterval: 100,
 			address: coordinator.address,
 			abi: COORDINATOR_EVENTS,
 			eventName: "KeyGenConfirmed",
@@ -249,16 +271,18 @@ describe("integration", () => {
 				clients[2].service.stop();
 			},
 		});
-		const abortedEpoch = (await testClient.getBlockNumber()) / blocksPerEpoch + 1n;
-		// We want to have enough time for 1 key rotation (including timeouts)
-		await new Promise((resolve) => setTimeout(resolve, 20000));
+		const abortedEpoch = (await testClient.getBlockNumber({ cacheTime: 0 })) / blocksPerEpoch + 1n;
+		// Wait until the end of the aborted epoch
+		await waitForBlock(testClient, abortedEpoch * blocksPerEpoch);
 
 		// Start clients again
+		testLogger.notice("Restart 2 clients, should recover on next epoch");
 		clients[1].service.start();
 		clients[2].service.start();
 
-		// We want to have enough time for 1 more key rotation
-		await new Promise((resolve) => setTimeout(resolve, 10000));
+		// Wait until the end of the next epoch
+		await waitForBlock(testClient, (abortedEpoch + 1n) * blocksPerEpoch);
+
 		// Check number of staged epochs
 		const epochStagedEvent = CONSENSUS_EVENTS.filter((e) => e.name === "EpochStaged")[0];
 		const stagedEpochs = await testClient.getLogs({
@@ -267,7 +291,7 @@ describe("integration", () => {
 			fromBlock: "earliest",
 		});
 		expect(stagedEpochs.length).toBe(1);
-		const proposedEpoch = (await testClient.getBlockNumber()) / blocksPerEpoch + 1n;
+		const proposedEpoch = abortedEpoch + 1n;
 		expect(stagedEpochs[0].args.proposedEpoch).toBe(proposedEpoch);
 		expect(abortedEpoch).not.toBe(proposedEpoch);
 		// Calculate group id with original group
@@ -290,11 +314,14 @@ describe("integration", () => {
 		const setupInfo = await setup({});
 		if (setupInfo === undefined) {
 			skip();
-			// We need the return here to make sure that setup is not undefined in the next steps
+			// Don't run the test code
 			return;
 		}
 		const { coordinator, consensus, triggerKeyGen } = setupInfo;
+		const startEpoch = (await testClient.getBlockNumber({ cacheTime: 0 })) / BLOCKS_PER_EPOCH;
 		await triggerKeyGen();
+
+		await waitForBlocks(testClient, 15n);
 		// Setup done ... SchildNetz läuft ... lets send some signature requests
 		const transaction = {
 			chainId: 1n,
@@ -305,19 +332,15 @@ describe("integration", () => {
 			operation: 0,
 			nonce: 0n,
 		};
-		setTimeout(
-			async () => {
-				await testClient.writeContract({
-					...consensus,
-					functionName: "proposeTransaction",
-					args: [transaction],
-				});
-			},
-			(TEST_RUNTIME_IN_SECONDS / 3) * 1000,
-		);
-		// Stop a few seconds before the end of the test run time, (otherwise, we may have
-		// already seen the 60'th block and start an additional key gen process).
-		await new Promise((resolve) => setTimeout(resolve, (TEST_RUNTIME_IN_SECONDS - 5) * 1000));
+		testLogger.notice("Propose transaction", transaction);
+		await testClient.writeContract({
+			...consensus,
+			functionName: "proposeTransaction",
+			args: [transaction],
+		});
+		// Wait until the end of the epoch
+		await waitForBlock(testClient, 40n);
+		const endEpoch = (await testClient.getBlockNumber({ cacheTime: 0 })) / BLOCKS_PER_EPOCH;
 		// Check number of staged epochs
 		const epochStagedEvent = CONSENSUS_EVENTS.filter((e) => e.name === "EpochStaged")[0];
 		const stagedEpochs = await testClient.getLogs({
@@ -325,7 +348,8 @@ describe("integration", () => {
 			event: epochStagedEvent,
 			fromBlock: "earliest",
 		});
-		expect(stagedEpochs.length).toBe(EXPECTED_GROUPS);
+		// For the start epoch there is no staged event, but for the epoch after the end epoch is an additional one
+		expect(stagedEpochs.length).toBe(Number(endEpoch - startEpoch));
 
 		// Check if signature request worked
 		// Calculate transaction hash
@@ -374,7 +398,7 @@ describe("integration", () => {
 		const request = signatureRequests[0];
 		expect(request.args.initiator).toBe(consensus.address);
 		expect(request.args.sid).toBeDefined();
-		if (request.args.gid === undefined) throw new Error("GroupId is expected to be defined");
+		expect(request.args.gid).toBeDefined();
 		// Load completed request for signature request
 		const signedEvent = COORDINATOR_EVENTS.filter((e) => e.name === "SignCompleted")[0];
 		const completedRequests = await testClient.getLogs({
@@ -382,7 +406,7 @@ describe("integration", () => {
 			event: signedEvent,
 			fromBlock: "earliest",
 			args: {
-				sid: request.args.sid,
+				sid: request.args.sid as Hex,
 			},
 		});
 		expect(completedRequests.length).toBe(1);
@@ -395,7 +419,7 @@ describe("integration", () => {
 		const groupKey = await testClient.readContract({
 			...coordinator,
 			functionName: "groupKey",
-			args: [request.args.gid],
+			args: [request.args.gid as Hex],
 		});
 		expect(verifySignature(toPoint(signature.r), signature.z, toPoint(groupKey), proposal.args.message)).toBeTruthy();
 
