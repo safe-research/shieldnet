@@ -97,7 +97,7 @@ describe("integration", () => {
 			await testClient.setIntervalMining({ interval: 0 });
 			miner = setInterval(async () => {
 				await testClient.mine({ blocks: 1 });
-			}, blockTimeMs);
+			}, blockTime);
 		}
 
 		const deploymentInfo = JSON.parse(fs.readFileSync(deploymentInfoFile, "utf-8"));
