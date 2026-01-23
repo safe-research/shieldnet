@@ -13,15 +13,12 @@ type MergeDefaults<T extends object, D extends object> = Prettify<{
 }>;
 
 export const withDefaults = <T extends object, D extends object>(config: T, defaultValues: D): MergeDefaults<T, D> => {
-	const merged = { ...defaultValues } as MergeDefaults<T, D>;
-	const keys = Object.keys(config) as Array<keyof T>;
-	for (const key of keys) {
+	const merged = { ...defaultValues } as Record<string, unknown>;
+	for (const key in config) {
 		const value = config[key];
 		if (value !== undefined) {
-			// We cast result to T temporarily to allow assignment of T's properties.
-			// This is type-safe because we are explicitly merging T into the object.
-			(merged as T)[key] = value;
+			merged[key] = value;
 		}
 	}
-	return merged;
+	return merged as MergeDefaults<T, D>;
 };
