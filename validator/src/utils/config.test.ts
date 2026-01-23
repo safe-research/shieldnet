@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { withDefaults } from "./config.js";
-import { Timer } from "../watcher/blocks.js";
 
 describe("withDefaults", () => {
 	it("should not overwrite defaults with undefined", async () => {
