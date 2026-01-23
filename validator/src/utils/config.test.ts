@@ -6,27 +6,34 @@ describe("withDefaults", () => {
 		const defaultConfig = { first: "123", second: undefined };
 		const config = { first: undefined, second: 123 };
 
-		const merged = withDefaults(defaultConfig, config);
+		const merged = withDefaults(config, defaultConfig);
 		expect(merged).toStrictEqual({ first: "123", second: 123 });
 	});
 
 	it("should use all default values for empty config", async () => {
 		const defaultConfig = { first: "123", second: 123 };
-		const merged = withDefaults(defaultConfig, {});
+		const merged = withDefaults({}, defaultConfig);
 		expect(merged).toStrictEqual({ first: "123", second: 123 });
 	});
 
 	it("should merge with no overwrites", async () => {
 		const defaultConfig = { first: "123" };
 		const config = { second: 123 };
-		const merged = withDefaults(defaultConfig, config);
+		const merged = withDefaults(config, defaultConfig);
 		expect(merged).toStrictEqual({ first: "123", second: 123 });
 	});
 
-	it("should ignore empty default value", async () => {
+	it("should keep empty default value", async () => {
 		const defaultConfig = { first: undefined };
 		const config = { second: 123 };
-		const merged = withDefaults(defaultConfig, config);
+		const merged = withDefaults(config, defaultConfig);
+		expect(merged).toStrictEqual({ first: undefined, second: 123 });
+	});
+
+	it("should drop empty config value", async () => {
+		const defaultConfig = { second: 123 };
+		const config = { first: undefined };
+		const merged = withDefaults(config, defaultConfig);
 		expect(merged).toStrictEqual({ second: 123 });
 	});
 
@@ -48,7 +55,7 @@ describe("withDefaults", () => {
 			blockRetryDelays: undefined,
 			timer: undefined,
 		};
-		const merged = withDefaults(defaultConfig, config);
+		const merged = withDefaults(config, defaultConfig);
 		expect(merged).toStrictEqual({
 			blockTime: 12000,
 			maxReorgDepth: 5,
