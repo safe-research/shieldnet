@@ -36,11 +36,14 @@ describe("protocol - sqlite", () => {
 					createdAt DATETIME DEFAULT (unixepoch())
 				);
 			`);
-			const migrationPath = path.join(__dirname, "..", "..", "..", "migrations", "1_add_submitted_at.sql");
-			const migrationSql = readFileSync(migrationPath, "utf-8");
-			expect(() => {
-				db.exec(migrationSql);
-			}).not.toThrow();
+			const migrations = ["1_add_submitted_at.sql", "2_add_fees_json.sql"];
+			for (const migration of migrations) {
+				const migrationPath = path.join(__dirname, "..", "..", "..", "migrations", migration);
+				const migrationSql = readFileSync(migrationPath, "utf-8");
+				expect(() => {
+					db.exec(migrationSql);
+				}).not.toThrow();
+			}
 			const columns = db.pragma("table_info(transaction_storage)") as Array<{ name: string }>;
 			expect(columns).toStrictEqual([
 				{
@@ -83,6 +86,14 @@ describe("protocol - sqlite", () => {
 					name: "submittedAt",
 					type: "INTEGER",
 				},
+				{
+					cid: 5,
+					dflt_value: "NULL",
+					notnull: 0,
+					pk: 0,
+					name: "feesJson",
+					type: "TEXT",
+				},
 			]);
 
 			// Check that it works with tx storage operations
@@ -94,16 +105,19 @@ describe("protocol - sqlite", () => {
 			const db = new Sqlite3(":memory:");
 			// Will create db with latest schema
 			new SqliteTxStorage(db);
-			const migrationPath = path.join(__dirname, "..", "..", "..", "migrations", "1_add_submitted_at.sql");
-			const migrationSql = readFileSync(migrationPath, "utf-8");
-			expect(() => {
-				db.exec(migrationSql);
-			}).toThrow();
+			const migrations = ["1_add_submitted_at.sql", "2_add_fees_json.sql"];
+			for (const migration of migrations) {
+				const migrationPath = path.join(__dirname, "..", "..", "..", "migrations", migration);
+				const migrationSql = readFileSync(migrationPath, "utf-8");
+				expect(() => {
+					db.exec(migrationSql);
+				}).toThrow();
+			}
 		});
 	});
 
 	describe("SqliteTxStorage", () => {
-		it("should throw in invalid stored json", () => {
+		it("should throw in invalid stored transaction json", () => {
 			const db = new Sqlite3(":memory:");
 			const storage = new SqliteTxStorage(db);
 			db.prepare(`
@@ -111,10 +125,30 @@ describe("protocol - sqlite", () => {
 				VALUES ($nonce, $transactionJson, $submittedAt);
 			`).run({
 				nonce: 1,
-				transactionJson: "Invalid JSON!",
+				transactionJson: "Invalid tx JSON!",
 				submittedAt: 0,
 			});
-			expect(() => storage.submittedUpTo(0n)).toThrow("Unexpected token 'I', \"Invalid JSON!\" is not valid JSON");
+			expect(() => storage.submittedUpTo(0n)).toThrow("Unexpected token 'I', \"Invalid tx JSON!\" is not valid JSON");
+		});
+
+		it("should throw in invalid fees json", () => {
+			const db = new Sqlite3(":memory:");
+			const storage = new SqliteTxStorage(db);
+			storage.register(
+				{
+					to: entryPoint06Address,
+					value: 0n,
+					data: "0x5afe01",
+				},
+				1,
+			);
+			storage.setSubmittedForPending(0n);
+			db.prepare(`
+				UPDATE transaction_storage
+				SET feesJson = ?
+				WHERE nonce = ?;
+			`).run("Invalid fees JSON!", 1);
+			expect(() => storage.submittedUpTo(0n)).toThrow("Unexpected token 'I', \"Invalid fees JSON!\" is not valid JSON");
 		});
 
 		it("should return empty if nothing stored", () => {
@@ -149,6 +183,7 @@ describe("protocol - sqlite", () => {
 					value: 0n,
 					data: "0x5afe01",
 					hash: null,
+					fees: null,
 					nonce: 1,
 				},
 			]);
@@ -158,6 +193,7 @@ describe("protocol - sqlite", () => {
 					value: 0n,
 					data: "0x5afe01",
 					hash: null,
+					fees: null,
 					nonce: 1,
 				},
 				{
@@ -165,6 +201,7 @@ describe("protocol - sqlite", () => {
 					value: 0n,
 					data: "0x5afe02",
 					hash: null,
+					fees: null,
 					nonce: 2,
 				},
 			]);
@@ -189,6 +226,7 @@ describe("protocol - sqlite", () => {
 					data: "0x5afe",
 					hash: null,
 					nonce: 1,
+					fees: null,
 				},
 			]);
 			storage.setHash(1, "0x5afe5afe");
@@ -199,6 +237,48 @@ describe("protocol - sqlite", () => {
 					data: "0x5afe",
 					hash: "0x5afe5afe",
 					nonce: 1,
+					fees: null,
+				},
+			]);
+		});
+
+		it("should update the transaction fees", () => {
+			const db = new Sqlite3(":memory:");
+			const storage = new SqliteTxStorage(db);
+			storage.register(
+				{
+					to: entryPoint06Address,
+					value: 0n,
+					data: "0x5afe",
+				},
+				1,
+			);
+			storage.setSubmittedForPending(0n);
+			expect(storage.submittedUpTo(0n)).toStrictEqual([
+				{
+					to: entryPoint06Address,
+					value: 0n,
+					data: "0x5afe",
+					hash: null,
+					nonce: 1,
+					fees: null,
+				},
+			]);
+			storage.setFees(1, {
+				maxFeePerGas: 102n,
+				maxPriorityFeePerGas: 51n,
+			});
+			expect(storage.submittedUpTo(0n)).toStrictEqual([
+				{
+					to: entryPoint06Address,
+					value: 0n,
+					data: "0x5afe",
+					hash: null,
+					nonce: 1,
+					fees: {
+						maxFeePerGas: 102n,
+						maxPriorityFeePerGas: 51n,
+					},
 				},
 			]);
 		});
@@ -238,6 +318,7 @@ describe("protocol - sqlite", () => {
 					data: "0x5afe01",
 					hash: null,
 					nonce: 1,
+					fees: null,
 				},
 				{
 					to: entryPoint06Address,
@@ -245,6 +326,7 @@ describe("protocol - sqlite", () => {
 					data: "0x5afe03",
 					hash: null,
 					nonce: 3,
+					fees: null,
 				},
 				{
 					to: entryPoint06Address,
@@ -252,6 +334,7 @@ describe("protocol - sqlite", () => {
 					data: "0x5afe02",
 					hash: null,
 					nonce: 4,
+					fees: null,
 				},
 			]);
 		});
@@ -284,6 +367,7 @@ describe("protocol - sqlite", () => {
 					data: "0x5afe01",
 					hash: null,
 					nonce: 1,
+					fees: null,
 				},
 				{
 					to: entryPoint06Address,
@@ -292,6 +376,7 @@ describe("protocol - sqlite", () => {
 					hash: null,
 					gas: 200_000n,
 					nonce: 2,
+					fees: null,
 				},
 			]);
 			storage.setExecuted(1);
@@ -303,6 +388,7 @@ describe("protocol - sqlite", () => {
 					hash: null,
 					gas: 200_000n,
 					nonce: 2,
+					fees: null,
 				},
 			]);
 		});

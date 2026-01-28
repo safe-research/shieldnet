@@ -12,7 +12,7 @@ import {
 	webSocket,
 } from "viem";
 import { KeyGenClient } from "../consensus/keyGen/client.js";
-import { OnchainProtocol } from "../consensus/protocol/onchain.js";
+import { GasFeeEstimator, OnchainProtocol } from "../consensus/protocol/onchain.js";
 import { SqliteActionQueue, SqliteTxStorage } from "../consensus/protocol/sqlite.js";
 import type { ActionWithTimeout } from "../consensus/protocol/types.js";
 import { SigningClient } from "../consensus/signing/client.js";
@@ -74,9 +74,11 @@ export class ValidatorService {
 		const actionStorage =
 			database !== undefined ? new SqliteActionQueue(database) : new InMemoryQueue<ActionWithTimeout>();
 		const txStorage = new SqliteTxStorage(database ?? new Sqlite3(":memory:"));
+		const gasFeeEstimator = new GasFeeEstimator(this.#publicClient);
 		const protocol = new OnchainProtocol({
 			publicClient: this.#publicClient,
 			signingClient: walletClient,
+			gasFeeEstimator,
 			consensus: config.consensus,
 			coordinator: config.coordinator,
 			queue: actionStorage,
@@ -107,8 +109,11 @@ export class ValidatorService {
 			logger,
 			onTransition: (t) => {
 				this.#stateMachine.transition(t);
-				// If we get a new block check pending actions
+				// If new block:
+				// - invalidate cached gas fees
+				// - check pending actions
 				if (t.id === "block_new") {
+					gasFeeEstimator.invalidate(t.block);
 					protocol.checkPendingActions(t.block);
 				}
 			},
