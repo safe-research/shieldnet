@@ -3,6 +3,7 @@ import {
 	type Address,
 	type Chain,
 	encodeFunctionData,
+	type FeeValuesEIP1559,
 	type Hex,
 	NonceTooLowError,
 	type PublicClient,
@@ -14,6 +15,7 @@ import {
 import type { FrostPoint, GroupId, SignatureId } from "../../frost/types.js";
 import { CONSENSUS_FUNCTIONS, COORDINATOR_FUNCTIONS } from "../../types/abis.js";
 import type { Logger } from "../../utils/logging.js";
+import { maxBigInt } from "../../utils/math.js";
 import type { Queue } from "../../utils/queue.js";
 import { BaseProtocol } from "./base.js";
 import type {
@@ -31,20 +33,51 @@ import type {
 	StartKeyGen,
 } from "./types.js";
 
+export type FeeValues = Pick<FeeValuesEIP1559, "maxFeePerGas" | "maxPriorityFeePerGas">;
 export type EthTransactionData = { to: Address; value: bigint; data: Hex; gas?: bigint };
+export type EthTransactionDetails = { nonce: number; fees: FeeValues | null; hash: Hex | null };
 
 export interface TransactionStorage {
 	register(tx: EthTransactionData, minNonce: number): number;
+	setFees(nonce: number, fees: FeeValues): void;
 	setHash(nonce: number, txHash: Hex): void;
 	setExecuted(nonce: number): void;
 	setAllBeforeAsExecuted(nonce: number): number;
 	setSubmittedForPending(blockNumber: bigint): number;
-	submittedUpTo(blockNumber: bigint): (EthTransactionData & { nonce: number; hash: Hex | null })[];
+	submittedUpTo(blockNumber: bigint): (EthTransactionData & EthTransactionDetails)[];
+}
+
+export class GasFeeEstimator {
+	#currentBlockNumner = 0n;
+	#cachedPrices: Promise<FeeValues> | null = null;
+	#client: PublicClient;
+
+	constructor(client: PublicClient) {
+		this.#client = client;
+	}
+
+	invalidate(blockNumber: bigint) {
+		if (blockNumber > this.#currentBlockNumner) {
+			this.#cachedPrices = null;
+			this.#currentBlockNumner = blockNumber;
+		}
+	}
+
+	estimateFees(): Promise<FeeValues> {
+		if (this.#cachedPrices !== null) {
+			return this.#cachedPrices;
+		}
+		// Also cache errors, to prevent that on error too many request are fired
+		const pricePromise = this.#client.estimateFeesPerGas();
+		this.#cachedPrices = pricePromise;
+		return pricePromise;
+	}
 }
 
 export class OnchainProtocol extends BaseProtocol {
 	#publicClient: PublicClient;
 	#signingClient: WalletClient<Transport, Chain, Account>;
+	#gasFeeEstimator: GasFeeEstimator;
 	#txStorage: TransactionStorage;
 	#consensus: Address;
 	#coordinator: Address;
@@ -54,6 +87,7 @@ export class OnchainProtocol extends BaseProtocol {
 	constructor({
 		publicClient,
 		signingClient,
+		gasFeeEstimator,
 		consensus,
 		coordinator,
 		queue,
@@ -63,6 +97,7 @@ export class OnchainProtocol extends BaseProtocol {
 	}: {
 		publicClient: PublicClient;
 		signingClient: WalletClient<Transport, Chain, Account>;
+		gasFeeEstimator: GasFeeEstimator;
 		consensus: Address;
 		coordinator: Address;
 		queue: Queue<ActionWithTimeout>;
@@ -73,6 +108,7 @@ export class OnchainProtocol extends BaseProtocol {
 		super(queue, logger);
 		this.#publicClient = publicClient;
 		this.#signingClient = signingClient;
+		this.#gasFeeEstimator = gasFeeEstimator;
 		this.#txStorage = txStorage;
 		this.#consensus = consensus;
 		this.#coordinator = coordinator;
@@ -113,7 +149,7 @@ export class OnchainProtocol extends BaseProtocol {
 			const pendingTxs = this.#txStorage.submittedUpTo(blockNumber - this.#blocksBeforeResubmit);
 			for (const tx of pendingTxs) {
 				// If we don't find the transaction or it has no blockHash then we resubmit it
-				this.#logger.debug(`Resubmit transaction for ${tx.nonce}!`, tx);
+				this.#logger.debug(`Resubmit transaction for ${tx.nonce}!`, { transaction: tx });
 				try {
 					await this.submitTransaction(tx);
 				} catch (error) {
@@ -122,7 +158,9 @@ export class OnchainProtocol extends BaseProtocol {
 						// Nonce error might be nested as cause error
 						(error instanceof TransactionExecutionError && error.cause instanceof NonceTooLowError)
 					) {
-						this.#logger.info(`Nonce already used. Marking transaction with nonce ${tx.nonce} as executed!`, { error });
+						this.#logger.info(`Nonce already used. Marking transaction with nonce ${tx.nonce} as executed!`, {
+							transaction: tx,
+						});
 						this.#txStorage.setExecuted(tx.nonce);
 						continue;
 					}
@@ -134,11 +172,28 @@ export class OnchainProtocol extends BaseProtocol {
 		}
 	}
 
-	private async submitTransaction(tx: EthTransactionData & { nonce: number }): Promise<Hex> {
+	private async submitTransaction(
+		tx: EthTransactionData & Pick<EthTransactionDetails, "nonce" | "fees">,
+	): Promise<Hex> {
+		const estimatedFees = await this.#gasFeeEstimator.estimateFees();
+		// Use max of previous fees and estimate and slightly increase the fees to ensure that it is always bigger than before
+		const fees: FeeValues = {
+			// Increase by 2 to cover an increase by 1 of the base fee and priority fee
+			maxFeePerGas: maxBigInt(estimatedFees.maxFeePerGas, tx.fees?.maxFeePerGas ?? 0n) + 2n,
+			maxPriorityFeePerGas: maxBigInt(estimatedFees.maxPriorityFeePerGas, tx.fees?.maxPriorityFeePerGas ?? 0n) + 1n,
+		};
+
+		// Store fees before submission in case an error occurs
+		this.#txStorage.setFees(tx.nonce, fees);
 		const txHash = await this.#signingClient.sendTransaction({
-			...tx,
+			to: tx.to,
+			value: tx.value,
+			data: tx.data,
+			nonce: tx.nonce,
+			gas: tx.gas,
 			chain: this.#signingClient.chain,
 			account: this.#signingClient.account,
+			...fees,
 		});
 		this.#txStorage.setHash(tx.nonce, txHash);
 		return txHash;
@@ -165,6 +220,7 @@ export class OnchainProtocol extends BaseProtocol {
 		return this.submitTransaction({
 			...txData,
 			nonce,
+			fees: null,
 		});
 	}
 

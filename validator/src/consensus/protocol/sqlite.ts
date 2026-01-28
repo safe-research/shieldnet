@@ -6,7 +6,7 @@ import type { GroupId, ParticipantId, SignatureId } from "../../frost/types.js";
 import { checkedAddressSchema, hexBytes32Schema, hexDataSchema } from "../../types/schemas.js";
 import { jsonReplacer } from "../../utils/json.js";
 import { SqliteQueue } from "../../utils/queue.js";
-import type { EthTransactionData, TransactionStorage } from "./onchain.js";
+import type { EthTransactionData, EthTransactionDetails, FeeValues, TransactionStorage } from "./onchain.js";
 import type { ActionWithTimeout } from "./types.js";
 
 const groupIdSchema = hexBytes32Schema.transform((v) => v as GroupId);
@@ -164,6 +164,11 @@ const ethTxSchema = z.object({
 	gas: coercedBigIntSchema.optional(),
 });
 
+const ethFeesSchema = z.object({
+	maxFeePerGas: coercedBigIntSchema,
+	maxPriorityFeePerGas: coercedBigIntSchema,
+});
+
 const txStorageSchema = z
 	.object({
 		nonce: z.number(),
@@ -171,6 +176,13 @@ const txStorageSchema = z
 			.string()
 			.transform((arg) => JSON.parse(arg))
 			.pipe(ethTxSchema),
+		feesJson: z.union([
+			z
+				.string()
+				.transform((arg) => JSON.parse(arg))
+				.pipe(ethFeesSchema),
+			z.null(),
+		]),
 		transactionHash: z.union([hexDataSchema, z.null()]),
 	})
 	.array();
@@ -186,7 +198,8 @@ export class SqliteTxStorage implements TransactionStorage {
 				transactionJson TEXT NOT NULL,
 				transactionHash TEXT DEFAULT NULL,
 				createdAt DATETIME DEFAULT (unixepoch()),
-				submittedAt INTEGER DEFAULT NULL
+				submittedAt INTEGER DEFAULT NULL,
+				feesJson TEXT DEFAULT NULL
 			);
 		`);
 	}
@@ -208,6 +221,16 @@ export class SqliteTxStorage implements TransactionStorage {
 		return Number(result.lastInsertRowid);
 	}
 
+	setFees(nonce: number, fees: FeeValues) {
+		const feesJson = JSON.stringify(fees, jsonReplacer);
+		const updateStmt = this.#db.prepare(`
+			UPDATE transaction_storage
+			SET feesJson = ?
+			WHERE nonce = ?;
+		`);
+		updateStmt.run(feesJson, nonce);
+	}
+
 	setHash(nonce: number, txHash: Hex) {
 		const updateStmt = this.#db.prepare(`
 			UPDATE transaction_storage
@@ -227,9 +250,9 @@ export class SqliteTxStorage implements TransactionStorage {
 		return result.changes;
 	}
 
-	submittedUpTo(blockNumber: bigint): (EthTransactionData & { nonce: number; hash: Hex | null })[] {
+	submittedUpTo(blockNumber: bigint): (EthTransactionData & EthTransactionDetails)[] {
 		const pendingTxsStmt = this.#db.prepare(`
-			SELECT nonce, transactionJson, transactionHash FROM transaction_storage 
+			SELECT nonce, transactionJson, transactionHash, feesJson FROM transaction_storage 
 			WHERE submittedAt <= ?;
 		`);
 		const pendingTxsResult = pendingTxsStmt.all(blockNumber);
@@ -239,6 +262,7 @@ export class SqliteTxStorage implements TransactionStorage {
 				...tx.transactionJson,
 				nonce: tx.nonce,
 				hash: tx.transactionHash,
+				fees: tx.feesJson,
 			};
 		});
 	}
