@@ -51,7 +51,7 @@ describe("trigger key gen", () => {
 		const keyGenClient = {} as unknown as KeyGenClient;
 		// Only provide 1 participant
 		expect(() => triggerKeyGen(MACHINE_CONFIG, keyGenClient, 1n, 20n, PARTICIPANTS.slice(0, 1), zeroHash)).toThrowError(
-			new Error("Not enough participants!"),
+			new Error("Not enough participants! Expected at least 2 got 1"),
 		);
 	});
 
@@ -78,7 +78,7 @@ describe("trigger key gen", () => {
 			],
 		} as unknown as MachineConfig;
 		expect(() => triggerKeyGen(config, keyGenClient, 1n, 20n, PARTICIPANTS.slice(0, 2), zeroHash)).toThrowError(
-			new Error("Not enough participants!"),
+			new Error("Not enough participants! Expected at least 3 got 2"),
 		);
 	});
 
