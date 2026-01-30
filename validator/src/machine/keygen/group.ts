@@ -9,10 +9,48 @@ export type GroupParameters = {
 	threshold: number;
 };
 
+/**
+ * Note on threshold and minimum participant count:
+ * With M as the count of malicious nodes
+ * and T as the minimum require signers (based on a percentage threshold t)
+ * it always needs to hold that
+ * M < T
+ * for any sub group
+ *
+ * With N as the default participants count
+ * and D as the number of dropped participants
+ * the calculation is:
+ * M < t * (N - D)
+ *
+ * Solving for D, to calculate the miminum participation count:
+ * D < N - M / t
+ *
+ * Assuming that M = (1 - t) * N
+ * for the default participants:
+ * D < N - (1 - t) * N / t
+ * D < N - (N / t - N)
+ * D < 2 * N - N / t
+ *
+ *
+ * With t set to 2 / 3 (see calcGroupParameters):
+ * D < N / 2
+ *
+ * Meaning for M < T to hold, less than half of the participant can drop.
+ *
+ * Therefore the minimum participant set must be more than 50% of the default participant count
+ */
+
+export const calcMinimumParticipants = ({
+	defaultParticipants,
+}: Pick<MachineConfig, "defaultParticipants">): number => {
+	// The defined minimum participantion group size is 1/2 or 50%
+	return Math.max(2, Math.floor(defaultParticipants.length / 2) + 1);
+};
+
 export const calcGroupParameters = (participantCount: number): GroupParameters => {
 	const count = participantCount;
-	const threshold = Math.floor(count / 2) + 1;
-	// TODO: Handle cases where the group size is too small.
+	// The defined threshold is 2/3 or 66,66...%
+	const threshold = Math.floor((count * 2) / 3) + 1;
 	return { count, threshold };
 };
 

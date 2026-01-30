@@ -101,6 +101,7 @@ export const checkKeyGenTimeouts = (
 
 	// For next key gen only consider active participants
 	const { diff } = triggerKeyGen(
+		machineConfig,
 		keyGenClient,
 		nextEpoch,
 		block + machineConfig.keyGenTimeout,
