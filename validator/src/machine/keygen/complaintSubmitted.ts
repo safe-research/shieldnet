@@ -43,6 +43,7 @@ export const handleComplaintSubmitted = async (
 		const nextParticipants = participants.filter((participant) => participant.id !== event.accused);
 		logger?.(`Restarting key gen after too many complaints against participant ${accusedId}`);
 		const { diff } = triggerKeyGen(
+			machineConfig,
 			keyGenClient,
 			machineStates.rollover.nextEpoch,
 			event.block + machineConfig.keyGenTimeout,

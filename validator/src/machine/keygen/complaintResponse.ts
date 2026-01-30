@@ -49,6 +49,7 @@ export const handleComplaintResponded = async (
 			.participants(machineStates.rollover.groupId)
 			.filter((p) => p.id !== event.accused);
 		const { diff } = triggerKeyGen(
+			machineConfig,
 			keyGenClient,
 			machineStates.rollover.nextEpoch,
 			event.block + machineConfig.keyGenTimeout,
