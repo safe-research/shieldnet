@@ -24,6 +24,7 @@ export const handleGenesisKeyGen = async (
 		logger?.("Trigger Genesis Group Generation");
 		// Set no timeout for the genesis group generation
 		const { groupId, diff } = triggerKeyGen(
+			machineConfig,
 			keyGenClient,
 			0n,
 			maxUint64,

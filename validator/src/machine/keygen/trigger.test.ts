@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { KeyGenClient } from "../../consensus/keyGen/client.js";
 import { toPoint } from "../../frost/math.js";
 import type { FrostPoint } from "../../frost/types.js";
+import type { MachineConfig } from "../types.js";
 import { triggerKeyGen } from "./trigger.js";
 
 // --- Test Data ---
@@ -27,11 +28,56 @@ const PARTICIPANTS = [
 	},
 ];
 
+const MACHINE_CONFIG = {
+	defaultParticipants: [
+		{
+			id: 1n,
+			address: entryPoint06Address,
+		},
+		{
+			id: 2n,
+			address: entryPoint07Address,
+		},
+		{
+			id: 3n,
+			address: entryPoint08Address,
+		},
+	],
+} as unknown as MachineConfig;
+
 // --- Tests ---
 describe("trigger key gen", () => {
-	it("should throw if not enough participants are provided", () => {
+	it("should throw if not enough participants are provided (below hard minimum of 2)", () => {
 		const keyGenClient = {} as unknown as KeyGenClient;
-		expect(() => triggerKeyGen(keyGenClient, 1n, 20n, PARTICIPANTS.slice(0, 1), zeroHash)).toThrowError(
+		// Only provide 1 participant
+		expect(() => triggerKeyGen(MACHINE_CONFIG, keyGenClient, 1n, 20n, PARTICIPANTS.slice(0, 1), zeroHash)).toThrowError(
+			new Error("Not enough participants!"),
+		);
+	});
+
+	it("should throw if not enough participants are provided (below crash fault tolerance)", () => {
+		const keyGenClient = {} as unknown as KeyGenClient;
+		const config = {
+			defaultParticipants: [
+				{
+					id: 1n,
+					address: entryPoint06Address,
+				},
+				{
+					id: 2n,
+					address: entryPoint07Address,
+				},
+				{
+					id: 3n,
+					address: entryPoint08Address,
+				},
+				{
+					id: 4n,
+					address: entryPoint08Address,
+				},
+			],
+		} as unknown as MachineConfig;
+		expect(() => triggerKeyGen(config, keyGenClient, 1n, 20n, PARTICIPANTS.slice(0, 2), zeroHash)).toThrowError(
 			new Error("Not enough participants!"),
 		);
 	});
@@ -54,7 +100,7 @@ describe("trigger key gen", () => {
 		const keyGenClient = {
 			setupGroup,
 		} as unknown as KeyGenClient;
-		const { groupId, diff } = triggerKeyGen(keyGenClient, 2n, 30n, PARTICIPANTS, context);
+		const { groupId, diff } = triggerKeyGen(MACHINE_CONFIG, keyGenClient, 2n, 30n, PARTICIPANTS, context);
 
 		expect(groupId).toBe("0x5afe02");
 		expect(diff.actions).toStrictEqual([
@@ -62,7 +108,7 @@ describe("trigger key gen", () => {
 				id: "key_gen_start",
 				participants: groupSetup.participantsRoot,
 				count: 3,
-				threshold: 2,
+				threshold: 3,
 				context,
 				participantId: 3n,
 				commitments: groupSetup.commitments,
@@ -82,6 +128,6 @@ describe("trigger key gen", () => {
 		expect(diff.signing).toBeUndefined();
 
 		expect(setupGroup).toBeCalledTimes(1);
-		expect(setupGroup).toBeCalledWith(PARTICIPANTS, 3, 2, context);
+		expect(setupGroup).toBeCalledWith(PARTICIPANTS, 3, 3, context);
 	});
 });
