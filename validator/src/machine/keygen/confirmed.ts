@@ -109,7 +109,6 @@ export const handleKeyGenConfirmed = async (
 			groupId,
 			nextEpoch,
 			message,
-			responsible: event.identifier,
 		},
 		signing: [
 			message,

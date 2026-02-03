@@ -56,7 +56,6 @@ const MACHINE_STATES: MachineStates = {
 		groupId: "0x0000000000000000000000007fa9385be102ac3eac297483dd6233d62b3e1496",
 		message: "0x5afe5afe",
 		nextEpoch: 3n,
-		responsible: 1n,
 	},
 	signing: {
 		"0x5afe5afe": SIGNING_STATE,
