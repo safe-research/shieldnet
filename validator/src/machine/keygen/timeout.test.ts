@@ -61,7 +61,6 @@ describe("key gen timeouts", () => {
 				groupId: "0x5afe01",
 				nextEpoch: 1n,
 				message: "0x5afe5afe5afe",
-				responsible: 3n,
 			},
 			signing: {},
 		};

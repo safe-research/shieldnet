@@ -50,7 +50,6 @@ export type RolloverState = Readonly<
 			groupId: GroupId;
 			nextEpoch: bigint;
 			message: Hex;
-			responsible: ParticipantId;
 	  }
 >;
 
