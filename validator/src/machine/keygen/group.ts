@@ -25,32 +25,31 @@ export type GroupParameters = {
  * Solving for D, to calculate the miminum participation count:
  * D < N - M / t
  *
- * Assuming that M = (1 - t) * N
+ * If BFT (aka M) is 50%, then D is 0, therefore the target BFT is 33%.  
+ * To achive a BFT of 33%, assume M = (1 / 3) * N
  * for the default participants:
- * D < N - (1 - t) * N / t
- * D < N - (N / t - N)
- * D < 2 * N - N / t
+ * D < N - (1 / 3) * N / t
+ * D < N - N / (3 * t) 
  *
+ * With t set to 1 / 2 (see calcGroupParameters):
+ * D < N / 3
  *
- * With t set to 2 / 3 (see calcGroupParameters):
- * D < N / 2
+ * Meaning for M < (1 / 3) * N to hold, less than a third of the participant can drop.
  *
- * Meaning for M < T to hold, less than half of the participant can drop.
- *
- * Therefore the minimum participant set must be more than 50% of the default participant count
+ * Therefore the minimum participant set must be more than 2 / 3 aka 66% of the default participant count
  */
 
 export const calcMinimumParticipants = ({
 	defaultParticipants,
 }: Pick<MachineConfig, "defaultParticipants">): number => {
-	// The defined minimum participantion group size is 1/2 or 50%
-	return Math.max(2, Math.floor(defaultParticipants.length / 2) + 1);
+	// The defined minimum participantion group size is 2/3 or 66.66...%
+	return Math.max(2, Math.floor((count * 2) / 3) + 1);
 };
 
 export const calcGroupParameters = (participantCount: number): GroupParameters => {
 	const count = participantCount;
-	// The defined threshold is 2/3 or 66,66...%
-	const threshold = Math.floor((count * 2) / 3) + 1;
+	// The defined threshold is 1/2 or 50%
+	const threshold = Math.floor(count / 2) + 1;
 	return { count, threshold };
 };
 
