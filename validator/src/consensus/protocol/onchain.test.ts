@@ -1224,7 +1224,7 @@ describe("GasFeeEstimator", () => {
 		await expect(price2).rejects.toThrow("Some error");
 	});
 
-	it("should invalidate cache if block is higher", async () => {
+	it("should invalidate cache", async () => {
 		const estimateFeesPerGas = vi.fn();
 		const publicClient = {
 			estimateFeesPerGas,
@@ -1234,11 +1234,9 @@ describe("GasFeeEstimator", () => {
 		const original = estimator.estimateFees();
 		expect(original).toBe(estimator.estimateFees());
 		expect(estimateFeesPerGas).toHaveBeenCalledTimes(1);
-		estimator.invalidate(1n);
+		estimator.invalidate();
 		const next = estimator.estimateFees();
 		expect(original).not.toBe(next);
-		estimator.invalidate(1n);
-		expect(next).toBe(estimator.estimateFees());
 		expect(estimateFeesPerGas).toHaveBeenCalledTimes(2);
 	});
 });

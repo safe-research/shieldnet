@@ -48,7 +48,6 @@ export interface TransactionStorage {
 }
 
 export class GasFeeEstimator {
-	#currentBlockNumber = 0n;
 	#cachedPrices: Promise<FeeValues> | null = null;
 	#client: PublicClient;
 
@@ -56,11 +55,8 @@ export class GasFeeEstimator {
 		this.#client = client;
 	}
 
-	invalidate(blockNumber: bigint) {
-		if (blockNumber > this.#currentBlockNumber) {
-			this.#cachedPrices = null;
-			this.#currentBlockNumber = blockNumber;
-		}
+	invalidate() {
+		this.#cachedPrices = null;
 	}
 
 	estimateFees(): Promise<FeeValues> {
