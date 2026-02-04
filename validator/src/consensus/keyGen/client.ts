@@ -86,6 +86,7 @@ export class KeyGenClient {
 		poap: ProofOfAttestationParticipation;
 	} {
 		const participantsRoot = calculateParticipantsRoot(participants);
+		// TODO: get rid of count and use participants.length
 		if (participants.length !== Number(count))
 			throw new Error(
 				`Unexpected participant count ${participantsRoot}! (Expected ${participants.length} got ${count})`,
@@ -142,6 +143,7 @@ export class KeyGenClient {
 			const encryptedShare = ecdh(peerShare, coefficients[0], peerCommitments[0]);
 			shares.push(encryptedShare);
 		}
+		// TODO: this should only happen if we are not part of the participant set, caller must check
 		if (shares.length !== participants.length - 1) {
 			throw new Error("Unexpect f length");
 		}
@@ -209,6 +211,7 @@ export class KeyGenClient {
 		peerShares: readonly bigint[],
 	): Promise<"invalid_share" | "pending_shares" | "shares_completed"> {
 		const participants = this.#storage.participants(groupId);
+		// TODO: caller verify that peerShares are correct length
 		if (peerShares.length !== participants.length - 1) {
 			throw new Error("Unexpect f length");
 		}
@@ -219,6 +222,7 @@ export class KeyGenClient {
 			return this.registerSecretShare(groupId, participantId, evalPoly(coefficients, participantId));
 		}
 		const shareIndex = participants.filter(({ id }) => id !== senderId).findIndex(({ id }) => id === participantId);
+		// TODO: caller verify that we are part of key geb
 		if (shareIndex < 0) throw new Error("Could not find self in participants");
 		const key = this.#storage.encryptionKey(groupId);
 		const commitments = this.#storage.commitments(groupId, senderId);

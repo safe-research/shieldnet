@@ -24,6 +24,7 @@ export class SigningClient {
 
 	generateNonceTree(groupId: GroupId): Hex {
 		const signingShare = this.#storage.signingShare(groupId);
+		// TODO: caller verify
 		if (signingShare === undefined) throw new Error(`No info for ${groupId}`);
 		const nonceTree = createNonceTree(signingShare);
 		const nonceTreeRoot = this.#storage.registerNonceTree(groupId, nonceTree);
@@ -47,9 +48,11 @@ export class SigningClient {
 		nonceCommitments: PublicNonceCommitments;
 		nonceProof: Hex[];
 	} {
+		// TODO: caller verify that threshold can be met
 		if (signers.length < this.#storage.threshold(groupId)) {
 			throw new Error("Not enough signers to start signing process");
 		}
+		// Check that signers are a subset of participants
 		const participantsSet = new Set(this.participants(groupId));
 		for (const signer of signers) {
 			if (!participantsSet.has(signer)) {
@@ -98,6 +101,7 @@ export class SigningClient {
 		const groupPublicKey = this.#storage.publicKey(groupId);
 		if (groupPublicKey === undefined) throw new Error(`Missing public key for group ${groupId}`);
 
+		// TODO: caller verify that this is only called if part of the group
 		const signingShare = this.#storage.signingShare(groupId);
 		if (signingShare === undefined) throw new Error(`Missing signing share for group ${groupId}`);
 
@@ -139,6 +143,7 @@ export class SigningClient {
 		// Calculate information specific to this signer
 		const nonceCommitments = nonceTree.commitments[Number(offset)];
 		if (nonceCommitments.bindingNonce === 0n && nonceCommitments.hidingNonce === 0n) {
+			// TODO: not an error, skip signing and log
 			throw new Error(`Nonces for sequence ${sequence} have been already burned`);
 		}
 		const signerPart = signerParts[signerIndex];

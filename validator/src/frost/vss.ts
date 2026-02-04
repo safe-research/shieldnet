@@ -48,5 +48,6 @@ export const verifyCommitments = (id: bigint, commitments: readonly FrostPoint[]
 	const ga0 = commitments[0];
 	const c = keyGenChallenge(id, ga0, proof.r);
 	const v = g(proof.mu).add(ga0.multiply(c).negate());
+	// TODO: change to boolean return type
 	if (!proof.r.equals(v)) throw new Error(`Invalid commitments for ${id}`);
 };

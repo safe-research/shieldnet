@@ -11,6 +11,7 @@ export const handleEpochStaged = async (
 	// An epoch was staged
 	// Ignore if not in "sign_rollover" state
 	if (machineStates.rollover.id !== "sign_rollover") {
+		// TODO: ignore
 		throw new Error(`Not expecting epoch staging during ${machineStates.rollover.id}!`);
 	}
 	// Check that signing state is waiting for attestation

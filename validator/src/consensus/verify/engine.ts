@@ -22,6 +22,7 @@ export class VerificationEngine {
 			throw new Error(`No handler registered for type ${packet.type}`);
 		}
 		// Throws if packet is invalid
+		// TODO: change return type to communicate if packet was invalid
 		const packetId = await handler.hashAndVerify(packet);
 		this.#verifiedMessages.add(packetId);
 		return packetId;

@@ -17,6 +17,7 @@ export const triggerKeyGen = (
 ): { groupId: GroupId; diff: StateDiff } => {
 	const requiredParticipants = calcMinimumParticipants(machineConfig);
 	if (participants.length < requiredParticipants) {
+		// TODO: skip
 		throw new Error(`Not enough participants! Expected at least ${requiredParticipants} got ${participants.length}`);
 	}
 	const { count, threshold } = calcGroupParameters(participants.length);

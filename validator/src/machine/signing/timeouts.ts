@@ -128,6 +128,7 @@ const checkSigningRequestTimeout = (
 					? status.packet.rollover.activeEpoch
 					: status.packet.proposal.epoch;
 			const groupInfo = consensusState.epochGroups[epoch.toString()];
+			// There should always be a group for a packet that was accepted before
 			if (groupInfo === undefined) {
 				throw new Error(`Unknown group for epoch ${epoch}`);
 			}
@@ -168,6 +169,7 @@ const checkSigningRequestTimeout = (
 					? status.packet.rollover.activeEpoch
 					: status.packet.proposal.epoch;
 			const groupInfo = consensusState.epochGroups[epoch.toString()];
+			// There should always be a group for a packet that was accepted before
 			if (groupInfo === undefined) {
 				throw new Error(`Unknown group for epoch ${epoch}`);
 			}

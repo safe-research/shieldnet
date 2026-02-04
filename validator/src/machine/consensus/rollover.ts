@@ -17,6 +17,10 @@ export const checkEpochRollover = (
 	let activeEpoch = consensusState.activeEpoch;
 	let stagedEpoch = consensusState.stagedEpoch;
 	if (stagedEpoch > 0n && stagedEpoch <= currentEpoch) {
+		if (machineStates.rollover.id !== "waiting_for_rollover") {
+			// TODO: refactor later, to monitor impact log the unexpected state
+			logger?.(`Unexpected rollover id ${machineStates.rollover.id}`);
+		}
 		logger?.(`Update active epoch from ${consensusState.activeEpoch} to ${consensusState.stagedEpoch}`);
 		// Update active epoch
 		activeEpoch = consensusState.stagedEpoch;
