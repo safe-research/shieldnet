@@ -1,6 +1,6 @@
 # Contracts
 
-This folder contains the smart contracts for Shieldnet.
+This folder contains the smart contracts for Safenet.
 
 ## Audits
 

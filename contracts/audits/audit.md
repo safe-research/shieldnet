@@ -13,4 +13,4 @@ There have been few bugfixes and gas optimization based changes.
 
 #### Files
 
-- [Shieldnet Staking Audit Report - Certora](./Safe%20Research%20-%20Certora%20-%20Shieldnet%20Staking%20-%20report%20v1%20-%20January%202026.pdf)
+- [Safenet Staking Audit Report - Certora](./Safe%20Research%20-%20Certora%20-%20Safenet%20Staking%20-%20report%20v1%20-%20January%202026.pdf)
