@@ -247,7 +247,7 @@ describe("integration", () => {
 		const expectedGroup = calcGroupId(
 			calculateParticipantsRoot([participants[0], participants[1], participants[3]]),
 			3,
-			3,
+			2,
 			calcGroupContext(consensus.address, proposedEpoch as bigint),
 		);
 		const expectedKey = await testClient.readContract({
