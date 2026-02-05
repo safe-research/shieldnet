@@ -17,7 +17,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { silentLogger, testLogger, testMetrics } from "../__tests__/config.js";
 import { waitForBlock, waitForBlocks } from "../__tests__/utils.js";
 import { toPoint } from "../frost/math.js";
-import { calcGroupContext } from "../machine/keygen/group.js";
+import { calcGenesisGroup, calcGroupContext } from "../machine/keygen/group.js";
 import type { WatcherConfig } from "../machine/transitions/watcher.js";
 import { createValidatorService, type ValidatorService } from "../service/service.js";
 import { CONSENSUS_EVENTS, COORDINATOR_EVENTS } from "../types/abis.js";
@@ -110,6 +110,7 @@ describe("integration", () => {
 				"function proposeTransaction((uint256 chainId, address account, address to, uint256 value, uint8 operation, bytes data, uint256 nonce) transaction) external",
 				"function getAttestation(uint64 epoch, (uint256 chainId, address account, address to, uint256 value, uint8 operation, bytes data, uint256 nonce) transaction) external view returns (bytes32 message, ((uint256 x, uint256 y) r, uint256 z) signature)",
 				"function getAttestationByMessage(bytes32 message) external view returns (((uint256 x, uint256 y) r, uint256 z) signature)",
+				"function getActiveEpoch() external view returns (uint64 epoch, bytes32 group)",
 			]),
 		} as const;
 		testLogger.notice(`Use consensus at ${consensus.address}`);
@@ -119,6 +120,7 @@ describe("integration", () => {
 			privateKeyToAccount("0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"),
 			privateKeyToAccount("0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a"),
 			privateKeyToAccount("0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6"),
+			privateKeyToAccount("0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a"),
 		];
 		const participants: Participant[] = accounts.map((a, i) => {
 			return { id: BigInt(i + 1), address: a.address };
@@ -156,6 +158,17 @@ describe("integration", () => {
 		// Store clients for cleanup
 		currentClients = clients;
 
+		const genesisGroup = calcGenesisGroup({
+			defaultParticipants: participants,
+			genesisSalt: zeroHash,
+		});
+		expect(
+			await testClient.readContract({
+				...consensus,
+				functionName: "getActiveEpoch",
+			}),
+		).toStrictEqual([0n, genesisGroup.id]);
+
 		for (const { service } of clients) {
 			await service.start();
 		}
@@ -165,7 +178,7 @@ describe("integration", () => {
 			await testClient.writeContract({
 				...coordinator,
 				functionName: "keyGen",
-				args: [calculateParticipantsRoot(participants), 3, 2, zeroHash],
+				args: [genesisGroup.participantsRoot, genesisGroup.count, genesisGroup.threshold, genesisGroup.context],
 			});
 		};
 
@@ -232,8 +245,8 @@ describe("integration", () => {
 		expect(proposedEpoch).toBeDefined();
 		// Calculate group id for reduced group
 		const expectedGroup = calcGroupId(
-			calculateParticipantsRoot([participants[0], participants[1]]),
-			2,
+			calculateParticipantsRoot([participants[0], participants[1], participants[3]]),
+			3,
 			2,
 			calcGroupContext(consensus.address, proposedEpoch as bigint),
 		);
@@ -297,8 +310,8 @@ describe("integration", () => {
 		// Calculate group id with original group
 		const expectedGroup = calcGroupId(
 			calculateParticipantsRoot(participants),
+			4,
 			3,
-			2,
 			calcGroupContext(consensus.address, proposedEpoch),
 		);
 		const expectedKey = await testClient.readContract({

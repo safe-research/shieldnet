@@ -7,7 +7,7 @@ import {FROSTCoordinator} from "@/FROSTCoordinator.sol";
 import {Consensus} from "@/Consensus.sol";
 
 contract DeployScript is Script {
-    bytes32 constant DEFAULT_GROUP_ID = 0xfa3efbc5dd215abad66149ad58d7869f90cf6d2c1bc472be0000000000000000;
+    bytes32 constant DEFAULT_GROUP_ID = 0xf4629588d4dce84006253785de150dbedb2f46ce41c1e06c0000000000000000;
 
     // The canonical Create2 factory address used by Foundry by default
     address constant DETERMINISTIC_FACTORY = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
