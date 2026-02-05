@@ -7,7 +7,7 @@ import {ConsensusMessages} from "@/libraries/ConsensusMessages.sol";
 import {FROST} from "@/libraries/FROST.sol";
 import {FROSTGroupId} from "@/libraries/FROSTGroupId.sol";
 import {FROSTSignatureId} from "@/libraries/FROSTSignatureId.sol";
-import {MetaTransaction} from "@/libraries/MetaTransaction.sol";
+import {SafeTransaction} from "@/libraries/SafeTransaction.sol";
 import {Secp256k1} from "@/libraries/Secp256k1.sol";
 
 /**
@@ -17,7 +17,7 @@ import {Secp256k1} from "@/libraries/Secp256k1.sol";
 contract Consensus is IFROSTCoordinatorCallback {
     using ConsensusMessages for bytes32;
     using FROSTSignatureId for FROSTSignatureId.T;
-    using MetaTransaction for MetaTransaction.T;
+    using SafeTransaction for SafeTransaction.T;
 
     // ============================================================
     // STRUCTS
@@ -113,7 +113,7 @@ contract Consensus is IFROSTCoordinatorCallback {
      * @param transaction The proposed meta-transaction.
      */
     event TransactionProposed(
-        bytes32 indexed message, bytes32 indexed transactionHash, uint64 epoch, MetaTransaction.T transaction
+        bytes32 indexed message, bytes32 indexed transactionHash, uint64 epoch, SafeTransaction.T transaction
     );
 
     /**
@@ -190,7 +190,7 @@ contract Consensus is IFROSTCoordinatorCallback {
      * @return message The EIP-712 message hash of the proposal.
      * @return signature The FROST signature attesting to the transaction.
      */
-    function getAttestation(uint64 epoch, MetaTransaction.T memory transaction)
+    function getAttestation(uint64 epoch, SafeTransaction.T memory transaction)
         external
         view
         returns (bytes32 message, FROST.Signature memory signature)
@@ -217,7 +217,7 @@ contract Consensus is IFROSTCoordinatorCallback {
      *      provided as a convenience method to clients who may want to query an attestation for a transaction they
      *      recently proposed for validator approval.
      */
-    function getRecentAttestation(MetaTransaction.T memory transaction)
+    function getRecentAttestation(SafeTransaction.T memory transaction)
         external
         view
         returns (bytes32 message, FROST.Signature memory signature)
@@ -330,7 +330,7 @@ contract Consensus is IFROSTCoordinatorCallback {
      * @param transaction The meta-transaction to propose.
      * @return message The EIP-712 message hash of the proposal.
      */
-    function proposeTransaction(MetaTransaction.T memory transaction) external returns (bytes32 message) {
+    function proposeTransaction(SafeTransaction.T memory transaction) external returns (bytes32 message) {
         Epochs memory epochs = _processRollover();
         bytes32 transactionHash = transaction.hash();
         message = domainSeparator().transactionProposal(epochs.active, transactionHash);
