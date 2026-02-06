@@ -187,6 +187,10 @@ const txStorageSchema = z
 	})
 	.array();
 
+const maxNonceSchema = z.object({
+	maxNonce: z.union([z.number(), z.null()]),
+});
+
 export class SqliteTxStorage implements TransactionStorage {
 	#db: Database;
 	constructor(database: Database) {
@@ -221,6 +225,25 @@ export class SqliteTxStorage implements TransactionStorage {
 		return Number(result.lastInsertRowid);
 	}
 
+	delete(nonce: number): void {
+		const updateStmt = this.#db.prepare(`
+			DELETE FROM transaction_storage
+			WHERE nonce = ?;
+		`);
+		updateStmt.run(nonce);
+	}
+
+	maxNonce(): number | null {
+		const result = this.#db
+			.prepare(`
+			SELECT MAX(nonce) as maxNonce
+			FROM transaction_storage;
+		`)
+			.get();
+
+		return maxNonceSchema.parse(result).maxNonce;
+	}
+
 	setFees(nonce: number, fees: FeeValues) {
 		const feesJson = JSON.stringify(fees, jsonReplacer);
 		const updateStmt = this.#db.prepare(`
@@ -250,12 +273,15 @@ export class SqliteTxStorage implements TransactionStorage {
 		return result.changes;
 	}
 
-	submittedUpTo(blockNumber: bigint): (EthTransactionData & EthTransactionDetails)[] {
+	submittedUpTo(blockNumber: bigint, offset = 0, limit = 100): (EthTransactionData & EthTransactionDetails)[] {
 		const pendingTxsStmt = this.#db.prepare(`
 			SELECT nonce, transactionJson, transactionHash, feesJson FROM transaction_storage 
-			WHERE submittedAt <= ?;
+			WHERE submittedAt <= ?
+			ORDER BY nonce ASC
+			LIMIT ?
+			OFFSET ?;
 		`);
-		const pendingTxsResult = pendingTxsStmt.all(blockNumber);
+		const pendingTxsResult = pendingTxsStmt.all(blockNumber, limit, offset);
 		const pendingTxs = txStorageSchema.parse(pendingTxsResult);
 		return pendingTxs.map((tx) => {
 			return {
@@ -268,11 +294,8 @@ export class SqliteTxStorage implements TransactionStorage {
 	}
 
 	setExecuted(nonce: number): void {
-		const updateStmt = this.#db.prepare(`
-			DELETE FROM transaction_storage
-			WHERE nonce = ?;
-		`);
-		updateStmt.run(nonce);
+		// Executed txs are delete to avoid the database from growing
+		this.delete(nonce);
 	}
 
 	setAllBeforeAsExecuted(nonce: number): number {
