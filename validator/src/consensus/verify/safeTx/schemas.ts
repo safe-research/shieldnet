@@ -1,20 +1,22 @@
 import z from "zod";
 import { checkedAddressSchema, hexDataSchema } from "../../../types/schemas.js";
 
-const safeMetaTransactionSchema = z.object({
+const safeTxSchema = z.object({
 	to: checkedAddressSchema,
 	value: z.bigint().nonnegative(),
 	data: hexDataSchema,
 	operation: z.union([z.literal(0), z.literal(1)]),
-});
-
-const partialSafeTransactionSchema = safeMetaTransactionSchema.extend({
+	safeTxGas: z.bigint().nonnegative(),
+	baseGas: z.bigint().nonnegative(),
+	gasPrice: z.bigint().nonnegative(),
+	gasToken: checkedAddressSchema,
+	refundReceiver: checkedAddressSchema,
 	nonce: z.bigint().nonnegative(),
 });
 
-export const safeTransactionSchema = partialSafeTransactionSchema.extend({
+export const safeTransactionSchema = safeTxSchema.extend({
 	chainId: z.bigint().nonnegative(),
-	account: checkedAddressSchema,
+	safe: checkedAddressSchema,
 });
 
 const transactionProposalSchema = z.object({
@@ -33,6 +35,6 @@ export const safeTransactionPacketSchema = z.object({
 	proposal: transactionProposalSchema,
 });
 
-export type MetaTransaction = z.infer<typeof safeTransactionSchema>;
+export type SafeTransaction = z.infer<typeof safeTransactionSchema>;
 
 export type SafeTransactionPacket = z.infer<typeof safeTransactionPacketSchema>;
