@@ -309,7 +309,6 @@ describe("key gen confirmed", () => {
 			groupId: "0x06cb03baac74421225341827941e88d9547e5459c4b3715c0000000000000000",
 			nextEpoch: 10n,
 			message: keccak256("0x5afe01020304"),
-			responsible: 2n,
 		};
 		expect(diff).toStrictEqual({
 			rollover,

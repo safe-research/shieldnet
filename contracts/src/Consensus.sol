@@ -269,8 +269,8 @@ contract Consensus is IFROSTCoordinatorCallback {
     /**
      * @notice Gets the group info for a specific epoch
      * @param epoch The epoch for which the group should be retrieved
-     * @return group The FROST group ID for the active epoch.
-     * @return groupKey The FROST group ID for the active epoch.
+     * @return group The FROST group ID for the specified epoch.
+     * @return groupKey The public key for the specified epoch's group.
      */
     function getEpochGroup(uint64 epoch) external view returns (FROSTGroupId.T group, Secp256k1.Point memory groupKey) {
         group = $groups[epoch];

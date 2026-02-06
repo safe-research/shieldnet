@@ -6,6 +6,8 @@
  */
 
 import { BlockNotFoundError, type Hex, type Prettify, type PublicClient, type Block as ViemBlock } from "viem";
+import { withDefaults } from "../utils/config.js";
+import { maxBigInt } from "../utils/math.js";
 
 export type Client = Pick<PublicClient, "getBlock">;
 export type Timer = {
@@ -84,7 +86,7 @@ export class BlockWatcher {
 
 	async #initialize(lastIndexedBlock: bigint | null): Promise<void> {
 		const latest = await this.#client.getBlock({ blockTag: "latest" });
-		const safe = bmax(latest.number - BigInt(this.#config.maxReorgDepth), 0n);
+		const safe = maxBigInt(latest.number - BigInt(this.#config.maxReorgDepth), 0n);
 
 		this.#updateNextPendingBlock(latest);
 
@@ -93,7 +95,7 @@ export class BlockWatcher {
 			// was restarted, we always need to create a "fake" reorg `maxReorgDepth` deep in order
 			// to re-index the last blocks before the service shutdown. Queue a block update for
 			// uncling the block right after the last safe indexed block.
-			const uncle = bmax(lastIndexedBlock - BigInt(this.#config.maxReorgDepth - 1), 0n);
+			const uncle = maxBigInt(lastIndexedBlock - BigInt(this.#config.maxReorgDepth - 1), 0n);
 			if (uncle <= lastIndexedBlock) {
 				this.#queue.push({ type: "watcher_update_uncle_block", blockNumber: uncle });
 			}
@@ -256,13 +258,8 @@ export class BlockWatcher {
 	 * Create a new block watcher with the specified paramters.
 	 */
 	static async create({ client, lastIndexedBlock, ...config }: CreateParams) {
-		const self = new BlockWatcher(client, {
-			...DEFAULT_OPTIONS,
-			...config,
-		});
+		const self = new BlockWatcher(client, withDefaults(config, DEFAULT_OPTIONS));
 		await self.#initialize(lastIndexedBlock);
 		return self;
 	}
 }
-
-const bmax = (a: bigint, b: bigint): bigint => (a > b ? a : b);
