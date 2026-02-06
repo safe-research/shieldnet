@@ -39,11 +39,13 @@ export type EthTransactionDetails = { nonce: number; fees: FeeValues | null; has
 
 export interface TransactionStorage {
 	register(tx: EthTransactionData, minNonce: number): number;
+	delete(nonce: number): void;
 	setFees(nonce: number, fees: FeeValues): void;
 	setHash(nonce: number, txHash: Hex): void;
 	setExecuted(nonce: number): void;
 	setAllBeforeAsExecuted(nonce: number): number;
 	setSubmittedForPending(blockNumber: bigint): number;
+	maxNonce(): number | null;
 	submittedUpTo(blockNumber: bigint): (EthTransactionData & EthTransactionDetails)[];
 }
 
@@ -197,7 +199,7 @@ export class OnchainProtocol extends BaseProtocol {
 		return txHash;
 	}
 
-	private async submitAction(action: SimulateContractParameters): Promise<Hex> {
+	private async submitAction(action: SimulateContractParameters): Promise<Hex | null> {
 		// 1. Get Network Baseline (The "Minimum Nonce")
 		// We use 'pending' to capture what the node knows about the mempool
 		const onChainNonce = await this.#publicClient.getTransactionCount({
@@ -219,6 +221,17 @@ export class OnchainProtocol extends BaseProtocol {
 			...txData,
 			nonce,
 			fees: null,
+		}).catch((e) => {
+			// Check if this tx is still the latest, if so delete it and throw error
+			// Retrying should happen on action level, which allows timeouts to apply
+			if (nonce === this.#txStorage.maxNonce()) {
+				this.#txStorage.delete(nonce);
+				throw e;
+			}
+			// If another action was already submitted it is important to prevent potential unused nonces
+			// In this case the transaction is kept and retried until executed (to use up the nonce)
+			// No error is thrown to avoid that the action is retried.
+			return null;
 		});
 	}
 
@@ -231,7 +244,7 @@ export class OnchainProtocol extends BaseProtocol {
 		commitments,
 		pok,
 		poap,
-	}: StartKeyGen): Promise<Hex> {
+	}: StartKeyGen): Promise<Hex | null> {
 		return this.submitAction({
 			address: this.#coordinator,
 			abi: COORDINATOR_FUNCTIONS,
@@ -253,7 +266,11 @@ export class OnchainProtocol extends BaseProtocol {
 		});
 	}
 
-	protected publishKeygenSecretShares({ groupId, verificationShare, shares }: PublishSecretShares): Promise<Hex> {
+	protected publishKeygenSecretShares({
+		groupId,
+		verificationShare,
+		shares,
+	}: PublishSecretShares): Promise<Hex | null> {
 		return this.submitAction({
 			address: this.#coordinator,
 			abi: COORDINATOR_FUNCTIONS,
@@ -269,7 +286,7 @@ export class OnchainProtocol extends BaseProtocol {
 		});
 	}
 
-	private confirmKeyGenWithCallback(groupId: GroupId, callbackContext: Hex): Promise<Hex> {
+	private confirmKeyGenWithCallback(groupId: GroupId, callbackContext: Hex): Promise<Hex | null> {
 		return this.submitAction({
 			address: this.#coordinator,
 			abi: COORDINATOR_FUNCTIONS,
@@ -285,7 +302,7 @@ export class OnchainProtocol extends BaseProtocol {
 		});
 	}
 
-	protected complain({ groupId, accused }: Complain): Promise<Hex> {
+	protected complain({ groupId, accused }: Complain): Promise<Hex | null> {
 		return this.submitAction({
 			address: this.#coordinator,
 			abi: COORDINATOR_FUNCTIONS,
@@ -295,7 +312,7 @@ export class OnchainProtocol extends BaseProtocol {
 		});
 	}
 
-	protected complaintResponse({ groupId, plaintiff, secretShare }: ComplaintResponse): Promise<Hex> {
+	protected complaintResponse({ groupId, plaintiff, secretShare }: ComplaintResponse): Promise<Hex | null> {
 		return this.submitAction({
 			address: this.#coordinator,
 			abi: COORDINATOR_FUNCTIONS,
@@ -305,7 +322,7 @@ export class OnchainProtocol extends BaseProtocol {
 		});
 	}
 
-	protected confirmKeyGen({ groupId, callbackContext }: ConfirmKeyGen): Promise<Hex> {
+	protected confirmKeyGen({ groupId, callbackContext }: ConfirmKeyGen): Promise<Hex | null> {
 		if (callbackContext !== undefined) {
 			return this.confirmKeyGenWithCallback(groupId, callbackContext);
 		}
@@ -318,7 +335,7 @@ export class OnchainProtocol extends BaseProtocol {
 		});
 	}
 
-	protected requestSignature({ groupId, message }: RequestSignature): Promise<Hex> {
+	protected requestSignature({ groupId, message }: RequestSignature): Promise<Hex | null> {
 		return this.submitAction({
 			address: this.#coordinator,
 			abi: COORDINATOR_FUNCTIONS,
@@ -328,7 +345,7 @@ export class OnchainProtocol extends BaseProtocol {
 		});
 	}
 
-	protected registerNonceCommitments({ groupId, nonceCommitmentsHash }: RegisterNonceCommitments): Promise<Hex> {
+	protected registerNonceCommitments({ groupId, nonceCommitmentsHash }: RegisterNonceCommitments): Promise<Hex | null> {
 		return this.submitAction({
 			address: this.#coordinator,
 			abi: COORDINATOR_FUNCTIONS,
@@ -342,7 +359,7 @@ export class OnchainProtocol extends BaseProtocol {
 		signatureId,
 		nonceCommitments,
 		nonceProof,
-	}: RevealNonceCommitments): Promise<Hex> {
+	}: RevealNonceCommitments): Promise<Hex | null> {
 		return this.submitAction({
 			address: this.#coordinator,
 			abi: COORDINATOR_FUNCTIONS,
@@ -368,7 +385,7 @@ export class OnchainProtocol extends BaseProtocol {
 		signatureShare: bigint,
 		lagrangeCoefficient: bigint,
 		callbackContext: Hex,
-	): Promise<Hex> {
+	): Promise<Hex | null> {
 		return this.submitAction({
 			address: this.#coordinator,
 			abi: COORDINATOR_FUNCTIONS,
@@ -403,7 +420,7 @@ export class OnchainProtocol extends BaseProtocol {
 		signatureShare,
 		lagrangeCoefficient,
 		callbackContext,
-	}: PublishSignatureShare): Promise<Hex> {
+	}: PublishSignatureShare): Promise<Hex | null> {
 		if (callbackContext !== undefined) {
 			return this.publishSignatureShareWithCallback(
 				signatureId,
@@ -437,7 +454,7 @@ export class OnchainProtocol extends BaseProtocol {
 		});
 	}
 
-	protected attestTransaction({ epoch, transactionHash, signatureId }: AttestTransaction): Promise<Hex> {
+	protected attestTransaction({ epoch, transactionHash, signatureId }: AttestTransaction): Promise<Hex | null> {
 		return this.submitAction({
 			address: this.#consensus,
 			abi: CONSENSUS_FUNCTIONS,
@@ -447,7 +464,7 @@ export class OnchainProtocol extends BaseProtocol {
 		});
 	}
 
-	protected stageEpoch({ proposedEpoch, rolloverBlock, groupId, signatureId }: StageEpoch): Promise<Hex> {
+	protected stageEpoch({ proposedEpoch, rolloverBlock, groupId, signatureId }: StageEpoch): Promise<Hex | null> {
 		return this.submitAction({
 			address: this.#consensus,
 			abi: CONSENSUS_FUNCTIONS,

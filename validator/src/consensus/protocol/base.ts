@@ -76,7 +76,7 @@ export abstract class BaseProtocol implements ShieldnetProtocol {
 			});
 	}
 
-	private async performAction(action: ProtocolAction): Promise<Hex> {
+	private async performAction(action: ProtocolAction): Promise<Hex | null> {
 		switch (action.id) {
 			case "key_gen_start":
 				return await this.startKeyGen(action);
@@ -102,25 +102,25 @@ export abstract class BaseProtocol implements ShieldnetProtocol {
 				return await this.stageEpoch(action);
 		}
 	}
-	protected abstract startKeyGen(args: StartKeyGen): Promise<Hex>;
+	protected abstract startKeyGen(args: StartKeyGen): Promise<Hex | null>;
 
-	protected abstract publishKeygenSecretShares(args: PublishSecretShares): Promise<Hex>;
+	protected abstract publishKeygenSecretShares(args: PublishSecretShares): Promise<Hex | null>;
 
-	protected abstract complain(args: Complain): Promise<Hex>;
+	protected abstract complain(args: Complain): Promise<Hex | null>;
 
-	protected abstract complaintResponse(args: ComplaintResponse): Promise<Hex>;
+	protected abstract complaintResponse(args: ComplaintResponse): Promise<Hex | null>;
 
-	protected abstract confirmKeyGen(args: ConfirmKeyGen): Promise<Hex>;
+	protected abstract confirmKeyGen(args: ConfirmKeyGen): Promise<Hex | null>;
 
-	protected abstract requestSignature(args: RequestSignature): Promise<Hex>;
+	protected abstract requestSignature(args: RequestSignature): Promise<Hex | null>;
 
-	protected abstract registerNonceCommitments(args: RegisterNonceCommitments): Promise<Hex>;
+	protected abstract registerNonceCommitments(args: RegisterNonceCommitments): Promise<Hex | null>;
 
-	protected abstract revealNonceCommitments(args: RevealNonceCommitments): Promise<Hex>;
+	protected abstract revealNonceCommitments(args: RevealNonceCommitments): Promise<Hex | null>;
 
-	protected abstract publishSignatureShare(args: PublishSignatureShare): Promise<Hex>;
+	protected abstract publishSignatureShare(args: PublishSignatureShare): Promise<Hex | null>;
 
-	protected abstract attestTransaction(args: AttestTransaction): Promise<Hex>;
+	protected abstract attestTransaction(args: AttestTransaction): Promise<Hex | null>;
 
-	protected abstract stageEpoch(args: StageEpoch): Promise<Hex>;
+	protected abstract stageEpoch(args: StageEpoch): Promise<Hex | null>;
 }

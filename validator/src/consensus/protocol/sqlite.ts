@@ -187,6 +187,10 @@ const txStorageSchema = z
 	})
 	.array();
 
+const maxNonceSchema = z.object({
+	maxNonce: z.union([z.number(), z.null()]),
+});
+
 export class SqliteTxStorage implements TransactionStorage {
 	#db: Database;
 	constructor(database: Database) {
@@ -219,6 +223,29 @@ export class SqliteTxStorage implements TransactionStorage {
 				transactionJson,
 			});
 		return Number(result.lastInsertRowid);
+	}
+
+	delete(nonce: number): void {
+		const updateStmt = this.#db.prepare(`
+			DELETE FROM transaction_storage
+			WHERE nonce = ?;
+		`);
+		updateStmt.run(nonce);
+	}
+
+	maxNonce(): number | null {
+		const result = this.#db
+			.prepare(`
+			SELECT MAX(nonce) as maxNonce
+			FROM transaction_storage;
+		`)
+			.get();
+
+		if (!result) {
+			return null; // No transactions stored
+		}
+
+		return maxNonceSchema.parse(result).maxNonce;
 	}
 
 	setFees(nonce: number, fees: FeeValues) {
@@ -268,11 +295,8 @@ export class SqliteTxStorage implements TransactionStorage {
 	}
 
 	setExecuted(nonce: number): void {
-		const updateStmt = this.#db.prepare(`
-			DELETE FROM transaction_storage
-			WHERE nonce = ?;
-		`);
-		updateStmt.run(nonce);
+		// Executed txs are delete to avoid the database from growing
+		this.delete(nonce);
 	}
 
 	setAllBeforeAsExecuted(nonce: number): number {
