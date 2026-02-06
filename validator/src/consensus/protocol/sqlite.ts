@@ -241,10 +241,6 @@ export class SqliteTxStorage implements TransactionStorage {
 		`)
 			.get();
 
-		if (!result) {
-			return null; // No transactions stored
-		}
-
 		return maxNonceSchema.parse(result).maxNonce;
 	}
 
