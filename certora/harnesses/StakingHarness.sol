@@ -70,8 +70,7 @@ contract StakingHarness is Staking {
                 currentId = nodes[currentId].next;
             }
             currentId = queue.tail;
-            for (uint256 i = 0; i < count; i++) {
-                uint256 j = count - i - 1;
+            for (uint256 i = count - 1; i >= 0; i--) {
                 if (withdrawalIds[i] != currentId) {
                     return false;
                 }
@@ -108,7 +107,7 @@ contract StakingHarness is Staking {
     function isPendingWithdrawalsTimestampIncreasing(address staker) public view returns (bool) {
         WithdrawalInfo[] memory pendingWithdrawals = this.getPendingWithdrawals(staker);
         for (uint256 i = 1; i < pendingWithdrawals.length; i++) {
-            if (pendingWithdrawals[i - 1].claimableAt >= pendingWithdrawals[i].claimableAt) {
+            if (pendingWithdrawals[i - 1].claimableAt > pendingWithdrawals[i].claimableAt) {
                 return false;
             }
         }
