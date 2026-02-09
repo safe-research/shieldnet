@@ -661,10 +661,16 @@ contract FROSTCoordinator {
      * @param gid The group ID.
      * @param message The message that was signed.
      */
-    function signatureVerify(FROSTSignatureId.T sid, FROSTGroupId.T gid, bytes32 message) external view {
+    function signatureVerify(FROSTSignatureId.T sid, FROSTGroupId.T gid, bytes32 message)
+        external
+        view
+        returns (FROST.Signature memory result)
+    {
         Signature storage signature = $signatures[sid];
-        require(signature.signed != bytes32(0), NotSigned());
+        bytes32 signed = signature.signed;
+        require(signed != bytes32(0), NotSigned());
         require(gid.eq(sid.group()) && message == signature.message, WrongSignature());
+        return $signatures[sid].shares.groupSignature(signed);
     }
 
     /**
