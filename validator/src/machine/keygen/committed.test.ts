@@ -98,6 +98,30 @@ describe("key gen committed", () => {
 		expect(participantId).toBeCalledWith("0x06cb03baac74421225341827941e88d9547e5459c4b3715c0000000000000000");
 	});
 
+	it("should not update state if invalid commitment", async () => {
+		const participantId = vi.fn();
+		const handleKeygenCommitment = vi.fn().mockReturnValueOnce(false);
+		const keyGenClient = {
+			handleKeygenCommitment,
+			participantId,
+		} as unknown as KeyGenClient;
+		const diff = await handleKeyGenCommitted(MACHINE_CONFIG, keyGenClient, MACHINE_STATES, EVENT);
+
+		expect(diff).toStrictEqual({});
+		expect(participantId).toBeCalledTimes(1);
+		expect(participantId).toBeCalledWith("0x06cb03baac74421225341827941e88d9547e5459c4b3715c0000000000000000");
+		expect(handleKeygenCommitment).toBeCalledTimes(1);
+		expect(handleKeygenCommitment).toBeCalledWith(
+			"0x06cb03baac74421225341827941e88d9547e5459c4b3715c0000000000000000",
+			2n,
+			[TEST_POINT, TEST_POINT, TEST_POINT],
+			{
+				r: TEST_POINT,
+				mu: 0x5afen,
+			},
+		);
+	});
+
 	it("should not update state if not fully committed", async () => {
 		const event: KeyGenCommittedEvent = {
 			...EVENT,
@@ -128,7 +152,7 @@ describe("key gen committed", () => {
 
 	it("should publish secret shares once fully committed", async () => {
 		const participantId = vi.fn();
-		const handleKeygenCommitment = vi.fn();
+		const handleKeygenCommitment = vi.fn().mockReturnValueOnce(true);
 		const createSecretShares = vi.fn();
 		createSecretShares.mockReturnValueOnce({
 			verificationShare: TEST_POINT,

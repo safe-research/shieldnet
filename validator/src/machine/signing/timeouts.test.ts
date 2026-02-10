@@ -525,8 +525,6 @@ describe("signing timeouts - waiting for request", () => {
 	});
 
 	it("should timeout with actions when I am responsible (epoch rollover)", async () => {
-		// TODO: this state makes no sense, when I am responsible then I need to remove myself from the signers,
-		// because I fucked up before
 		const threshold = vi.fn().mockReturnValueOnce(2);
 		const signingClient = {
 			threshold,
@@ -708,8 +706,6 @@ describe("signing timeouts - waiting for request", () => {
 	});
 
 	it("should timeout with actions when I am responsible (transaction attestation)", async () => {
-		// TODO: this state makes no sense, when I am responsible then I need to remove myself from the signers,
-		// because I fucked up before
 		const threshold = vi.fn().mockReturnValueOnce(2);
 		const signingClient = {
 			threshold,

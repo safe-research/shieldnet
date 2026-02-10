@@ -109,9 +109,9 @@ export class KeyGenClient {
 		peerCommitments: readonly FrostPoint[],
 		pok: ProofOfKnowledge,
 	): boolean {
-		verifyCommitments(senderId, peerCommitments, pok);
+		if (!verifyCommitments(senderId, peerCommitments, pok)) return false;
 		this.#storage.registerCommitments(groupId, senderId, peerCommitments);
-		return this.#storage.checkIfCommitmentsComplete(groupId);
+		return true;
 	}
 
 	// Round 2.1

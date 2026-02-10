@@ -99,7 +99,6 @@ export class SigningClient {
 		const groupPublicKey = this.#storage.publicKey(groupId);
 		if (groupPublicKey === undefined) throw new Error(`Missing public key for group ${groupId}`);
 
-		// TODO: caller verify that this is only called if part of the group
 		const signingShare = this.#storage.signingShare(groupId);
 		if (signingShare === undefined) throw new Error(`Missing signing share for group ${groupId}`);
 
@@ -141,7 +140,6 @@ export class SigningClient {
 		// Calculate information specific to this signer
 		const nonceCommitments = nonceTree.commitments[Number(offset)];
 		if (nonceCommitments.bindingNonce === 0n && nonceCommitments.hidingNonce === 0n) {
-			// TODO: not an error, skip signing and log
 			throw new Error(`Nonces for sequence ${sequence} have been already burned`);
 		}
 		const signerPart = signerParts[signerIndex];

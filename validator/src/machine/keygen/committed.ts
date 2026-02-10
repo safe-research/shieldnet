@@ -25,11 +25,16 @@ export const handleKeyGenCommitted = async (
 		return {};
 	}
 
-	// TODO: handle bad commitments -> Remove participant
-	keyGenClient.handleKeygenCommitment(event.gid, event.identifier, event.commitment.c, {
-		r: event.commitment.r,
-		mu: event.commitment.mu,
-	});
+	if (
+		!keyGenClient.handleKeygenCommitment(event.gid, event.identifier, event.commitment.c, {
+			r: event.commitment.r,
+			mu: event.commitment.mu,
+		})
+	) {
+		logger?.(`Invalid key gen commitment from participant ${event.identifier}`);
+		// No state changes for invalid key gen commitments, participant will be removed on timeout
+		return {};
+	}
 	logger?.(`Registered key gen commitment for participant ${event.identifier}`);
 	if (!event.committed) {
 		return {};
