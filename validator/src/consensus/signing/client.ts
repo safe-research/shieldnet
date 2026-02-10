@@ -174,6 +174,10 @@ export class SigningClient {
 		return this.#storage.signers(signatureId);
 	}
 
+	signingGroup(signatureId: SignatureId): GroupId {
+		return this.#storage.signingGroup(signatureId);
+	}
+
 	participants(groupId: GroupId): ParticipantId[] {
 		return this.#storage.participants(groupId).map((p) => p.id);
 	}
@@ -191,25 +195,11 @@ export class SigningClient {
 		}
 	}
 
-	signingGroup(signatureId: SignatureId): GroupId {
-		return this.#storage.signingGroup(signatureId);
-	}
-
-	message(signatureId: SignatureId): Hex {
-		return this.#storage.message(signatureId);
-	}
-
-	threshold(signatureId: SignatureId): number {
-		const groupId = this.#storage.signingGroup(signatureId);
+	threshold(groupId: GroupId): number {
 		return this.#storage.threshold(groupId);
 	}
 
-	requiredShareCount(signatureId: SignatureId): bigint {
-		return BigInt(this.signers(signatureId).length);
-	}
-
-	participantId(signatureId: SignatureId): bigint {
-		const groupId = this.#storage.signingGroup(signatureId);
+	participantId(groupId: GroupId): bigint {
 		return this.#storage.participantId(groupId);
 	}
 }

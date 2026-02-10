@@ -69,7 +69,9 @@ const checkSigningRequestTimeout = (
 				];
 			}
 			const signatureId = status.signatureId;
-			const act = everyoneResponsible || status.responsible === signingClient.participantId(signatureId);
+			const act =
+				everyoneResponsible ||
+				status.responsible === signingClient.participantId(signingClient.signingGroup(signatureId));
 			if (!act) {
 				return stateDiff;
 			}
@@ -105,9 +107,22 @@ const checkSigningRequestTimeout = (
 		}
 		case "waiting_for_request": {
 			const signers = status.signers.filter((id) => id !== status.responsible);
+			const epoch =
+				status.packet.type === "epoch_rollover_packet"
+					? status.packet.rollover.activeEpoch
+					: status.packet.proposal.epoch;
+			const groupInfo = consensusState.epochGroups[epoch.toString()];
+			if (groupInfo === undefined || signers.length < signingClient.threshold(groupInfo.groupId)) {
+				// There are not enough signers, or group is not known, so the request is dropped
+				return {
+					...stateDiff,
+					signing: [message, undefined],
+				};
+			}
+			const { groupId, participantId } = groupInfo;
 			const everyoneResponsible = status.responsible === undefined;
 			if (everyoneResponsible) {
-				// Everyone is responsible or there are not enough signers
+				// Everyone is responsible
 				// Signature request will be re-added once it is submitted
 				// and no more state needs to be tracked
 				// if the deadline is hit again this would be a critical failure
@@ -124,16 +139,6 @@ const checkSigningRequestTimeout = (
 					},
 				];
 			}
-			const epoch =
-				status.packet.type === "epoch_rollover_packet"
-					? status.packet.rollover.activeEpoch
-					: status.packet.proposal.epoch;
-			const groupInfo = consensusState.epochGroups[epoch.toString()];
-			// There should always be a group for a packet that was accepted before
-			if (groupInfo === undefined) {
-				throw new Error(`Unknown group for epoch ${epoch}`);
-			}
-			const { groupId, participantId } = groupInfo;
 			const act = everyoneResponsible || status.responsible === participantId;
 			if (!act) {
 				return stateDiff;
@@ -156,22 +161,12 @@ const checkSigningRequestTimeout = (
 				signatureIdToMessage: [status.signatureId, undefined],
 			};
 			// Get participants that did not participate
-			const currentSigners = signingClient.signers(status.signatureId)
+			const currentSigners = signingClient.signers(status.signatureId);
 			const missingParticipants =
 				status.id === "collect_nonce_commitments"
 					? signingClient.missingNonces(status.signatureId)
 					: currentSigners.filter((s) => status.sharesFrom.indexOf(s) < 0);
 			logger?.("Removing signers for not participating", { missingParticipants });
-			// For retry of remove inactive signers from current signers set
-			const signers = currentSigners
-				.filter((pid) => missingParticipants.indexOf(pid) < 0);
-			if (signers.length < signingClient.threshold(status.signatureId)) {
-				// Not enough signers to handle the message, remove request
-				return {
-					...stateDiff,
-					signing: [message, undefined]
-				};
-			}
 			const epoch =
 				status.packet.type === "epoch_rollover_packet"
 					? status.packet.rollover.activeEpoch
@@ -182,6 +177,15 @@ const checkSigningRequestTimeout = (
 				throw new Error(`Unknown group for epoch ${epoch}`);
 			}
 			const { groupId } = groupInfo;
+			// For retry of remove inactive signers from current signers set
+			const signers = currentSigners.filter((pid) => missingParticipants.indexOf(pid) < 0);
+			if (signers.length < signingClient.threshold(groupId)) {
+				// Not enough signers to handle the message, remove request
+				return {
+					...stateDiff,
+					signing: [message, undefined],
+				};
+			}
 			stateDiff.signing = [
 				message,
 				{
@@ -192,7 +196,7 @@ const checkSigningRequestTimeout = (
 					packet: status.packet,
 				},
 			];
-			if (status.lastSigner !== signingClient.participantId(status.signatureId)) {
+			if (status.lastSigner !== signingClient.participantId(groupId)) {
 				return stateDiff;
 			}
 			return {
