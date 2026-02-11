@@ -91,6 +91,8 @@
 | tx | Transaction |
 | SEC | Standards for Efficient Cryptography |
 | SHA | Secure Hash Algorithm |
+| BFT | Byzantine Fault Tolerance |
+| CFT | Crash Fault Tolerance |
 
 ## Security Terms
 
@@ -103,6 +105,7 @@
 | **Collusion** | When $t$ or more participants cooperate to compromise security |
 | **Key Recovery** | Extracting private key from signatures (possible with nonce reuse) |
 | **Denial of Service** | Preventing protocol completion by refusing to participate |
+| **Shrinking Quorum Attack** | Ensuring that the quorum cannot shrink to the point that malicious parties have control over consensus |
 
 ## External References (To Be Moved)
 
