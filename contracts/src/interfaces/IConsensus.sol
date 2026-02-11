@@ -6,7 +6,6 @@ import {FROST} from "@/libraries/FROST.sol";
 import {FROSTGroupId} from "@/libraries/FROSTGroupId.sol";
 import {FROSTSignatureId} from "@/libraries/FROSTSignatureId.sol";
 import {SafeTransaction} from "@/libraries/SafeTransaction.sol";
-import {Secp256k1} from "@/libraries/Secp256k1.sol";
 import {IERC165} from "@/interfaces/IERC165.sol";
 
 /**
@@ -55,59 +54,48 @@ interface IConsensus is IERC165, IFROSTCoordinatorCallback {
      * @notice Gets a transaction attestation for a specific epoch and transaction.
      * @param epoch The epoch in which the transaction was proposed.
      * @param transaction The Safe transaction to query the attestation for.
-     * @return message The EIP-712 message hash of the proposal.
      * @return signature The FROST signature attesting to the transaction.
      */
-    function getAttestation(uint64 epoch, SafeTransaction.T memory transaction)
+    function getTransactionAttestation(uint64 epoch, SafeTransaction.T memory transaction)
         external
         view
-        returns (bytes32 message, FROST.Signature memory signature);
+        returns (FROST.Signature memory signature);
 
     /**
      * @notice Gets a transaction attestation for a specific epoch and transaction hash.
      * @param epoch The epoch in which the transaction was proposed.
      * @param transactionHash The Safe transaction hash to query the attestation for.
-     * @return message The EIP-712 message hash of the proposal.
      * @return signature The FROST signature attesting to the transaction.
      */
-    function getAttestationByHash(uint64 epoch, bytes32 transactionHash)
+    function getTransactionAttestationByHash(uint64 epoch, bytes32 transactionHash)
         external
         view
-        returns (bytes32 message, FROST.Signature memory signature);
-
-    /**
-     * @notice Gets a transaction attestation by its transaction proposal hash.
-     * @param message The EIP-712 message hash of the proposal.
-     * @return signature The FROST signature attesting to the transaction.
-     */
-    function getAttestationByMessage(bytes32 message) external view returns (FROST.Signature memory signature);
+        returns (FROST.Signature memory signature);
 
     /**
      * @notice Gets a recent transaction attestation.
      * @param transaction The Safe transaction to query the attestation for.
      * @return epoch The recent epoch that the transaction was attested in.
-     * @return message The EIP-712 message hash of the proposal.
      * @return signature The FROST signature attesting to the transaction.
      * @dev This method will fail if the attestation did not happen in either the active or previous epochs. This is
      *      provided as a convenience method to clients who may want to query an attestation for a transaction they
      *      recently proposed for validator approval.
      */
-    function getRecentAttestation(SafeTransaction.T memory transaction)
+   function getRecentTransactionAttestation(SafeTransaction.T memory transaction)
         external
         view
-        returns (uint64 epoch, bytes32 message, FROST.Signature memory signature);
+        returns (uint64 epoch, FROST.Signature memory signature);
 
     /**
      * @notice Gets a recent transaction attestation by transaction hash.
      * @param transactionHash The hash of the Safe transaction.
      * @return epoch The recent epoch that the transaction was attested in.
-     * @return message The EIP-712 message hash of the proposal.
      * @return signature The FROST signature attesting to the transaction.
      */
-    function getRecentAttestationByHash(bytes32 transactionHash)
+    function getRecentTransactionAttestationByHash(bytes32 transactionHash)
         external
         view
-        returns (uint64 epoch, bytes32 message, FROST.Signature memory signature);
+        returns (uint64 epoch, FROST.Signature memory signature);
 
     /**
      * @notice Gets the active epoch and its group ID.
@@ -117,18 +105,26 @@ interface IConsensus is IERC165, IFROSTCoordinatorCallback {
     function getActiveEpoch() external view returns (uint64 epoch, FROSTGroupId.T group);
 
     /**
-     * @notice Gets the current epochs (previous, active, staged).
-     * @return epochs The current active epoch.
+     * @notice Gets the internal epochs state.
+     * @return epochs The epochs state tracking previous, active, and staged epochs.
      */
-    function getCurrentEpochs() external view returns (Epochs memory epochs);
+    function getEpochsState() external view returns (Epochs memory epochs);
 
     /**
      * @notice Gets the group info for a specific epoch
      * @param epoch The epoch for which the group should be retrieved
      * @return group The FROST group ID for the specified epoch.
-     * @return groupKey The public key for the specified epoch's group.
      */
-    function getEpochGroup(uint64 epoch) external view returns (FROSTGroupId.T group, Secp256k1.Point memory groupKey);
+    function getEpochGroupId(uint64 epoch) external view returns (FROSTGroupId.T group);
+
+    /**
+     * @notice Gets the FROST signature ID of an attestation to the specified rollover or transaction message.
+     * @param message The message to query an attestation signature ID for.
+     * @return signature The signature ID of the attested message; a zero value indicates the message was never
+     *                    attested to.
+     */
+    function getAttestationSignatureId(bytes32 message) external view returns (FROSTSignatureId.T signature);
+
 
     // ============================================================
     // EXTERNAL AND PUBLIC STATE-CHANGING FUNCTIONS
@@ -162,12 +158,11 @@ interface IConsensus is IERC165, IFROSTCoordinatorCallback {
     /**
      * @notice Proposes a transaction for validator approval.
      * @param transaction The Safe transaction to propose.
-     * @return message The EIP-712 message hash of the proposal.
      * @return transactionHash The Safe transaction hash.
      */
     function proposeTransaction(SafeTransaction.T memory transaction)
         external
-        returns (bytes32 message, bytes32 transactionHash);
+        returns (bytes32 transactionHash);
 
     /**
      * @notice Proposes a transaction for validator approval, only specifying the basic transaction properties.
@@ -177,7 +172,6 @@ interface IConsensus is IERC165, IFROSTCoordinatorCallback {
      * @param value Native token value of the Safe transaction.
      * @param data Data payload of the Safe transaction.
      * @param nonce Safe transaction nonce.
-     * @return message The EIP-712 message hash of the proposal.
      * @return transactionHash The Safe transaction hash.
      * @dev This is provided as a convenience method for proposing transactions with the most common parameters.
      */
@@ -188,7 +182,7 @@ interface IConsensus is IERC165, IFROSTCoordinatorCallback {
         uint256 value,
         bytes memory data,
         uint256 nonce
-    ) external returns (bytes32 message, bytes32 transactionHash);
+    ) external returns (bytes32 transactionHash);
 
     /**
      * @notice Attests to a transaction.

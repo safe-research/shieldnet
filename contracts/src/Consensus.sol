@@ -193,14 +193,7 @@ contract Consensus is IConsensus {
         view
         returns (FROST.Signature memory signature)
     {
-        message = domainSeparator().transactionProposal(epoch, transactionHash);
-        signature = getAttestationByMessage(message);
-    }
-
-    /**
-     * @inheritdoc IConsensus
-     */
-    function getAttestationByMessage(bytes32 message) public view returns (FROST.Signature memory signature) {
+        bytes32 message = domainSeparator().transactionProposal(epoch, transactionHash);
         return COORDINATOR.signatureValue($attestations[message]);
     }
 
