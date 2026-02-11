@@ -12,7 +12,6 @@ import {IERC165} from "@/interfaces/IERC165.sol";
  * @title Consensus Interface
  */
 interface IConsensus is IERC165, IFROSTCoordinatorCallback {
-
     // ============================================================
     // STRUCTS
     // ============================================================
@@ -38,7 +37,7 @@ interface IConsensus is IERC165, IFROSTCoordinatorCallback {
         uint64 active;
         uint64 staged;
         uint64 rolloverBlock;
-    }    
+    }
 
     // ============================================================
     // EXTERNAL AND PUBLIC VIEW FUNCTIONS
@@ -81,7 +80,7 @@ interface IConsensus is IERC165, IFROSTCoordinatorCallback {
      *      provided as a convenience method to clients who may want to query an attestation for a transaction they
      *      recently proposed for validator approval.
      */
-   function getRecentTransactionAttestation(SafeTransaction.T memory transaction)
+    function getRecentTransactionAttestation(SafeTransaction.T memory transaction)
         external
         view
         returns (uint64 epoch, FROST.Signature memory signature);
@@ -125,7 +124,6 @@ interface IConsensus is IERC165, IFROSTCoordinatorCallback {
      */
     function getAttestationSignatureId(bytes32 message) external view returns (FROSTSignatureId.T signature);
 
-
     // ============================================================
     // EXTERNAL AND PUBLIC STATE-CHANGING FUNCTIONS
     // ============================================================
@@ -160,9 +158,7 @@ interface IConsensus is IERC165, IFROSTCoordinatorCallback {
      * @param transaction The Safe transaction to propose.
      * @return transactionHash The Safe transaction hash.
      */
-    function proposeTransaction(SafeTransaction.T memory transaction)
-        external
-        returns (bytes32 transactionHash);
+    function proposeTransaction(SafeTransaction.T memory transaction) external returns (bytes32 transactionHash);
 
     /**
      * @notice Proposes a transaction for validator approval, only specifying the basic transaction properties.

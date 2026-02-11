@@ -438,10 +438,7 @@ contract Consensus is IConsensus {
      * @return Whether or not the interface is supported.
      */
     function supportsInterface(bytes4 interfaceId) external view returns (bool) {
-        return
-            interfaceId == type(IConsensus).interfaceId ||
-            interfaceId == type(IFROSTCoordinatorCallback).interfaceId ||
-            interfaceId == type(IERC165).interfaceId;
+        return interfaceId == type(IConsensus).interfaceId || interfaceId == type(IFROSTCoordinatorCallback).interfaceId
+            || interfaceId == type(IERC165).interfaceId;
     }
-
 }
