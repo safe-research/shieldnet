@@ -42,12 +42,11 @@ export const handleEpochStaged = async (
 	// Clean up internal state and mark group as ready for signing
 	return {
 		consensus: {
-			stagedEpoch: event.proposedEpoch,
 			signatureIdToMessage: [status.signatureId],
 			groupPendingNonces: [groupId, true],
 		},
 		signing: [machineStates.rollover.message],
-		rollover: { id: "waiting_for_rollover" },
+		rollover: { id: "epoch_staged", nextEpoch: event.proposedEpoch },
 		actions,
 	};
 };

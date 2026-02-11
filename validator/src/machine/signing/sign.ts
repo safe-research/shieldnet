@@ -71,7 +71,7 @@ const checkAvailableNonces = (
 	sequence: bigint,
 	logger?: (msg: unknown) => void,
 ): Pick<StateDiff, "consensus"> & Pick<StateDiff, "actions"> => {
-	if (consensusState.activeEpoch === 0n && machineStates.rollover.id !== "waiting_for_rollover") {
+	if (consensusState.activeEpoch === 0n && machineStates.rollover.id !== "epoch_staged") {
 		// We are in the genesis setup
 		return {};
 	}

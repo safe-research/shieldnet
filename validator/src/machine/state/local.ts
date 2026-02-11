@@ -95,17 +95,6 @@ export class LocalConsensusStates implements ConsensusState {
 		this.tempState.activeEpoch = value;
 	}
 
-	public get stagedEpoch(): bigint {
-		if (this.tempState.stagedEpoch !== undefined) {
-			return this.tempState.stagedEpoch;
-		}
-		return this.immutableState.stagedEpoch;
-	}
-
-	public set stagedEpoch(value: bigint) {
-		this.tempState.stagedEpoch = value;
-	}
-
 	public get groupPendingNonces(): Record<Hex, boolean> {
 		return proxy(this.immutableState.groupPendingNonces, this.tempState.groupPendingNonces ?? {});
 	}

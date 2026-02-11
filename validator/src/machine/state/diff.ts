@@ -1,6 +1,6 @@
 import type { MutableConsensusState, MutableMachineStates, Optional, StateDiff } from "../types.js";
 
-export type UpdatableConsensusState = Optional<MutableConsensusState, "activeEpoch" | "stagedEpoch" | "genesisGroupId">;
+export type UpdatableConsensusState = Optional<MutableConsensusState, "activeEpoch" | "genesisGroupId">;
 export type UpdatableMachineState = Optional<MutableMachineStates, "rollover">;
 
 export const applyMachines = (diff: Pick<StateDiff, "rollover" | "signing">, machineStates: UpdatableMachineState) => {
@@ -30,9 +30,6 @@ export const applyConsensus = (diff: Pick<StateDiff, "consensus">, consensusStat
 		}
 		if (consensusDiff.activeEpoch !== undefined) {
 			consensusState.activeEpoch = consensusDiff.activeEpoch;
-		}
-		if (consensusDiff.stagedEpoch !== undefined) {
-			consensusState.stagedEpoch = consensusDiff.stagedEpoch;
 		}
 		if (consensusDiff.genesisGroupId !== undefined) {
 			consensusState.genesisGroupId = consensusDiff.genesisGroupId;

@@ -18,13 +18,12 @@ export class InMemoryStateStorage implements StateStorage {
 		this.#consensusState = {
 			epochGroups: {},
 			activeEpoch: 0n,
-			stagedEpoch: 0n,
 			groupPendingNonces: {},
 			signatureIdToMessage: {},
 			...consensus,
 		};
 		this.#machineStates = {
-			rollover: machines?.rollover ?? { id: "waiting_for_rollover" },
+			rollover: machines?.rollover ?? { id: "waiting_for_genesis" },
 			signing: machines?.signing ?? {},
 		};
 	}

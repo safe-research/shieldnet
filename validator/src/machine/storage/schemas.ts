@@ -60,8 +60,8 @@ export const signingQueryResultSchema = z.array(
 
 // --- 1. RolloverState Schemas ---
 
-const waitingForRolloverSchema = z.object({
-	id: z.literal("waiting_for_rollover"),
+const waitingForGenesisSchema = z.object({
+	id: z.literal("waiting_for_genesis"),
 });
 
 const skipEpochSchema = z.object({
@@ -113,13 +113,19 @@ const signRolloverSchema = z.object({
 	message: hexBytes32Schema,
 });
 
+const epochStagedSchema = z.object({
+	id: z.literal("epoch_staged"),
+	nextEpoch: coercedBigIntSchema,
+});
+
 export const rolloverStateSchema = z.discriminatedUnion("id", [
-	waitingForRolloverSchema,
+	waitingForGenesisSchema,
 	skipEpochSchema,
 	collectingCommitmentsSchema,
 	collectingSharesSchema,
 	collectingConfirmationsSchema,
 	signRolloverSchema,
+	epochStagedSchema,
 ]);
 
 // --- 2. SigningState Schemas ---
@@ -177,7 +183,6 @@ const groupInfoSchema = z.object({
 export const consensusStateSchema = z.object({
 	genesisGroupId: groupIdSchema.optional(),
 	activeEpoch: coercedBigIntSchema,
-	stagedEpoch: coercedBigIntSchema,
 	groupPendingNonces: z.record(groupIdSchema, z.boolean()),
 	epochGroups: z.record(z.string(), groupInfoSchema),
 	signatureIdToMessage: z.record(signatureIdSchema, hexBytes32Schema),

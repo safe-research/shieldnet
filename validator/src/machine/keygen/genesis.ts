@@ -16,9 +16,8 @@ export const handleGenesisKeyGen = async (
 	const genesisGroup = calcGenesisGroup(machineConfig);
 	logger?.(`Genesis group id: ${genesisGroup.id}`);
 	if (
-		machineStates.rollover.id === "waiting_for_rollover" &&
+		machineStates.rollover.id === "waiting_for_genesis" &&
 		consensusState.activeEpoch === 0n &&
-		consensusState.stagedEpoch === 0n &&
 		transition.gid === genesisGroup.id
 	) {
 		logger?.("Trigger Genesis Group Generation");

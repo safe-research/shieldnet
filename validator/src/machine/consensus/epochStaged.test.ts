@@ -74,7 +74,7 @@ describe("epoch staged", () => {
 	it("should not handle epoch if in unexpected rollover state", async () => {
 		const signingClient: SigningClient = {} as unknown as SigningClient;
 		const machineStates: MachineStates = {
-			rollover: { id: "waiting_for_rollover" },
+			rollover: { id: "waiting_for_genesis" },
 			signing: {},
 		};
 		const diff = await handleEpochStaged(signingClient, machineStates, EVENT);
@@ -124,9 +124,8 @@ describe("epoch staged", () => {
 				nonceCommitmentsHash: "0xdeadb055",
 			},
 		]);
-		expect(diff.rollover).toStrictEqual({ id: "waiting_for_rollover" });
+		expect(diff.rollover).toStrictEqual({ id: "epoch_staged", nextEpoch: 2n });
 		expect(diff.consensus).toStrictEqual({
-			stagedEpoch: 2n,
 			groupPendingNonces: ["0x5afe5af3", true],
 			signatureIdToMessage: ["0x5af35af3"],
 		});

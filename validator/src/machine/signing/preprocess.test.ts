@@ -7,7 +7,6 @@ import { handlePreprocess } from "./preprocess.js";
 // --- Test Data ---
 const CONSENSUS_STATE: ConsensusState = {
 	activeEpoch: 0n,
-	stagedEpoch: 0n,
 	groupPendingNonces: {
 		"0x000000000000000000000000000000000000000000000000000000005af35af3": true,
 	},
