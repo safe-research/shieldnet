@@ -10,7 +10,6 @@ import { handleTransactionProposed } from "./transactionProposed.js";
 // --- Test Data ---
 const CONSENSUS_STATE: ConsensusState = {
 	activeEpoch: 0n,
-	stagedEpoch: 0n,
 	groupPendingNonces: {},
 	epochGroups: {
 		"10": { groupId: "0x5af3", participantId: 1n },

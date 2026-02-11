@@ -43,7 +43,6 @@ const MACHINE_STATES: MachineStates = {
 
 const CONSENSUS_STATE: ConsensusState = {
 	activeEpoch: 0n,
-	stagedEpoch: 0n,
 	groupPendingNonces: {},
 	epochGroups: {},
 	signatureIdToMessage: {

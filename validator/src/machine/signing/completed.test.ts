@@ -30,7 +30,7 @@ const SIGNING_STATE: SigningState = {
 
 const MACHINE_STATES: MachineStates = {
 	rollover: {
-		id: "waiting_for_rollover",
+		id: "waiting_for_genesis",
 	},
 	signing: {
 		"0x5afe5afe": SIGNING_STATE,
@@ -39,7 +39,6 @@ const MACHINE_STATES: MachineStates = {
 
 const CONSENSUS_STATE: ConsensusState = {
 	activeEpoch: 0n,
-	stagedEpoch: 0n,
 	groupPendingNonces: {},
 	epochGroups: {},
 	signatureIdToMessage: {

@@ -63,7 +63,7 @@ const EVENT: KeyGenCommittedEvent = {
 describe("key gen committed", () => {
 	it("should not handle event if in unexpected state", async () => {
 		const machineStates: MachineStates = {
-			rollover: { id: "waiting_for_rollover" },
+			rollover: { id: "waiting_for_genesis" },
 			signing: {},
 		};
 		const keyGenClient = {} as unknown as KeyGenClient;

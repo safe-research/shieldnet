@@ -15,13 +15,12 @@ const TEST_POINT: FrostPoint = toPoint({
 });
 
 const MACHINE_STATES: MachineStates = {
-	rollover: { id: "waiting_for_rollover" },
+	rollover: { id: "waiting_for_genesis" },
 	signing: {},
 };
 
 const CONSENSUS_STATE: ConsensusState = {
 	activeEpoch: 0n,
-	stagedEpoch: 0n,
 	groupPendingNonces: {},
 	epochGroups: {},
 	signatureIdToMessage: {},
@@ -85,17 +84,6 @@ describe("gensis key gen", () => {
 		const consensusState: ConsensusState = {
 			...CONSENSUS_STATE,
 			activeEpoch: 1n,
-		};
-		const keyGenClient = {} as unknown as KeyGenClient;
-		const diff = await handleGenesisKeyGen(MACHINE_CONFIG, keyGenClient, consensusState, MACHINE_STATES, EVENT);
-
-		expect(diff).toStrictEqual({});
-	});
-
-	it("should not trigger genesis key gen when an epoch is staged", async () => {
-		const consensusState: ConsensusState = {
-			...CONSENSUS_STATE,
-			stagedEpoch: 1n,
 		};
 		const keyGenClient = {} as unknown as KeyGenClient;
 		const diff = await handleGenesisKeyGen(MACHINE_CONFIG, keyGenClient, consensusState, MACHINE_STATES, EVENT);

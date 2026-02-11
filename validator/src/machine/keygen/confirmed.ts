@@ -67,7 +67,8 @@ export const handleKeyGenConfirmed = async (
 				nonceCommitmentsHash: nonceTreeRoot,
 			},
 		];
-		return { consensus, rollover: { id: "waiting_for_rollover" }, actions };
+		// Epoch 0 (Genesis) is setup. This should trigger the first non-genesis key gen
+		return { consensus, rollover: { id: "epoch_staged", nextEpoch: 0n }, actions };
 	}
 
 	// All participants have confirmed - compute the epoch rollover message locally

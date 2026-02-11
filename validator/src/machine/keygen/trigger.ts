@@ -54,7 +54,7 @@ export const triggerKeyGen = (
 			id: "collecting_commitments",
 			nextEpoch: epoch,
 			groupId,
-			deadline: deadline,
+			deadline,
 		},
 		actions,
 	};

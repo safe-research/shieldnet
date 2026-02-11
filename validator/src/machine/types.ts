@@ -12,10 +12,9 @@ export type Complaints = {
 	total: bigint;
 };
 
-// TODO: adjust waiting_for_rollover to align with epoch_staged from specs
 export type RolloverState = Readonly<
 	| {
-			id: "waiting_for_rollover";
+			id: "waiting_for_genesis";
 	  }
 	| {
 			id: "epoch_skipped";
@@ -53,6 +52,10 @@ export type RolloverState = Readonly<
 			groupId: GroupId;
 			nextEpoch: bigint;
 			message: Hex;
+	  }
+	| {
+			id: "epoch_staged";
+			nextEpoch: bigint;
 	  }
 >;
 
@@ -99,7 +102,6 @@ export type GroupInfo = {
 export type ConsensusDiff = {
 	groupPendingNonces?: [GroupId, true?];
 	activeEpoch?: bigint;
-	stagedEpoch?: bigint;
 	genesisGroupId?: GroupId;
 	epochGroup?: [bigint, GroupInfo];
 	signatureIdToMessage?: [SignatureId, Hex?];
@@ -115,7 +117,6 @@ export type StateDiff = {
 export type MutableConsensusState = {
 	genesisGroupId?: GroupId;
 	activeEpoch: bigint;
-	stagedEpoch: bigint;
 	groupPendingNonces: Record<GroupId, boolean>;
 	epochGroups: Record<string, GroupInfo>;
 	signatureIdToMessage: Record<SignatureId, Hex>;
@@ -124,7 +125,6 @@ export type MutableConsensusState = {
 export type ConsensusState = Readonly<{
 	genesisGroupId?: GroupId;
 	activeEpoch: bigint;
-	stagedEpoch: bigint;
 	groupPendingNonces: Readonly<Record<GroupId, boolean>>;
 	epochGroups: Readonly<Record<string, Readonly<GroupInfo>>>;
 	signatureIdToMessage: Readonly<Record<SignatureId, Hex>>;

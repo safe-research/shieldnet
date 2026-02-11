@@ -36,7 +36,6 @@ const MACHINE_CONFIG: MachineConfig = {
 
 const CONSENSUS_STATE: ConsensusState = {
 	activeEpoch: 0n,
-	stagedEpoch: 0n,
 	genesisGroupId: "0x5af35afe",
 	groupPendingNonces: {},
 	epochGroups: {},
@@ -47,7 +46,7 @@ const CONSENSUS_STATE: ConsensusState = {
 // This avoids that nonce commitments are triggered every time
 const MACHINE_STATES: MachineStates = {
 	rollover: {
-		id: "waiting_for_rollover",
+		id: "waiting_for_genesis",
 	},
 	signing: {},
 };
@@ -66,7 +65,39 @@ describe("check rollover", () => {
 		expect(diff).toStrictEqual({});
 	});
 
-	it("should not trigger key gen if not waiting for rollover", async () => {
+	it("should not abort genesis key gen", async () => {
+		const protocol = {} as unknown as ShieldnetProtocol;
+		const keyGenClient = {} as unknown as KeyGenClient;
+		const machineStates: MachineStates = {
+			...MACHINE_STATES,
+			rollover: {
+				id: "collecting_commitments",
+				groupId: "0xda5afe3",
+				nextEpoch: 0n,
+				deadline: 22n,
+			},
+		};
+		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, CONSENSUS_STATE, machineStates, 1n);
+
+		expect(diff).toStrictEqual({});
+	});
+
+	it("should not abort genesis key gen in skipped state (this is an expected halt condition)", async () => {
+		const protocol = {} as unknown as ShieldnetProtocol;
+		const keyGenClient = {} as unknown as KeyGenClient;
+		const machineStates: MachineStates = {
+			...MACHINE_STATES,
+			rollover: {
+				id: "epoch_skipped",
+				nextEpoch: 0n,
+			},
+		};
+		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, CONSENSUS_STATE, machineStates, 1n);
+
+		expect(diff).toStrictEqual({});
+	});
+
+	it("should not trigger key gen if next epoch is still in the future", async () => {
 		const protocol = {} as unknown as ShieldnetProtocol;
 		const keyGenClient = {} as unknown as KeyGenClient;
 		const machineStates: MachineStates = {
@@ -81,45 +112,6 @@ describe("check rollover", () => {
 		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, CONSENSUS_STATE, machineStates, 1n);
 
 		expect(diff).toStrictEqual({});
-	});
-
-	it("should not trigger key gen if rollover is staged", async () => {
-		const protocol = {} as unknown as ShieldnetProtocol;
-		const keyGenClient = {} as unknown as KeyGenClient;
-		const consensus: ConsensusState = {
-			...CONSENSUS_STATE,
-			stagedEpoch: 1n,
-		};
-		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, consensus, MACHINE_STATES, 1n);
-
-		expect(diff).toStrictEqual({});
-	});
-
-	it("should update staged rollover without triggering key gen", async () => {
-		const protocol = {} as unknown as ShieldnetProtocol;
-		const keyGenClient = {} as unknown as KeyGenClient;
-		const machineStates: MachineStates = {
-			...MACHINE_STATES,
-			rollover: {
-				id: "collecting_commitments",
-				groupId: "0xda5afe3",
-				nextEpoch: 2n,
-				deadline: 22n,
-			},
-		};
-		const consensus: ConsensusState = {
-			...CONSENSUS_STATE,
-			stagedEpoch: 1n,
-		};
-		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, consensus, machineStates, 10n);
-
-		expect(diff.actions).toBeUndefined();
-		expect(diff.rollover).toBeUndefined();
-		expect(diff.consensus).toStrictEqual({
-			activeEpoch: 1n,
-			stagedEpoch: 0n,
-		});
-		expect(diff.signing).toBeUndefined();
 	});
 
 	it("should not trigger key gen if current epoch was skipped", async () => {
@@ -189,8 +181,6 @@ describe("check rollover", () => {
 		});
 		expect(diff.consensus).toStrictEqual({
 			epochGroup: [3n, { groupId: "0x5afe02", participantId: 3n }],
-			activeEpoch: 0n,
-			stagedEpoch: 0n,
 		});
 		expect(diff.signing).toBeUndefined();
 
@@ -203,7 +193,7 @@ describe("check rollover", () => {
 		);
 	});
 
-	it("should trigger key gen if no key gen is active", async () => {
+	it("should trigger key gen if key gen was aborted (in progress key gen is for a past epoch)", async () => {
 		const consensus = vi.fn();
 		consensus.mockReturnValueOnce(ethAddress);
 		const protocol = {
@@ -225,7 +215,16 @@ describe("check rollover", () => {
 		const keyGenClient = {
 			setupGroup,
 		} as unknown as KeyGenClient;
-		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, CONSENSUS_STATE, MACHINE_STATES, 10n);
+		const machineStates: MachineStates = {
+			...MACHINE_STATES,
+			rollover: {
+				id: "collecting_commitments",
+				groupId: "0xda5afe3",
+				nextEpoch: 1n,
+				deadline: 12n,
+			},
+		};
+		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, CONSENSUS_STATE, machineStates, 10n);
 
 		expect(diff.actions).toStrictEqual([
 			{
@@ -248,8 +247,6 @@ describe("check rollover", () => {
 		});
 		expect(diff.consensus).toStrictEqual({
 			epochGroup: [2n, { groupId: "0x5afe02", participantId: 3n }],
-			activeEpoch: 0n,
-			stagedEpoch: 0n,
 		});
 		expect(diff.signing).toBeUndefined();
 
@@ -262,7 +259,7 @@ describe("check rollover", () => {
 		);
 	});
 
-	it("should trigger key gen after rollover if no key gen is active", async () => {
+	it("should trigger key gen after when staged epoch becomes active", async () => {
 		const consensus = vi.fn();
 		consensus.mockReturnValueOnce(ethAddress);
 		const protocol = {
@@ -284,11 +281,11 @@ describe("check rollover", () => {
 		const keyGenClient = {
 			setupGroup,
 		} as unknown as KeyGenClient;
-		const consensusState: ConsensusState = {
-			...CONSENSUS_STATE,
-			stagedEpoch: 1n,
+		const machineStates: MachineStates = {
+			...MACHINE_STATES,
+			rollover: { id: "epoch_staged", nextEpoch: 1n },
 		};
-		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, consensusState, MACHINE_STATES, 10n);
+		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, CONSENSUS_STATE, machineStates, 10n);
 
 		expect(diff.actions).toStrictEqual([
 			{
@@ -312,7 +309,6 @@ describe("check rollover", () => {
 		expect(diff.consensus).toStrictEqual({
 			epochGroup: [2n, { groupId: "0x5afe02", participantId: 3n }],
 			activeEpoch: 1n,
-			stagedEpoch: 0n,
 		});
 		expect(diff.signing).toBeUndefined();
 

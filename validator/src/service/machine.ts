@@ -8,7 +8,6 @@ import { handleEpochStaged } from "../machine/consensus/epochStaged.js";
 import { checkEpochRollover } from "../machine/consensus/rollover.js";
 import { handleTransactionAttested } from "../machine/consensus/transactionAttested.js";
 import { handleTransactionProposed } from "../machine/consensus/transactionProposed.js";
-import { checkKeyGenAbort } from "../machine/keygen/abort.js";
 import { handleKeyGenCommitted } from "../machine/keygen/committed.js";
 import { handleComplaintResponded } from "../machine/keygen/complaintResponse.js";
 import { handleComplaintSubmitted } from "../machine/keygen/complaintSubmitted.js";
@@ -149,7 +148,17 @@ export class ShieldnetStateMachine {
 		}
 		this.#lastProcessedBlock = block;
 		this.#lastProcessedIndex = -1;
-		state.apply(checkKeyGenAbort(this.#machineConfig, state.consensus, state.machines, block, this.#logger.info));
+		state.apply(
+			checkEpochRollover(
+				this.#machineConfig,
+				this.#protocol,
+				this.#keyGenClient,
+				state.consensus,
+				state.machines,
+				block,
+				this.#logger.info,
+			),
+		);
 		state.apply(
 			checkKeyGenTimeouts(
 				this.#machineConfig,
@@ -171,18 +180,6 @@ export class ShieldnetStateMachine {
 		)) {
 			state.apply(diff);
 		}
-
-		state.apply(
-			checkEpochRollover(
-				this.#machineConfig,
-				this.#protocol,
-				this.#keyGenClient,
-				state.consensus,
-				state.machines,
-				block,
-				this.#logger.info,
-			),
-		);
 
 		return state.diffs;
 	}

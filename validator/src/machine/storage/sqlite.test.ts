@@ -47,8 +47,8 @@ const EPOCH_ROLLOVER_PACKET: EpochRolloverPacket = {
 };
 
 const ROLLOVER_TEST_STATES: { [K in RolloverState["id"]]: RolloverState & { id: K } } = {
-	waiting_for_rollover: {
-		id: "waiting_for_rollover",
+	waiting_for_genesis: {
+		id: "waiting_for_genesis",
 	},
 	epoch_skipped: {
 		id: "epoch_skipped",
@@ -103,6 +103,10 @@ const ROLLOVER_TEST_STATES: { [K in RolloverState["id"]]: RolloverState & { id: 
 		message: keccak256("0x5afe5afe5afe"),
 		nextEpoch: 1n,
 	},
+	epoch_staged: {
+		id: "epoch_staged",
+		nextEpoch: 1n,
+	},
 };
 
 describe("SqliteStateStorage", () => {
@@ -116,7 +120,7 @@ describe("SqliteStateStorage", () => {
 		it("should store and reinstantiate rollover state correctly", () => {
 			const originalStorage = new SqliteStateStorage(testDb);
 			expect(originalStorage.machineStates().rollover).toStrictEqual({
-				id: "waiting_for_rollover",
+				id: "waiting_for_genesis",
 			});
 			originalStorage.applyDiff({
 				rollover,
@@ -131,7 +135,6 @@ describe("SqliteStateStorage", () => {
 		const originalStorage = new SqliteStateStorage(testDb);
 		expect(originalStorage.consensusState()).toStrictEqual({
 			activeEpoch: 0n,
-			stagedEpoch: 0n,
 			epochGroups: {},
 			groupPendingNonces: {},
 			signatureIdToMessage: {},
@@ -139,7 +142,6 @@ describe("SqliteStateStorage", () => {
 		originalStorage.applyDiff({
 			consensus: {
 				activeEpoch: 1n,
-				stagedEpoch: 2n,
 				epochGroup: [
 					1n,
 					{ groupId: "0x5afe000000000000000000000000000000000000000000000000000000000000", participantId: 1n },
@@ -153,7 +155,6 @@ describe("SqliteStateStorage", () => {
 		});
 		expect(originalStorage.consensusState()).toStrictEqual({
 			activeEpoch: 1n,
-			stagedEpoch: 2n,
 			epochGroups: {
 				"1": { groupId: "0x5afe000000000000000000000000000000000000000000000000000000000000", participantId: 1n },
 			},
@@ -168,7 +169,6 @@ describe("SqliteStateStorage", () => {
 		const recoveredStorage = new SqliteStateStorage(testDb);
 		expect(recoveredStorage.consensusState()).toStrictEqual({
 			activeEpoch: 1n,
-			stagedEpoch: 2n,
 			epochGroups: {
 				"1": { groupId: "0x5afe000000000000000000000000000000000000000000000000000000000000", participantId: 1n },
 			},
@@ -190,7 +190,6 @@ describe("SqliteStateStorage", () => {
 		const cleanedStorage = new SqliteStateStorage(testDb);
 		expect(cleanedStorage.consensusState()).toStrictEqual({
 			activeEpoch: 1n,
-			stagedEpoch: 2n,
 			epochGroups: {
 				"1": { groupId: "0x5afe000000000000000000000000000000000000000000000000000000000000", participantId: 1n },
 			},

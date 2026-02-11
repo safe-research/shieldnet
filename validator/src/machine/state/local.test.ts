@@ -30,7 +30,7 @@ describe("LocalMachineStates", () => {
 	it("should return original state", () => {
 		const immutableState: MachineStates = {
 			rollover: {
-				id: "waiting_for_rollover",
+				id: "waiting_for_genesis",
 			},
 			signing: {
 				"0x5afe5afe": SIGNING_STATE,
@@ -38,7 +38,7 @@ describe("LocalMachineStates", () => {
 		};
 		const localState = new LocalMachineStates(immutableState);
 
-		expect(localState.rollover).toStrictEqual({ id: "waiting_for_rollover" });
+		expect(localState.rollover).toStrictEqual({ id: "waiting_for_genesis" });
 		expect(localState.signing["0x5afe5afe"]).toStrictEqual(SIGNING_STATE);
 	});
 
@@ -46,7 +46,7 @@ describe("LocalMachineStates", () => {
 		const signingState = (tag: number) => ({ ...SIGNING_STATE, deadline: BigInt(tag) });
 		const immutableState: MachineStates = {
 			rollover: {
-				id: "waiting_for_rollover",
+				id: "waiting_for_genesis",
 			},
 			signing: {
 				"0x5afe5afe00": signingState(0),
@@ -79,7 +79,7 @@ describe("LocalMachineStates", () => {
 	it("should return undefined for deleted state", () => {
 		const immutableState: MachineStates = {
 			rollover: {
-				id: "waiting_for_rollover",
+				id: "waiting_for_genesis",
 			},
 			signing: {
 				"0x5afe5afe": SIGNING_STATE,
@@ -98,7 +98,7 @@ describe("LocalMachineStates", () => {
 	it("should return updated state", () => {
 		const immutableState: MachineStates = {
 			rollover: {
-				id: "waiting_for_rollover",
+				id: "waiting_for_genesis",
 			},
 			signing: {
 				"0x5afe5afe": SIGNING_STATE,
@@ -125,7 +125,7 @@ describe("LocalMachineStates", () => {
 		expect(localState.rollover).toStrictEqual(updatedRollover);
 		expect(localState.signing["0x5afe5afe"]).toStrictEqual(updatedState);
 		expect(immutableState.rollover).toStrictEqual({
-			id: "waiting_for_rollover",
+			id: "waiting_for_genesis",
 		});
 		expect(immutableState.signing["0x5afe5afe"]).toStrictEqual(SIGNING_STATE);
 	});
@@ -135,7 +135,6 @@ describe("LocalConsensusStates", () => {
 	it("should return original state", () => {
 		const immutableState: ConsensusState = {
 			activeEpoch: 7n,
-			stagedEpoch: 11n,
 			groupPendingNonces: {
 				"0x5afe5afe": true,
 			},
@@ -149,7 +148,6 @@ describe("LocalConsensusStates", () => {
 		const localState = new LocalConsensusStates(immutableState);
 
 		expect(localState.activeEpoch).toBe(7n);
-		expect(localState.stagedEpoch).toBe(11n);
 		expect(localState.groupPendingNonces["0x5afe5afe"]).toBeTruthy();
 		expect(localState.epochGroups["0x5afe5af3"]).toStrictEqual({
 			groupId: "0x5afe5afe23",
@@ -161,7 +159,6 @@ describe("LocalConsensusStates", () => {
 	it("should return undefined for deleted state", () => {
 		const immutableState: ConsensusState = {
 			activeEpoch: 7n,
-			stagedEpoch: 11n,
 			groupPendingNonces: {
 				"0x5afe5afe": true,
 			},
@@ -186,7 +183,6 @@ describe("LocalConsensusStates", () => {
 
 		// Check that immutable state was not touched
 		expect(immutableState.activeEpoch).toBe(7n);
-		expect(immutableState.stagedEpoch).toBe(11n);
 		expect(immutableState.groupPendingNonces["0x5afe5afe"]).toBeTruthy();
 		expect(immutableState.epochGroups["0x5afe5af3"]).toStrictEqual({
 			groupId: "0x5afe5afe23",
@@ -198,7 +194,6 @@ describe("LocalConsensusStates", () => {
 	it("should return updated state", () => {
 		const immutableState: ConsensusState = {
 			activeEpoch: 7n,
-			stagedEpoch: 11n,
 			groupPendingNonces: {
 				"0x5afe5afe": true,
 			},
@@ -212,7 +207,6 @@ describe("LocalConsensusStates", () => {
 		const localState = new LocalConsensusStates(immutableState);
 		const _updatedState: ConsensusState = {
 			activeEpoch: 11n,
-			stagedEpoch: 13n,
 			groupPendingNonces: {
 				"0x5afe5afe": true,
 				"0x5afe5afe2": true,
@@ -229,7 +223,6 @@ describe("LocalConsensusStates", () => {
 		const diff: StateDiff = {
 			consensus: {
 				activeEpoch: 11n,
-				stagedEpoch: 13n,
 				groupPendingNonces: ["0x5afe5afe2", true],
 				epochGroup: [0x5afe5af5n, { groupId: "0x5afe5afe27", participantId: 1n }],
 				signatureIdToMessage: ["0x5afe5afe27", zeroHash],
@@ -238,7 +231,6 @@ describe("LocalConsensusStates", () => {
 		localState.apply(diff);
 
 		expect(localState.activeEpoch).toBe(11n);
-		expect(localState.stagedEpoch).toBe(13n);
 		expect(localState.groupPendingNonces["0x5afe5afe"]).toBeTruthy();
 		expect(localState.groupPendingNonces["0x5afe5afe2"]).toBeTruthy();
 		expect(localState.epochGroups["0x5afe5af3"]).toStrictEqual({
@@ -254,7 +246,6 @@ describe("LocalConsensusStates", () => {
 
 		// Check that immutable state was not touched
 		expect(immutableState.activeEpoch).toBe(7n);
-		expect(immutableState.stagedEpoch).toBe(11n);
 		expect(immutableState.groupPendingNonces["0x5afe5afe"]).toBeTruthy();
 		expect(immutableState.epochGroups["0x5afe5af3"]).toStrictEqual({
 			groupId: "0x5afe5afe23",

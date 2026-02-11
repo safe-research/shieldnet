@@ -51,7 +51,6 @@ const MACHINE_STATES: MachineStates = {
 
 const CONSENSUS_STATE: ConsensusState = {
 	activeEpoch: 0n,
-	stagedEpoch: 0n,
 	groupPendingNonces: {},
 	epochGroups: {},
 	signatureIdToMessage: {},
@@ -91,7 +90,7 @@ const EVENT: KeyGenConfirmedEvent = {
 describe("key gen confirmed", () => {
 	it("should not handle event if in unexpected state", async () => {
 		const machineStates: MachineStates = {
-			rollover: { id: "waiting_for_rollover" },
+			rollover: { id: "waiting_for_genesis" },
 			signing: {},
 		};
 		const keyGenClient = {} as unknown as KeyGenClient;
@@ -215,7 +214,7 @@ describe("key gen confirmed", () => {
 		);
 
 		expect(diff).toStrictEqual({
-			rollover: { id: "waiting_for_rollover" },
+			rollover: { id: "epoch_staged", nextEpoch: 0n },
 			consensus: {
 				groupPendingNonces: ["0x06cb03baac74421225341827941e88d9547e5459c4b3715c0000000000000000", true],
 			},

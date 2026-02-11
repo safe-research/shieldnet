@@ -40,11 +40,11 @@ const MACHINE_CONFIG: MachineConfig = {
 
 // --- Tests ---
 describe("key gen timeouts", () => {
-	it("should not timeout in waiting for rollover", () => {
+	it("should not timeout in waiting for genesis", () => {
 		const protocol = {} as unknown as ShieldnetProtocol;
 		const keyGenClient = {} as unknown as KeyGenClient;
 		const machineStates: MachineStates = {
-			rollover: { id: "waiting_for_rollover" },
+			rollover: { id: "waiting_for_genesis" },
 			signing: {},
 		};
 		const diff = checkKeyGenTimeouts(MACHINE_CONFIG, protocol, keyGenClient, machineStates, 10n);

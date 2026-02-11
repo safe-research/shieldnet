@@ -57,7 +57,7 @@ const SIGNING_STATE: SigningState = {
 // This avoids that nonce commitments are triggered every time
 const MACHINE_STATES: MachineStates = {
 	rollover: {
-		id: "waiting_for_rollover",
+		id: "waiting_for_genesis",
 	},
 	signing: {
 		[MESSAGE]: SIGNING_STATE,
