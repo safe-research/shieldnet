@@ -46,76 +46,64 @@ const EPOCH_ROLLOVER_PACKET: EpochRolloverPacket = {
 	},
 };
 
-const ROLLOVER_TEST_STATES = [
-	{
-		description: "epoch skipped",
-		rollover: {
-			id: "epoch_skipped",
-			nextEpoch: 1n,
-		} as RolloverState,
+const ROLLOVER_TEST_STATES: { [K in RolloverState["id"]]: RolloverState & { id: K } } = {
+	waiting_for_rollover: {
+		id: "waiting_for_rollover",
 	},
-	{
-		description: "collecting commitments",
-		rollover: {
-			id: "collecting_commitments",
-			groupId: "0x5afe000000000000000000000000000000000000000000000000000000000000",
-			deadline: 100n,
-			nextEpoch: 1n,
-		} as RolloverState,
+	epoch_skipped: {
+		id: "epoch_skipped",
+		nextEpoch: 1n,
 	},
-	{
-		description: "collecting shares",
-		rollover: {
-			id: "collecting_shares",
-			groupId: "0x5afe000000000000000000000000000000000000000000000000000000000000",
-			nextEpoch: 1n,
-			deadline: 100n,
-			missingSharesFrom: [1n],
-			complaints: {
-				"1": {
-					total: 2n,
-					unresponded: 1n,
-				},
-				"2": {
-					total: 1n,
-					unresponded: 0n,
-				},
+	collecting_commitments: {
+		id: "collecting_commitments",
+		groupId: "0x5afe000000000000000000000000000000000000000000000000000000000000",
+		deadline: 100n,
+		nextEpoch: 1n,
+	},
+	collecting_shares: {
+		id: "collecting_shares",
+		groupId: "0x5afe000000000000000000000000000000000000000000000000000000000000",
+		nextEpoch: 1n,
+		deadline: 100n,
+		missingSharesFrom: [1n],
+		complaints: {
+			"1": {
+				total: 2n,
+				unresponded: 1n,
 			},
-		} as RolloverState,
-	},
-	{
-		description: "collecting confirmations",
-		rollover: {
-			id: "collecting_confirmations",
-			groupId: "0x5afe000000000000000000000000000000000000000000000000000000000000",
-			nextEpoch: 1n,
-			deadline: 100n,
-			complaintDeadline: 80n,
-			responseDeadline: 60n,
-			missingSharesFrom: [1n],
-			complaints: {
-				"1": {
-					total: 2n,
-					unresponded: 1n,
-				},
-				"2": {
-					total: 1n,
-					unresponded: 0n,
-				},
+			"2": {
+				total: 1n,
+				unresponded: 0n,
 			},
-			confirmationsFrom: [1n],
-		} as RolloverState,
+		},
 	},
-	{
-		description: "sign rollover",
-		rollover: {
-			id: "sign_rollover",
-			groupId: "0x5afe000000000000000000000000000000000000000000000000000000000000",
-			message: keccak256("0x5afe5afe5afe"),
-			nextEpoch: 1n,
-		} as RolloverState,
+	collecting_confirmations: {
+		id: "collecting_confirmations",
+		groupId: "0x5afe000000000000000000000000000000000000000000000000000000000000",
+		nextEpoch: 1n,
+		deadline: 100n,
+		complaintDeadline: 80n,
+		responseDeadline: 60n,
+		missingSharesFrom: [1n],
+		complaints: {
+			"1": {
+				total: 2n,
+				unresponded: 1n,
+			},
+			"2": {
+				total: 1n,
+				unresponded: 0n,
+			},
+		},
+		confirmationsFrom: [1n],
 	},
-];
+	sign_rollover: {
+		id: "sign_rollover",
+		groupId: "0x5afe000000000000000000000000000000000000000000000000000000000000",
+		message: keccak256("0x5afe5afe5afe"),
+		nextEpoch: 1n,
+	},
+};
 
 describe("SqliteStateStorage", () => {
 	let testDb = new Sqlite3(":memory:");
@@ -124,7 +112,7 @@ describe("SqliteStateStorage", () => {
 		testDb = new Sqlite3(":memory:");
 	});
 
-	describe.each(ROLLOVER_TEST_STATES)("when $description", ({ rollover }) => {
+	describe.each(Object.values(ROLLOVER_TEST_STATES))("when $id", (rollover) => {
 		it("should store and reinstantiate rollover state correctly", () => {
 			const originalStorage = new SqliteStateStorage(testDb);
 			expect(originalStorage.machineStates().rollover).toStrictEqual({
