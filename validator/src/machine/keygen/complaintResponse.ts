@@ -63,7 +63,7 @@ export const handleComplaintResponded = async (
 
 	const actions: ProtocolAction[] = [];
 	if (sharesState === "shares_completed") {
-		logger?.info?.(`Valid complaint response from ${accusedId}`);
+		logger?.debug?.(`Valid complaint response from ${accusedId}`);
 		const nextEpoch = machineStates.rollover.nextEpoch;
 		const callbackContext = buildKeyGenCallback(machineConfig, nextEpoch);
 		actions.push({
