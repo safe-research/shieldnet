@@ -19,22 +19,13 @@ export function SearchBar({
 	const handleSelected = () => {
 		const cleanInput = idInput.trim();
 		if (cleanInput.length === 0) return;
-		if (selectedNetwork === "Safenet") {
-			navigate({
-				to: "/proposal",
-				search: {
-					id: cleanInput,
-				},
-			});
-		} else {
-			navigate({
-				to: "/safeTx",
-				search: {
-					chainId: selectedNetwork,
-					safeTxHash: cleanInput,
-				},
-			});
-		}
+		navigate({
+			to: "/safeTx",
+			search: {
+				chainId: selectedNetwork,
+				safeTxHash: cleanInput,
+			},
+		});
 	};
 	return (
 		<div className={cn("flex justify-center w-full", className)}>
@@ -49,9 +40,6 @@ export function SearchBar({
 							{info.name}
 						</option>
 					))}
-					<option key="Safenet" value="Safenet">
-						Safenet
-					</option>
 				</select>
 				<input
 					className="p-2 flex-1 text-xs"

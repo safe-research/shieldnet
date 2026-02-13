@@ -2,8 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { Container } from "@/components/Groups";
 import { SearchBar } from "@/components/search/SearchBar";
-import { TransactionProposalList } from "@/components/transaction/Proposals";
-import { useRecentTransactionProposals } from "@/hooks/useRecentTransactions";
+import { RecentTransactionProposals } from "@/components/transaction/RecentTransactionProposals";
+import { useRecentTransactionProposals } from "@/hooks/useRecentTransactionProposals";
 import { SAFE_SERVICE_CHAINS } from "@/lib/chains";
 
 export function App() {
@@ -13,7 +13,7 @@ export function App() {
 const PAGE_SIZE = 10;
 
 function AppInner() {
-	const recentProposals = useRecentTransactionProposals();
+	const proposals = useRecentTransactionProposals();
 	const { limit, network } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
@@ -32,6 +32,7 @@ function AppInner() {
 			replace: true,
 		});
 	};
+
 	return (
 		<Container>
 			<div className="text-center mb-12">
@@ -41,10 +42,10 @@ function AppInner() {
 
 			<SearchBar className="mb-8" onSelectNetwork={updateSelectedNetwork} selectedNetwork={network} />
 
-			{recentProposals.data.length > 0 && (
-				<TransactionProposalList
-					proposals={recentProposals.data}
-					itemsToDisplay={limit ?? PAGE_SIZE}
+			{proposals.data.length > 0 && (
+				<RecentTransactionProposals
+					proposals={proposals.data}
+					itemsToShow={limit ?? PAGE_SIZE}
 					onShowMore={handleShowMore}
 				/>
 			)}

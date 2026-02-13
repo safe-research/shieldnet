@@ -1,6 +1,6 @@
 import {
-	type AbiEvent,
 	type Address,
+	formatLog,
 	getAbiItem,
 	type Hex,
 	type Log,
@@ -8,10 +8,11 @@ import {
 	type PublicClient,
 	parseAbi,
 	parseEventLogs,
+	toEventSelector,
 } from "viem";
 import z from "zod";
-import { bigIntSchema, bytes32Schema, checkedAddressSchema, hexDataSchema } from "./schemas";
-import { jsonReplacer } from "./utils";
+import { bigIntSchema, checkedAddressSchema, hexDataSchema } from "@/lib/schemas";
+import { jsonReplacer } from "@/lib/utils";
 
 const consensusAbi = parseAbi([
 	"function getActiveEpoch() external view returns (uint64 epoch, bytes32 group)",
@@ -56,30 +57,22 @@ export const safeTransactionSchema = z.object({
 	nonce: bigIntSchema,
 });
 
-export const transactionProposedSchema = z.object({
-	proposedAt: bigIntSchema,
-	transactionHash: bytes32Schema,
-	chainId: bigIntSchema,
-	safe: checkedAddressSchema,
-	epoch: bigIntSchema,
-	transaction: safeTransactionSchema,
-});
-
 export type SafeTransaction = z.output<typeof safeTransactionSchema>;
 
-export type TransactionProposal = z.output<typeof transactionProposedSchema>;
+export type TransactionProposal = {
+	safeTxHash: Hex;
+	epoch: bigint;
+	transaction: SafeTransaction;
+	proposedAt: bigint;
+	attestedAt: bigint | null;
+};
 
 const MAX_BLOCKS_RANGE = 50000n;
 
 const getFromBlock = async (provider: PublicClient): Promise<bigint> => {
-	const blockNo = await provider.getBlockNumber();
-	return blockNo > MAX_BLOCKS_RANGE ? blockNo - MAX_BLOCKS_RANGE : 0n;
+	const blockNumber = await provider.getBlockNumber();
+	return blockNumber > MAX_BLOCKS_RANGE ? blockNumber - MAX_BLOCKS_RANGE : 0n;
 };
-
-const transactionProposedEvent = getAbiItem({
-	abi: consensusAbi,
-	name: "TransactionProposed",
-});
 
 const mostRecentFirst = <T extends Pick<Log<bigint, number, false>, "blockNumber" | "logIndex">>(logs: T[]): T[] =>
 	logs.sort((left, right) => {
@@ -89,103 +82,98 @@ const mostRecentFirst = <T extends Pick<Log<bigint, number, false>, "blockNumber
 		return right.logIndex - left.logIndex;
 	});
 
-const parseTransactionProposal = <E extends AbiEvent>(
-	log: Log<bigint, number, false, E> | null | undefined,
-): TransactionProposal | undefined =>
-	transactionProposedSchema.safeParse({
-		...log?.args,
-		proposedAt: log?.blockNumber,
-	}).data;
+const transactionEventSelectors = ["TransactionProposed" as const, "TransactionAttested" as const].map((eventName) =>
+	toEventSelector(
+		getAbiItem({
+			abi: consensusAbi,
+			name: eventName,
+		}),
+	),
+);
 
-export const loadProposalsForTransaction = async (
-	provider: PublicClient,
-	consensus: Address,
-	proposalTxHash: Hex,
-): Promise<TransactionProposal[]> => {
+export const loadProposedSafeTransaction = async ({
+	provider,
+	consensus,
+	safeTxHash,
+}: {
+	provider: PublicClient;
+	consensus: Address;
+	safeTxHash: Hex;
+}): Promise<SafeTransaction | null> => {
 	const fromBlock = await getFromBlock(provider);
 	const logs = await provider.getLogs({
 		address: consensus,
-		event: transactionProposedEvent,
+		event: getAbiItem({
+			abi: consensusAbi,
+			name: "TransactionProposed",
+		}),
 		args: {
-			transactionHash: proposalTxHash,
+			transactionHash: safeTxHash,
 		},
 		fromBlock,
+		strict: true,
 	});
-	return mostRecentFirst(logs)
-		.map(parseTransactionProposal)
-		.filter((e) => e !== undefined);
+	return safeTransactionSchema.safeParse(logs.at(0)?.args?.transaction).data ?? null;
 };
 
-export const loadRecentTransactionProposals = async (
-	provider: PublicClient,
-	consensus: Address,
-): Promise<TransactionProposal[]> => {
-	const fromBlock = await getFromBlock(provider);
-	const logs = await provider.getLogs({
-		address: consensus,
-		event: transactionProposedEvent,
-		fromBlock,
-	});
-	return mostRecentFirst(logs)
-		.map(parseTransactionProposal)
-		.filter((e) => e !== undefined);
-};
-
-export type TransactionDetails = {
-	proposal: TransactionProposal;
-	attestedAt: bigint | null;
-};
-
-export const loadTransactionProposalDetails = async (
-	provider: PublicClient,
-	consensus: Address,
-	safeTxHash: Hex,
-): Promise<TransactionDetails | null> => {
+export const loadTransactionProposals = async ({
+	provider,
+	consensus,
+	safeTxHash,
+}: {
+	provider: PublicClient;
+	consensus: Address;
+	safeTxHash?: Hex;
+}): Promise<TransactionProposal[]> => {
+	// We use an `eth_getLogs` here directly, in order to filter on the `transactionHash` of both `TransactionProposed`
+	// and `TransactionAttested` events.
 	const fromBlock = await getFromBlock(provider);
 	const logs = await provider.request({
 		method: "eth_getLogs",
 		params: [
 			{
 				address: consensus,
-				topics: [null, safeTxHash],
+				topics: [transactionEventSelectors, safeTxHash ?? null],
 				fromBlock: numberToHex(fromBlock),
 			},
 		],
 	});
-	const events = mostRecentFirst(
+	const eventLogs = mostRecentFirst(
 		parseEventLogs({
-			logs,
+			// <https://github.com/wevm/viem/issues/4340>
+			logs: logs.map((log) => formatLog(log)),
 			abi: consensusAbi,
 			strict: true,
 		}),
 	);
 
-	// First look for attestations, and try to return transaction details for it.
-	for (const attestation of events.filter((e) => e.eventName === "TransactionAttested")) {
-		const proposal = parseTransactionProposal(
-			events.find((e) => e.eventName === "TransactionProposed" && e.args.epoch === attestation.args.epoch),
-		);
-		if (proposal === undefined) {
-			continue;
-		}
+	const attestationKey = (log: { args: { transactionHash: Hex; epoch: bigint } }) =>
+		`${log.args.transactionHash}:${log.args.epoch}`;
+	const attestations = new Map(
+		eventLogs
+			.filter((log) => log.eventName === "TransactionAttested")
+			.map((log) => [attestationKey(log), log.blockNumber] as const),
+	);
+	return eventLogs
+		.map((log) => {
+			if (log.eventName !== "TransactionProposed") {
+				return undefined;
+			}
 
-		return {
-			proposal,
-			attestedAt: attestation.blockNumber,
-		};
-	}
+			const transaction = safeTransactionSchema.safeParse(log.args.transaction);
+			if (!transaction.success) {
+				return undefined;
+			}
 
-	// If we can't find an attestation with a matching transaction proposal, return the most recent pending proposal.
-	const proposal = parseTransactionProposal(events.find((e) => e.eventName === "TransactionProposed"));
-	if (proposal !== undefined) {
-		return {
-			proposal,
-			attestedAt: null,
-		};
-	}
-
-	// We can't find anything...
-	return null;
+			return {
+				safeTxHash: log.args.transactionHash,
+				epoch: log.args.epoch,
+				transaction: transaction.data,
+				proposedAt: log.blockNumber,
+				attestedAt: attestations.get(attestationKey(log)) ?? null,
+			};
+		})
+		.filter((proposal) => proposal !== undefined);
 };
 
 export const postTransactionProposal = async (url: string, transaction: SafeTransaction) => {
