@@ -4,7 +4,7 @@ import type { KeyGenClient } from "../../consensus/keyGen/client.js";
 import type { SafenetProtocol } from "../../consensus/protocol/types.js";
 import { toPoint } from "../../frost/math.js";
 import type { FrostPoint } from "../../frost/types.js";
-import type { ConsensusState, MachineConfig, MachineStates } from "../types.js";
+import type { MachineConfig, MachineStates } from "../types.js";
 import { checkEpochRollover } from "./rollover.js";
 
 // --- Test Data ---
@@ -34,14 +34,6 @@ const MACHINE_CONFIG: MachineConfig = {
 	blocksPerEpoch: 10n,
 };
 
-const CONSENSUS_STATE: ConsensusState = {
-	activeEpoch: 0n,
-	genesisGroupId: "0x5af35afe",
-	groupPendingNonces: {},
-	epochGroups: {},
-	signatureIdToMessage: {},
-};
-
 // By default we setup in a genesis state
 // This avoids that nonce commitments are triggered every time
 const MACHINE_STATES: MachineStates = {
@@ -56,11 +48,7 @@ describe("check rollover", () => {
 	it("should not trigger key gen in genesis state", async () => {
 		const protocol = {} as unknown as SafenetProtocol;
 		const keyGenClient = {} as unknown as KeyGenClient;
-		const consensus: ConsensusState = {
-			...CONSENSUS_STATE,
-			genesisGroupId: undefined,
-		};
-		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, consensus, MACHINE_STATES, 1n);
+		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, MACHINE_STATES, 1n);
 
 		expect(diff).toStrictEqual({});
 	});
@@ -77,7 +65,7 @@ describe("check rollover", () => {
 				deadline: 22n,
 			},
 		};
-		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, CONSENSUS_STATE, machineStates, 1n);
+		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, machineStates, 1n);
 
 		expect(diff).toStrictEqual({});
 	});
@@ -92,7 +80,7 @@ describe("check rollover", () => {
 				nextEpoch: 0n,
 			},
 		};
-		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, CONSENSUS_STATE, machineStates, 1n);
+		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, machineStates, 1n);
 
 		expect(diff).toStrictEqual({});
 	});
@@ -109,7 +97,7 @@ describe("check rollover", () => {
 				deadline: 22n,
 			},
 		};
-		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, CONSENSUS_STATE, machineStates, 1n);
+		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, machineStates, 1n);
 
 		expect(diff).toStrictEqual({});
 	});
@@ -124,7 +112,7 @@ describe("check rollover", () => {
 			},
 			signing: {},
 		};
-		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, CONSENSUS_STATE, machineState, 19n);
+		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, machineState, 19n);
 
 		expect(diff).toStrictEqual({});
 	});
@@ -158,7 +146,7 @@ describe("check rollover", () => {
 			},
 			signing: {},
 		};
-		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, CONSENSUS_STATE, machineState, 20n);
+		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, machineState, 20n);
 
 		expect(diff.actions).toStrictEqual([
 			{
@@ -224,7 +212,7 @@ describe("check rollover", () => {
 				deadline: 12n,
 			},
 		};
-		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, CONSENSUS_STATE, machineStates, 10n);
+		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, machineStates, 10n);
 
 		expect(diff.actions).toStrictEqual([
 			{
@@ -285,7 +273,7 @@ describe("check rollover", () => {
 			...MACHINE_STATES,
 			rollover: { id: "epoch_staged", nextEpoch: 1n },
 		};
-		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, CONSENSUS_STATE, machineStates, 10n);
+		const diff = checkEpochRollover(MACHINE_CONFIG, protocol, keyGenClient, machineStates, 10n);
 
 		expect(diff.actions).toStrictEqual([
 			{

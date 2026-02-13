@@ -1,6 +1,7 @@
 import type { KeyGenClient } from "../../consensus/keyGen/client.js";
 import type { SafenetProtocol } from "../../consensus/protocol/types.js";
 import type { Participant } from "../../consensus/storage/types.js";
+import type { Logger } from "../../utils/logging.js";
 import type { MachineConfig, MachineStates, RolloverState, StateDiff } from "../types.js";
 import { calcGroupContext } from "./group.js";
 import { triggerKeyGen } from "./trigger.js";
@@ -87,7 +88,7 @@ export const checkKeyGenTimeouts = (
 	keyGenClient: KeyGenClient,
 	machineStates: MachineStates,
 	block: bigint,
-	logger?: (msg: unknown, span?: unknown) => void,
+	logger?: Logger,
 ): StateDiff => {
 	const timeoutInfo = getTimeoutInfo(keyGenClient, machineStates.rollover, block);
 
@@ -96,7 +97,7 @@ export const checkKeyGenTimeouts = (
 		return {};
 	}
 
-	logger?.("Key gen timed out", { rollover: { id: machineStates.rollover.id }, timeoutInfo });
+	logger?.info?.("Key gen timed out", { rollover: { id: machineStates.rollover.id }, timeoutInfo });
 	const [adjustedParticipants, nextEpoch] = timeoutInfo;
 
 	// For next key gen only consider active participants

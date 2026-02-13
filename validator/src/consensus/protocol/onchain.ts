@@ -202,10 +202,10 @@ export class OnchainProtocol extends BaseProtocol {
 
 	private async submitAction(action: SimulateContractParameters): Promise<Hex | null> {
 		// 1. Get Network Baseline (The "Minimum Nonce")
-		// We use 'pending' to capture what the node knows about the mempool
+		// Use 'latest' as all pending transactions are tracked in the tx storage
 		const onChainNonce = await this.#publicClient.getTransactionCount({
 			address: this.#signingClient.account.address,
-			blockTag: "pending",
+			blockTag: "latest",
 		});
 
 		const calldata = encodeFunctionData(action);
