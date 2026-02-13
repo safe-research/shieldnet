@@ -1143,7 +1143,7 @@ describe("OnchainProtocol", () => {
 		expect(getTransactionCount).toBeCalledTimes(1);
 		expect(getTransactionCount).toBeCalledWith({
 			address: entryPoint09Address,
-			blockTag: "pending",
+			blockTag: "latest",
 		});
 		expect(register).toBeCalledTimes(1);
 		expect(register).toBeCalledWith(tx, 10);
@@ -1220,7 +1220,7 @@ describe("OnchainProtocol", () => {
 		expect(getTransactionCount).toBeCalledTimes(1);
 		expect(getTransactionCount).toBeCalledWith({
 			address: entryPoint09Address,
-			blockTag: "pending",
+			blockTag: "latest",
 		});
 		expect(register).toBeCalledTimes(1);
 		expect(register).toBeCalledWith(tx, 10);
@@ -1302,7 +1302,7 @@ describe("OnchainProtocol", () => {
 			expect(getTransactionCount).toBeCalledTimes(1);
 			expect(getTransactionCount).toBeCalledWith({
 				address: entryPoint09Address,
-				blockTag: "pending",
+				blockTag: "latest",
 			});
 			expect(register).toBeCalledTimes(1);
 			expect(register).toBeCalledWith(tx, 2);

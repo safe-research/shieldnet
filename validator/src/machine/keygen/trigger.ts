@@ -2,6 +2,7 @@ import type { Hex } from "viem";
 import type { KeyGenClient } from "../../consensus/keyGen/client.js";
 import type { ProtocolAction } from "../../consensus/protocol/types.js";
 import type { Participant } from "../../consensus/storage/types.js";
+import type { Logger } from "../../utils/logging.js";
 import type { MachineConfig, StateDiff } from "../types.js";
 import { calcMinimumParticipants, calcTreshold } from "./group.js";
 
@@ -12,10 +13,11 @@ export const triggerKeyGen = (
 	deadline: bigint,
 	participants: Participant[],
 	context: Hex,
-	logger?: (msg: unknown) => void,
+	logger?: Logger,
 ): StateDiff => {
 	const requiredParticipants = calcMinimumParticipants(machineConfig);
 	if (participants.length < requiredParticipants) {
+		logger?.info?.(`Skipped epoch ${epoch}!`, { requiredParticipants, participants });
 		return {
 			rollover: {
 				id: "epoch_skipped",
@@ -45,7 +47,7 @@ export const triggerKeyGen = (
 		},
 	];
 
-	logger?.(`Triggered key gen for epoch ${epoch} with ${groupId}`);
+	logger?.info?.(`Triggered key gen for epoch ${epoch} with ${groupId}`, { participants });
 	return {
 		consensus: {
 			epochGroup: [epoch, { groupId, participantId }],

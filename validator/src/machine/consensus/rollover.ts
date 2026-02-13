@@ -1,17 +1,17 @@
 import type { KeyGenClient } from "../../consensus/keyGen/client.js";
 import type { SafenetProtocol } from "../../consensus/protocol/types.js";
+import type { Logger } from "../../utils/logging.js";
 import { calcGroupContext } from "../keygen/group.js";
 import { triggerKeyGen } from "../keygen/trigger.js";
-import type { ConsensusState, MachineConfig, MachineStates, StateDiff } from "../types.js";
+import type { MachineConfig, MachineStates, StateDiff } from "../types.js";
 
 export const checkEpochRollover = (
 	machineConfig: MachineConfig,
 	protocol: SafenetProtocol,
 	keyGenClient: KeyGenClient,
-	_consensusState: ConsensusState,
 	machineStates: MachineStates,
 	block: bigint,
-	logger?: (msg: unknown) => void,
+	logger?: Logger,
 ): StateDiff => {
 	const currentEpoch = block / machineConfig.blocksPerEpoch;
 	const currentState = machineStates.rollover;
@@ -35,6 +35,7 @@ export const checkEpochRollover = (
 
 	const rolloverDiff: StateDiff = {};
 	if (currentState.id === "epoch_staged") {
+		logger?.info?.(`Rollover to epoch ${currentState.nextEpoch}`);
 		rolloverDiff.consensus = {
 			activeEpoch: currentState.nextEpoch,
 		};
@@ -42,7 +43,7 @@ export const checkEpochRollover = (
 
 	// Trigger key gen for next epoch
 	const nextEpoch = currentEpoch + 1n;
-	logger?.(`Trigger key gen for epoch ${nextEpoch}`);
+	logger?.info?.(`Trigger key gen for epoch ${nextEpoch}`);
 	// For each epoch rollover key gen trigger always use the default participants
 	// This allows previously removed validators to recover
 	const diff = triggerKeyGen(

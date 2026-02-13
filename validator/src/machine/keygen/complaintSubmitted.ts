@@ -1,5 +1,6 @@
 import type { KeyGenClient } from "../../consensus/keyGen/client.js";
 import type { ComplaintResponse, SafenetProtocol } from "../../consensus/protocol/types.js";
+import type { Logger } from "../../utils/logging.js";
 import type { KeyGenComplaintSubmittedEvent } from "../transitions/types.js";
 import type { MachineConfig, MachineStates, RolloverState, StateDiff } from "../types.js";
 import { calcGroupContext } from "./group.js";
@@ -11,7 +12,7 @@ export const handleComplaintSubmitted = async (
 	keyGenClient: KeyGenClient,
 	machineStates: MachineStates,
 	event: KeyGenComplaintSubmittedEvent,
-	logger?: (msg: unknown) => void,
+	logger?: Logger,
 ): Promise<StateDiff> => {
 	if (machineStates.rollover.id !== "collecting_shares" && machineStates.rollover.id !== "collecting_confirmations") {
 		return {};
@@ -41,7 +42,7 @@ export const handleComplaintSubmitted = async (
 	if (nextComplaint.total >= threshold) {
 		const participants = keyGenClient.participants(event.gid);
 		const nextParticipants = participants.filter((participant) => participant.id !== event.accused);
-		logger?.(`Restarting key gen after too many complaints against participant ${accusedId}`);
+		logger?.info?.(`Restarting key gen after too many complaints against participant ${accusedId}`);
 		return triggerKeyGen(
 			machineConfig,
 			keyGenClient,

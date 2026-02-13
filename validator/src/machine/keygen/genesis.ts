@@ -1,5 +1,6 @@
 import { maxUint64 } from "viem";
 import type { KeyGenClient } from "../../consensus/keyGen/client.js";
+import type { Logger } from "../../utils/logging.js";
 import type { KeyGenEvent } from "../transitions/types.js";
 import type { ConsensusState, MachineConfig, MachineStates, StateDiff } from "../types.js";
 import { calcGenesisGroup } from "./group.js";
@@ -11,16 +12,15 @@ export const handleGenesisKeyGen = async (
 	consensusState: ConsensusState,
 	machineStates: MachineStates,
 	transition: KeyGenEvent,
-	logger?: (msg: unknown) => void,
+	logger?: Logger,
 ): Promise<StateDiff> => {
 	const genesisGroup = calcGenesisGroup(machineConfig);
-	logger?.(`Genesis group id: ${genesisGroup.id}`);
 	if (
 		machineStates.rollover.id === "waiting_for_genesis" &&
 		consensusState.activeEpoch === 0n &&
 		transition.gid === genesisGroup.id
 	) {
-		logger?.("Trigger Genesis Group Generation");
+		logger?.info?.("Trigger Genesis Group Generation", { genesisGroup });
 		// Set no timeout for the genesis group generation
 		const diff = triggerKeyGen(
 			machineConfig,

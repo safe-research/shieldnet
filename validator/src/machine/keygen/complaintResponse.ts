@@ -1,5 +1,6 @@
 import type { KeyGenClient } from "../../consensus/keyGen/client.js";
 import type { ProtocolAction, SafenetProtocol } from "../../consensus/protocol/types.js";
+import type { Logger } from "../../utils/logging.js";
 import type { KeyGenComplaintResponsedEvent } from "../transitions/types.js";
 import type { MachineConfig, MachineStates, RolloverState, StateDiff } from "../types.js";
 import { calcGroupContext } from "./group.js";
@@ -12,7 +13,7 @@ export const handleComplaintResponded = async (
 	keyGenClient: KeyGenClient,
 	machineStates: MachineStates,
 	event: KeyGenComplaintResponsedEvent,
-	logger?: (msg: unknown) => void,
+	logger?: Logger,
 ): Promise<StateDiff> => {
 	if (machineStates.rollover.id !== "collecting_shares" && machineStates.rollover.id !== "collecting_confirmations") {
 		return {};
@@ -45,6 +46,7 @@ export const handleComplaintResponded = async (
 				: undefined;
 
 	if (sharesState === "invalid_share") {
+		logger?.info?.(`Invalid share submitted by ${accusedId}`);
 		const participants = keyGenClient
 			.participants(machineStates.rollover.groupId)
 			.filter((p) => p.id !== event.accused);
@@ -61,6 +63,7 @@ export const handleComplaintResponded = async (
 
 	const actions: ProtocolAction[] = [];
 	if (sharesState === "shares_completed") {
+		logger?.debug?.(`Valid complaint response from ${accusedId}`);
 		const nextEpoch = machineStates.rollover.nextEpoch;
 		const callbackContext = buildKeyGenCallback(machineConfig, nextEpoch);
 		actions.push({

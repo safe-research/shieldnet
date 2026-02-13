@@ -13,6 +13,7 @@ import { handleComplaintResponded } from "../machine/keygen/complaintResponse.js
 import { handleComplaintSubmitted } from "../machine/keygen/complaintSubmitted.js";
 import { handleKeyGenConfirmed } from "../machine/keygen/confirmed.js";
 import { handleGenesisKeyGen } from "../machine/keygen/genesis.js";
+import { calcGenesisGroup } from "../machine/keygen/group.js";
 import { handleKeyGenSecretShared } from "../machine/keygen/secretShares.js";
 import { checkKeyGenTimeouts } from "../machine/keygen/timeouts.js";
 import { handleSigningCompleted } from "../machine/signing/completed.js";
@@ -90,6 +91,10 @@ export class SafenetStateMachine {
 		this.#storage = storage;
 		this.#logger = logger;
 		this.#metrics = metrics;
+
+		// Log genesis group id on start
+		const genesisGroup = calcGenesisGroup(this.#machineConfig);
+		logger.info(`Genesis group id: ${genesisGroup.id}`);
 	}
 
 	transition(transition: StateTransition) {
@@ -149,25 +154,10 @@ export class SafenetStateMachine {
 		this.#lastProcessedBlock = block;
 		this.#lastProcessedIndex = -1;
 		state.apply(
-			checkEpochRollover(
-				this.#machineConfig,
-				this.#protocol,
-				this.#keyGenClient,
-				state.consensus,
-				state.machines,
-				block,
-				this.#logger.info,
-			),
+			checkEpochRollover(this.#machineConfig, this.#protocol, this.#keyGenClient, state.machines, block, this.#logger),
 		);
 		state.apply(
-			checkKeyGenTimeouts(
-				this.#machineConfig,
-				this.#protocol,
-				this.#keyGenClient,
-				state.machines,
-				block,
-				this.#logger.info,
-			),
+			checkKeyGenTimeouts(this.#machineConfig, this.#protocol, this.#keyGenClient, state.machines, block, this.#logger),
 		);
 
 		for (const diff of checkSigningTimeouts(
@@ -216,7 +206,7 @@ export class SafenetStateMachine {
 					consensusState,
 					machineStates,
 					transition,
-					this.#logger.info,
+					this.#logger,
 				);
 			}
 			case "event_key_gen_committed": {
@@ -244,7 +234,7 @@ export class SafenetStateMachine {
 					this.#keyGenClient,
 					machineStates,
 					transition,
-					this.#logger.info,
+					this.#logger,
 				);
 			}
 			case "event_key_gen_complaint_responded": {
@@ -254,7 +244,7 @@ export class SafenetStateMachine {
 					this.#keyGenClient,
 					machineStates,
 					transition,
-					this.#logger.info,
+					this.#logger,
 				);
 			}
 			case "event_key_gen_confirmed": {
