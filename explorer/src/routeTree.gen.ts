@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SafeTxRouteImport } from './routes/safeTx'
-import { Route as ProposalRouteImport } from './routes/proposal'
 import { Route as IndexRouteImport } from './routes/index'
 
 const SettingsRoute = SettingsRouteImport.update({
@@ -24,11 +23,6 @@ const SafeTxRoute = SafeTxRouteImport.update({
   path: '/safeTx',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProposalRoute = ProposalRouteImport.update({
-  id: '/proposal',
-  path: '/proposal',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -37,34 +31,30 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/proposal': typeof ProposalRoute
   '/safeTx': typeof SafeTxRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/proposal': typeof ProposalRoute
   '/safeTx': typeof SafeTxRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/proposal': typeof ProposalRoute
   '/safeTx': typeof SafeTxRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/proposal' | '/safeTx' | '/settings'
+  fullPaths: '/' | '/safeTx' | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/proposal' | '/safeTx' | '/settings'
-  id: '__root__' | '/' | '/proposal' | '/safeTx' | '/settings'
+  to: '/' | '/safeTx' | '/settings'
+  id: '__root__' | '/' | '/safeTx' | '/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ProposalRoute: typeof ProposalRoute
   SafeTxRoute: typeof SafeTxRoute
   SettingsRoute: typeof SettingsRoute
 }
@@ -85,13 +75,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SafeTxRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/proposal': {
-      id: '/proposal'
-      path: '/proposal'
-      fullPath: '/proposal'
-      preLoaderRoute: typeof ProposalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -104,7 +87,6 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ProposalRoute: ProposalRoute,
   SafeTxRoute: SafeTxRoute,
   SettingsRoute: SettingsRoute,
 }

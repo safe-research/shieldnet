@@ -2,7 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import z from "zod";
 import { ConditionalBackButton } from "@/components/BackButton";
 import { Box, Container, ContainerTitle } from "@/components/Groups";
-import { SafeTxOverview, TransactionDataDetails, TransactionProposals } from "@/components/transaction/SafeTxOverview";
+import { SafeTxDataDetails } from "@/components/transaction/SafeTxDataDetails";
+import { SafeTxOverview } from "@/components/transaction/SafeTxOverview";
+import { SafeTxProposals } from "@/components/transaction/SafeTxProposals";
+
 import { useSafeTransactionDetails } from "@/hooks/useSafeTransactionDetails";
 import { bigIntSchema, bytes32Schema } from "@/lib/schemas";
 
@@ -30,10 +33,10 @@ export function SafeTransaction() {
 						<SafeTxOverview title={`Safe Tx Hash: ${safeTxHash}`} transaction={details.data} />
 					</Box>
 					<Box>
-						<TransactionDataDetails data={details.data.data} />
+						<SafeTxDataDetails data={details.data.data} />
 					</Box>
 					<Box>
-						<TransactionProposals transaction={details.data} />
+						<SafeTxProposals transaction={details.data} />
 					</Box>
 				</div>
 			)}
