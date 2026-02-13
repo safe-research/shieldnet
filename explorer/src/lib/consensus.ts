@@ -153,10 +153,12 @@ export const loadTransactionProposals = async ({
 		}),
 	);
 
+	const attestationKey = (log: { args: { transactionHash: Hex; epoch: bigint } }) =>
+		`${log.args.transactionHash}:${log.args.epoch}`;
 	const attestations = new Map(
 		eventLogs
 			.filter((log) => log.eventName === "TransactionAttested")
-			.map((log) => [log.args.epoch, log.blockNumber] as const),
+			.map((log) => [attestationKey(log), log.blockNumber] as const),
 	);
 	return eventLogs
 		.map((log) => {
@@ -170,7 +172,7 @@ export const loadTransactionProposals = async ({
 			}
 
 			const calculatedSafeTxHash = calculateSafeTxHash(transaction.data);
-			if (calculatedSafeTxHash !== (safeTxHash ?? calculatedSafeTxHash)) {
+			if (safeTxHash !== undefined && calculatedSafeTxHash !== safeTxHash) {
 				return undefined;
 			}
 
@@ -179,7 +181,7 @@ export const loadTransactionProposals = async ({
 				epoch: log.args.epoch,
 				transaction: transaction.data,
 				proposedAt: log.blockNumber,
-				attestedAt: attestations.get(log.args.epoch) ?? null,
+				attestedAt: attestations.get(attestationKey(log)) ?? null,
 			};
 		})
 		.filter((proposal) => proposal !== undefined);

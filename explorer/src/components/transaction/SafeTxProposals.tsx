@@ -33,7 +33,7 @@ function SafeTxProposal({ proposal }: { proposal: TransactionProposal }) {
 		<Box className={`${isAttested ? "border-positive" : "border-pending"}`}>
 			<p>Proposed at block {proposal.proposedAt}</p>
 			{isAttested && <p>Attested at block {proposal.attestedAt}</p>}
-			{!isAttested && <p>Attestetation pending</p>}
+			{!isAttested && <p>Attestation pending</p>}
 		</Box>
 	);
 }
